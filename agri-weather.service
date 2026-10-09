@@ -1,0 +1,33 @@
+[Unit]
+Description=智慧农业天气系统 后端服务
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/agri-weather
+ExecStart=/usr/bin/java -jar /opt/agri-weather/agri-weather-server.jar --spring.profiles.active=prod
+
+# ============================================
+# ⚠️ 部署前必须修改以下三行！！！
+# ============================================
+Environment="DB_URL=jdbc:mysql://localhost:3306/agri_weather?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8"
+Environment="DB_USER=agri_app"
+Environment="DB_PASSWORD=改成你的数据库密码"
+Environment="JWT_SECRET=改成随机生成的256位密钥"
+Environment="CORS_ORIGINS=改成你的前端域名"
+
+# 安全加固
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# 自动重启
+Restart=always
+RestartSec=10
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

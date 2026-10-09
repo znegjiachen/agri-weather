@@ -1,0 +1,2165 @@
+/* ==============================================
+   UI Pro Max Design System — Weather App
+   ============================================== */
+
+/* ----- Design Tokens ----- */
+:root {
+  /* Glass layers */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-hover: rgba(255, 255, 255, 0.88);
+  --glass-bg-dark: rgba(30, 40, 50, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-border-dark: rgba(255, 255, 255, 0.08);
+  --glass-blur: 16px;
+  --glass-blur-heavy: 24px;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 24px rgba(255, 255, 255, 0.4);
+
+  /* Radius */
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-full: 9999px;
+
+  /* Text colors */
+  --text-primary: #1a202c;
+  --text-secondary: #5a6577;
+  --text-muted: #8896a6;
+  --text-light: #e2e8f0;
+  --text-light-muted: #94a3b8;
+
+  /* Transitions */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --transition-fast: 150ms var(--ease-out-expo);
+  --transition-base: 300ms var(--ease-out-expo);
+  --transition-slow: 500ms var(--ease-out-expo);
+}
+
+/* ----- Reset & Base ----- */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: var(--text-primary);
+  padding: 20px;
+  transition: background 1.2s var(--ease-out-expo);
+  overflow-x: hidden;
+}
+
+/* ==============================================
+   Dynamic Backgrounds (Pro Max Gradient System)
+   ============================================== */
+body.bg-sunny {
+  background: linear-gradient(160deg, #f6d365 0%, #fda085 25%, #4facfe 75%, #00f2fe 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+
+body.bg-cloudy {
+  background: linear-gradient(160deg, #a8c0ff 0%, #c2e9fb 30%, #667eea 70%, #3f2b96 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 10s ease infinite;
+}
+
+body.bg-rainy {
+  background: linear-gradient(160deg, #232526 0%, #414345 30%, #373b44 60%, #4286f4 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 8s ease infinite;
+}
+
+body.bg-snowy {
+  background: linear-gradient(160deg, #e6dada 0%, #cfd9df 30%, #a8c0ff 60%, #274046 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 10s ease infinite;
+}
+
+body.bg-night {
+  background: linear-gradient(160deg, #0f2027 0%, #1a2a6c 40%, #203a43 70%, #2c5364 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 15s ease infinite;
+}
+
+body.bg-thunder {
+  background: linear-gradient(160deg, #141e30 0%, #1a1a2e 30%, #232526 60%, #414345 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 6s ease infinite;
+}
+
+body.bg-default {
+  background: linear-gradient(160deg, #667eea 0%, #9b59b6 50%, #764ba2 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 12s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+}
+
+/* ==============================================
+   Particle Canvas
+   ============================================== */
+#particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ==============================================
+   Container & Layout
+   ============================================== */
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ==============================================
+   Header (Pro Max)
+   ============================================== */
+header {
+  text-align: center;
+  margin-bottom: 28px;
+  animation: slideDown 0.7s var(--ease-out-expo);
+}
+
+header h1 {
+  color: white;
+  font-size: 2.6rem;
+  font-weight: 700;
+  margin-bottom: 22px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.2), 0 0 40px rgba(255, 255, 255, 0.15);
+  letter-spacing: 3px;
+}
+
+header h1 .emoji {
+  display: inline-block;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Search Box — Enhanced */
+.search-box {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.search-box input {
+  padding: 14px 24px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  font-size: 16px;
+  width: 340px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm), 0 0 0 0 rgba(255, 255, 255, 0.4);
+  transition: all var(--transition-base);
+  backdrop-filter: blur(8px);
+}
+
+.search-box input:focus {
+  box-shadow: var(--shadow-md), 0 0 0 8px rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 1);
+}
+
+/* Search Buttons */
+.search-box button {
+  padding: 14px 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: white;
+  color: #667eea;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.search-box button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.5) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.search-box button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.search-box button:hover::after {
+  opacity: 1;
+}
+
+.search-box button:active {
+  transform: translateY(0) scale(0.97);
+  transition: transform 80ms ease;
+}
+
+#locationBtn {
+  background: linear-gradient(135deg, #48bb78, #3aa05f);
+  color: white;
+}
+
+#locationBtn:hover {
+  background: linear-gradient(135deg, #3aa05f, #2d8a4e);
+}
+
+/* Search History — Enhanced */
+.search-history {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  min-height: 32px;
+  animation: fadeIn 0.6s ease 0.3s both;
+}
+
+.history-chip {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: white;
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: all var(--transition-base);
+}
+
+.history-chip:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ==============================================
+   Pro Max Glassmorphism System
+   ============================================== */
+.glass {
+  position: relative;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Glass highlight — subtle top light reflection */
+.glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Dark theme glass adjustments */
+body.bg-night .glass,
+body.bg-thunder .glass,
+body.bg-rainy .glass {
+  background: var(--glass-bg-dark);
+  border: 1px solid var(--glass-border-dark);
+}
+
+/* ==============================================
+   Dark Mode Text Adjustments (Consolidated)
+   ============================================== */
+body.bg-night .glass *,
+body.bg-thunder .glass *,
+body.bg-rainy .glass * {
+  color-scheme: dark;
+}
+
+body.bg-night .current-weather h2,
+body.bg-thunder .current-weather h2,
+body.bg-rainy .current-weather h2 {
+  color: var(--text-light);
+}
+
+body.bg-night .temperature,
+body.bg-thunder .temperature,
+body.bg-rainy .temperature {
+  color: var(--text-light);
+}
+
+body.bg-night .detail-card span:last-child,
+body.bg-thunder .detail-card span:last-child,
+body.bg-rainy .detail-card span:last-child {
+  color: var(--text-light);
+}
+
+body.bg-night .forecast-section h3,
+body.bg-thunder .forecast-section h3,
+body.bg-rainy .forecast-section h3,
+body.bg-night .hourly-section h3,
+body.bg-thunder .hourly-section h3,
+body.bg-rainy .hourly-section h3 {
+  color: var(--text-light);
+}
+
+body.bg-night .unit,
+body.bg-thunder .unit,
+body.bg-rainy .unit,
+body.bg-night #currentDate,
+body.bg-thunder #currentDate,
+body.bg-rainy #currentDate,
+body.bg-night .detail-card .label,
+body.bg-thunder .detail-card .label,
+body.bg-rainy .detail-card .label,
+body.bg-night .forecast-item .day,
+body.bg-thunder .forecast-item .day,
+body.bg-rainy .forecast-item .day,
+body.bg-night .forecast-item .temp-low,
+body.bg-thunder .forecast-item .temp-low,
+body.bg-rainy .forecast-item .temp-low,
+body.bg-night .hourly-item .hour,
+body.bg-thunder .hourly-item .hour,
+body.bg-rainy .hourly-item .hour {
+  color: var(--text-light-muted);
+}
+
+body.bg-night .hourly-item .temp,
+body.bg-thunder .hourly-item .temp,
+body.bg-rainy .hourly-item .temp {
+  color: var(--text-light);
+}
+
+/* ==============================================
+   Unit Toggle — Enhanced
+   ============================================== */
+.top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+  animation: slideUp 0.6s var(--ease-out-expo) 0.1s both;
+}
+
+.unit-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-sm);
+}
+
+.unit-toggle button {
+  padding: 9px 22px;
+  border: none;
+  background: transparent;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+}
+
+.unit-toggle button:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.unit-toggle button.active {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: var(--radius-full);
+  color: #2d3748;
+  box-shadow: var(--shadow-sm);
+  transform: scale(1.05);
+}
+
+/* ==============================================
+   Current Weather — Pro Max
+   ============================================== */
+.current-weather {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: 40px 32px;
+  text-align: center;
+  margin-bottom: 20px;
+  overflow: hidden;
+  animation: cardEnter 0.7s var(--ease-out-expo) 0.15s both;
+}
+
+.current-weather:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  transition: all var(--transition-base);
+}
+
+.current-weather h2 {
+  font-size: 2.4rem;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+#currentDate {
+  color: var(--text-secondary);
+  margin-bottom: 22px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+
+.weather-icon {
+  font-size: 5rem;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.1));
+  animation: iconFloat 3s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(2deg); }
+  75% { transform: translateY(-10px) rotate(-2deg); }
+}
+
+.temperature {
+  font-size: 4.5rem;
+  font-weight: 200;
+  color: var(--text-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -2px;
+}
+
+.unit {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  vertical-align: super;
+  font-weight: 400;
+}
+
+#weatherDesc {
+  font-size: 1.3rem;
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+  font-weight: 500;
+}
+
+.sun-info {
+  display: flex;
+  justify-content: center;
+  gap: 36px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ==============================================
+   Weather Details — Animated Grid
+   ============================================== */
+.weather-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detail-card {
+  position: relative;
+  border-radius: var(--radius-md);
+  padding: 20px 16px;
+  text-align: center;
+  overflow: hidden;
+  animation: cardEnter 0.5s var(--ease-out-expo) both;
+}
+
+.detail-card:nth-child(1) { animation-delay: 0.2s; }
+.detail-card:nth-child(2) { animation-delay: 0.25s; }
+.detail-card:nth-child(3) { animation-delay: 0.3s; }
+.detail-card:nth-child(4) { animation-delay: 0.35s; }
+.detail-card:nth-child(5) { animation-delay: 0.4s; }
+.detail-card:nth-child(6) { animation-delay: 0.45s; }
+
+.detail-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  transition: all 0.35s var(--ease-out-back);
+}
+
+.detail-card .label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.detail-card span:last-child {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Detail card value pop on hover */
+.detail-card:hover span:last-child {
+  animation: valuePop 0.4s var(--ease-out-back);
+}
+
+@keyframes valuePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* ==============================================
+   Hourly Forecast — Smooth Scroll
+   ============================================== */
+.hourly-section {
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  margin-bottom: 20px;
+  animation: cardEnter 0.6s var(--ease-out-expo) 0.5s both;
+}
+
+.hourly-section h3 {
+  margin-bottom: 20px;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.hourly-list {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.hourly-list::-webkit-scrollbar {
+  height: 5px;
+}
+
+.hourly-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+}
+
+.hourly-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+}
+
+.hourly-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.hourly-item {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-md);
+  padding: 16px 12px;
+  text-align: center;
+  min-width: 72px;
+  scroll-snap-align: start;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+}
+
+body.bg-night .hourly-item,
+body.bg-thunder .hourly-item,
+body.bg-rainy .hourly-item {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hourly-item:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-md);
+}
+
+body.bg-night .hourly-item:hover,
+body.bg-thunder .hourly-item:hover,
+body.bg-rainy .hourly-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hourly-item:first-child {
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-glow);
+}
+
+.hourly-item .hour {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.hourly-item .icon {
+  font-size: 1.9rem;
+  margin-bottom: 8px;
+}
+
+.hourly-item .temp {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+/* ==============================================
+   Daily Forecast — Staggered Cards
+   ============================================== */
+.forecast-section {
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  animation: cardEnter 0.6s var(--ease-out-expo) 0.6s both;
+}
+
+.forecast-section h3 {
+  margin-bottom: 22px;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.forecast-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(95px, 1fr));
+  gap: 10px;
+}
+
+.forecast-item {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-md);
+  padding: 18px 12px;
+  text-align: center;
+  transition: all var(--transition-base);
+  border: 1px solid transparent;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.forecast-item:nth-child(1) { animation-delay: 0.65s; }
+.forecast-item:nth-child(2) { animation-delay: 0.7s; }
+.forecast-item:nth-child(3) { animation-delay: 0.75s; }
+.forecast-item:nth-child(4) { animation-delay: 0.8s; }
+.forecast-item:nth-child(5) { animation-delay: 0.85s; }
+.forecast-item:nth-child(6) { animation-delay: 0.9s; }
+.forecast-item:nth-child(7) { animation-delay: 0.95s; }
+
+body.bg-night .forecast-item,
+body.bg-thunder .forecast-item,
+body.bg-rainy .forecast-item {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.forecast-item:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-md);
+}
+
+body.bg-night .forecast-item:hover,
+body.bg-thunder .forecast-item:hover,
+body.bg-rainy .forecast-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.forecast-item:first-child {
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-glow);
+}
+
+.forecast-item .day {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.forecast-item .icon {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+  display: inline-block;
+  transition: transform var(--transition-base);
+}
+
+.forecast-item:hover .icon {
+  transform: scale(1.2);
+}
+
+.forecast-item .temp-high {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+
+.forecast-item .temp-low {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ==============================================
+   Temperature Bar (Visual range indicator)
+   ============================================== */
+.temp-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 2px;
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.temp-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #60a5fa, #f59e0b, #ef4444);
+  transition: width var(--transition-base);
+}
+
+/* ==============================================
+   Loading — Skeleton Pro Max
+   ============================================== */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: white;
+  animation: fadeIn 0.3s ease;
+}
+
+.spinner-container {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+}
+
+.spinner {
+  width: 56px;
+  height: 56px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-inner {
+  position: absolute;
+  inset: 10px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-bottom-color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: spin 1.2s linear infinite reverse;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading p {
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ==============================================
+   Error — Glass Error Panel
+   ============================================== */
+.error {
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  text-align: center;
+  margin-top: 20px;
+  animation: shake 0.6s var(--ease-out-expo);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-8px); }
+  30% { transform: translateX(8px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+  90% { transform: translateX(3px); }
+}
+
+.error p {
+  margin-bottom: 20px;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.retry-btn {
+  padding: 12px 32px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.retry-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+.retry-btn:active {
+  transform: scale(0.97);
+}
+
+/* ==============================================
+   Entry Animations
+   ============================================== */
+main {
+  animation: fadeInScale 0.5s var(--ease-out-expo);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ==============================================
+   Responsive (Pro Max enhanced)
+   ============================================== */
+@media (max-width: 640px) {
+  body {
+    padding: 14px;
+  }
+
+  header h1 {
+    font-size: 1.9rem;
+    letter-spacing: 1px;
+  }
+
+  .search-box input {
+    width: 100%;
+    font-size: 15px;
+    padding: 13px 20px;
+  }
+
+  .search-box button {
+    padding: 12px 22px;
+    font-size: 14px;
+  }
+
+  .temperature {
+    font-size: 3.5rem;
+  }
+
+  .weather-icon {
+    font-size: 4rem;
+  }
+
+  .weather-main {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .current-weather {
+    padding: 28px 20px;
+  }
+
+  .weather-details {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .detail-card {
+    padding: 16px 12px;
+  }
+
+  .forecast-list {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .forecast-item {
+    padding: 14px 8px;
+  }
+
+  .forecast-item .icon {
+    font-size: 1.8rem;
+  }
+
+  .hourly-item {
+    min-width: 65px;
+    padding: 12px 8px;
+  }
+
+  .hourly-section,
+  .forecast-section {
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 400px) {
+  .weather-details {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .forecast-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .temperature {
+    font-size: 2.8rem;
+  }
+}
+
+/* ==============================================
+   Agri Platform — Auth Pages
+   ============================================== */
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 36px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+  animation: fadeInScale 0.5s var(--ease-out-expo);
+}
+
+.auth-card h2 {
+  font-size: 1.6rem;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+}
+
+.auth-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+
+.auth-card form input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.auth-card form input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.auth-card form button {
+  width: 100%;
+  padding: 13px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  margin-top: 4px;
+}
+
+.auth-card form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.auth-switch {
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.auth-switch span {
+  color: #667eea;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.auth-switch span:hover { text-decoration: underline; }
+
+/* ==============================================
+   Agri Platform — App Layout
+   ============================================== */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  gap: 0;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  min-height: 100vh;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  backdrop-filter: blur(20px);
+}
+
+.nav-brand {
+  padding: 0 20px 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 12px;
+}
+
+.nav-logo { margin-right: 8px; font-size: 1.4rem; }
+
+.nav-links {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.nav-links button {
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.nav-links button:hover {
+  background: rgba(102, 126, 234, 0.08);
+  color: #667eea;
+}
+
+.nav-links button.active {
+  background: rgba(102, 126, 234, 0.12);
+  color: #667eea;
+  font-weight: 600;
+}
+
+.nav-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.nav-user {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #ef4444;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Main content */
+.main-content {
+  margin-left: 220px;
+  flex: 1;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+/* ==============================================
+   Agri Platform — Dashboard
+   ============================================== */
+.dashboard {
+  animation: fadeInScale 0.4s var(--ease-out-expo);
+}
+
+.welcome {
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+
+.welcome h2 { font-size: 1.4rem; color: var(--text-primary); margin-bottom: 4px; }
+.welcome p { color: var(--text-muted); font-size: 0.95rem; }
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  border-radius: var(--radius-md);
+  padding: 24px 20px;
+  text-align: center;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+
+.stat-num { font-size: 2.4rem; font-weight: 700; color: #667eea; }
+.stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.section-card {
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.section-card h3 {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.crop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.crop-chip {
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.crop-chip:hover, .crop-chip.active {
+  background: rgba(102, 126, 234, 0.2);
+  border-color: #667eea;
+}
+
+.empty-text { color: var(--text-muted); text-align: center; padding: 20px; }
+
+.alert-mini-list { display: flex; flex-direction: column; gap: 8px; }
+
+.alert-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid;
+  font-size: 0.85rem;
+}
+
+.alert-mini.level-red { border-color: #ef4444; background: rgba(239, 68, 68, 0.06); }
+.alert-mini.level-orange { border-color: #f97316; background: rgba(249, 115, 22, 0.06); }
+.alert-mini.level-yellow { border-color: #eab308; background: rgba(234, 179, 8, 0.06); }
+.alert-mini.level-blue { border-color: #3b82f6; background: rgba(59, 130, 246, 0.06); }
+
+.alert-type-tag {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ==============================================
+   Agri Platform — Crop Page
+   ============================================== */
+.page-title {
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.crop-detail {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.crop-detail h4 { margin-bottom: 8px; color: var(--text-primary); }
+.crop-detail p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 4px; }
+
+.tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.tag {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tag-danger { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.tag-warning { background: rgba(249, 115, 22, 0.1); color: #ea580c; }
+.tag-info { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
+
+.match-form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.match-form label input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.match-form button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.match-form button:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3); }
+.match-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.match-result {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+}
+
+.match-result.score-good { background: rgba(34, 197, 94, 0.08); }
+.match-result.score-warn { background: rgba(234, 179, 8, 0.08); }
+.match-result.score-bad { background: rgba(239, 68, 68, 0.08); }
+
+.match-score {
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.match-result p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 3px; }
+.match-result .warning { color: #ef4444; font-weight: 600; margin-top: 8px; }
+
+.stages-timeline {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.stage-item {
+  flex: 0 0 auto;
+  min-width: 150px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.5);
+  border-left: 4px solid #22c55e;
+}
+
+.stage-item.risk-high { border-color: #ef4444; }
+.stage-item.risk-medium { border-color: #f97316; }
+.stage-item.risk-low { border-color: #22c55e; }
+
+.stage-order {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #667eea;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stage-name { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.stage-days { font-size: 0.8rem; color: var(--text-muted); }
+.stage-temp { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+.stage-warn { font-size: 0.78rem; color: #ef4444; margin-top: 6px; }
+
+/* ==============================================
+   Agri Platform — Pest Page
+   ============================================== */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.filter-bar button {
+  padding: 8px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-full);
+  background: white;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-bar button.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
+.pest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.pest-card {
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.pest-card:nth-child(1) { animation-delay: 0.05s; }
+.pest-card:nth-child(2) { animation-delay: 0.1s; }
+.pest-card:nth-child(3) { animation-delay: 0.15s; }
+.pest-card:nth-child(4) { animation-delay: 0.2s; }
+
+.pest-card h4 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.pest-type-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.pest-triggers p {
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+}
+
+.pest-stages {
+  font-size: 0.83rem;
+  color: #ef4444;
+  margin-top: 8px;
+}
+
+.pest-methods {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.pest-methods p {
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.pest-pesticide {
+  margin-top: 8px;
+  font-size: 0.83rem;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+/* ==============================================
+   Agri Platform — Alerts Page
+   ============================================== */
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.alert-item {
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  border-left: 4px solid #999;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.alert-item:nth-child(1) { animation-delay: 0.05s; }
+.alert-item:nth-child(2) { animation-delay: 0.1s; }
+.alert-item:nth-child(3) { animation-delay: 0.15s; }
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.alert-level-badge {
+  padding: 3px 10px;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.alert-type {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.alert-time {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.alert-content {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.alert-suggestion {
+  font-size: 0.85rem;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.06);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
+/* ==============================================
+   Responsive — Agri Platform
+   ============================================== */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 60px;
+    padding: 16px 0;
+  }
+
+  .nav-brand span:last-child,
+  .nav-links button span,
+  .nav-user,
+  .btn-logout { display: none; }
+
+  .nav-links button {
+    text-align: center;
+    padding: 12px 8px;
+    font-size: 1.2rem;
+  }
+
+  .nav-brand { text-align: center; padding: 0 8px 16px; }
+  .nav-logo { margin: 0; }
+
+  .main-content { margin-left: 60px; padding: 16px; }
+  .grid-2col { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .pest-grid { grid-template-columns: 1fr; }
+}
+
+/* ==============================================
+   Farmlands Page
+   ============================================== */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.btn-primary {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.farmland-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.farmland-card {
+  border-radius: var(--radius-md);
+  padding: 24px;
+  animation: cardEnter 0.4s var(--ease-out-expo) both;
+}
+
+.farmland-card:nth-child(1) { animation-delay: 0.05s; }
+.farmland-card:nth-child(2) { animation-delay: 0.1s; }
+.farmland-card:nth-child(3) { animation-delay: 0.15s; }
+
+.farmland-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.farmland-header h3 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.crop-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.farmland-details p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.farmland-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.btn-edit, .btn-del {
+  padding: 6px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  background: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-edit:hover { background: rgba(102, 126, 234, 0.06); border-color: #667eea; }
+.btn-del:hover { background: rgba(239, 68, 68, 0.06); border-color: #ef4444; }
+
+.btn-cancel {
+  padding: 10px 24px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Form overlay */
+.form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+}
+
+.form-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  animation: fadeInScale 0.3s var(--ease-out-expo);
+}
+
+.form-card h3 {
+  font-size: 1.2rem;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.form-card label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.form-card label input,
+.form-card label select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+  background: white;
+}
+
+.form-card label input:focus,
+.form-card label select:focus {
+  border-color: #667eea;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .farmland-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-card {
+    max-width: 90vw;
+    padding: 24px;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ============================================================
+   农事智能体（AgentPage）
+   ============================================================ */
+
+.agent-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.agent-warning {
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #9a3412;
+}
+
+.agent-warning strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.agent-warning p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.agent-warning code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 0 4px;
+}
+
+/* ---------- 对话窗口 ---------- */
+.agent-window {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.agent-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scroll-behavior: smooth;
+}
+
+/* ---------- 欢迎屏 ---------- */
+.agent-welcome {
+  margin: auto;
+  text-align: center;
+  max-width: 560px;
+  padding: 40px 20px;
+}
+
+.agent-welcome-icon {
+  font-size: 52px;
+  margin-bottom: 12px;
+  animation: agentFloat 3s ease-in-out infinite;
+}
+
+@keyframes agentFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+.agent-welcome h3 {
+  font-size: 20px;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+}
+
+.agent-welcome p {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 24px;
+}
+
+.agent-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.agent-suggestion {
+  padding: 12px 16px;
+  border: 1px solid rgba(102, 126, 234, 0.25);
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: var(--radius-sm);
+  color: #667eea;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.agent-suggestion:hover:not(:disabled) {
+  background: rgba(102, 126, 234, 0.12);
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.agent-suggestion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- 消息气泡 ---------- */
+.agent-msg {
+  display: flex;
+  gap: 10px;
+  animation: agentMsgIn 320ms var(--ease-out-expo);
+}
+
+@keyframes agentMsgIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.agent-msg-user {
+  flex-direction: row-reverse;
+}
+
+.agent-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+.agent-bubble-wrap {
+  max-width: 76%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-msg-user .agent-bubble-wrap {
+  align-items: flex-end;
+}
+
+.agent-bubble {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-msg-assistant .agent-bubble {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-top-left-radius: 4px;
+}
+
+.agent-msg-user .agent-bubble {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-top-right-radius: 4px;
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+}
+
+.agent-note {
+  font-size: 12px;
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+/* ---------- 思考中动画 ---------- */
+.agent-thinking {
+  display: flex;
+  align-items: center;
+}
+
+.agent-dot {
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #667eea;
+  animation: agentBlink 1.3s infinite ease-in-out both;
+}
+
+.agent-dot:nth-child(2) { animation-delay: 0.18s; }
+.agent-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes agentBlink {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+  40%           { opacity: 1;    transform: scale(1); }
+}
+
+/* ---------- 工具调用轨迹 ---------- */
+.tool-trace {
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  background: rgba(102, 126, 234, 0.04);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.tool-trace-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.tool-trace-toggle:hover {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.tool-trace-body {
+  padding: 4px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.tool-trace-item {
+  font-size: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(102, 126, 234, 0.15);
+}
+
+.tool-trace-item:last-child {
+  border-bottom: none;
+}
+
+.tool-trace-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.tool-trace-head code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.tool-trace-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.tool-trace-args {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.tool-trace-result {
+  background: rgba(0, 0, 0, 0.03);
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 96px;
+  overflow-y: auto;
+  word-break: break-all;
+}
+
+/* ---------- 输入区 ---------- */
+.agent-input-bar {
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.35);
+  align-items: flex-end;
+}
+
+.agent-input-bar textarea {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  min-height: 42px;
+  padding: 11px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  line-height: 1.5;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.agent-input-bar textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
+
+.agent-input-bar textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.agent-send {
+  padding: 11px 22px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.agent-error {
+  margin: 0 18px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm);
+  color: #dc2626;
+  font-size: 13px;
+}
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 768px) {
+  .agent-messages { padding: 16px; }
+  .agent-bubble-wrap { max-width: 88%; }
+  .agent-suggestions { grid-template-columns: 1fr; }
+}

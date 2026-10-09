@@ -1,0 +1,45 @@
+# =============================================
+# 智慧农业天气系统 — 生产环境配置
+# =============================================
+# 使用方式：
+#   java -jar app.jar --spring.profiles.active=prod
+#   或设置环境变量 SPRING_PROFILES_ACTIVE=prod
+#
+# 所有敏感信息从环境变量读取：
+#   DB_URL      — 数据库连接地址
+#   DB_USER     — 数据库用户名
+#   DB_PASSWORD — 数据库密码
+#   JWT_SECRET  — JWT 签名密钥（至少256位随机字符串）
+#   CORS_ORIGINS — 允许的前端域名，逗号分隔
+# =============================================
+
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/agri_weather?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # 生产环境不自动建表
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# JWT
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-random-string-at-least-256-bits}
+    expiration-ms: 86400000       # 24小时
+
+# 访问日志
+logging:
+  level:
+    com.agriweather: INFO
+  file:
+    path: /var/log/agri-weather

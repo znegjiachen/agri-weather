@@ -1,0 +1,34 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/agri_weather?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# JWT
+app:
+  jwt:
+    secret: YWdyaS13ZWF0aGVyLXNlY3JldC1rZXktMjAyNi1zbWFydC1mYXJtaW5nLXBsYXRmb3Jt
+    expiration-ms: 86400000
+
+  # 农事智能体（DeepSeek）
+  # API Key 用环境变量注入，不要写在本文件里：set DEEPSEEK_API_KEY=sk-xxx
+  deepseek:
+    api-key: ${DEEPSEEK_API_KEY:}
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    max-iterations: 6
+    timeout-seconds: 60
+    temperature: 0.3
+    max-tokens: 2048
