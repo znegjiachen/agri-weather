@@ -1,6 +1,6 @@
 #!/bin/sh
 # Maven Wrapper startup script
-MAVEN_PROJECTBASEDIR=$(dirname "$0")
+MAVEN_PROJECTBASEDIR=$(cd "$(dirname "$0")" && pwd)
 export MAVEN_PROJECTBASEDIR
 MAVEN_USER_HOME="${HOME}/.m2"
 export MAVEN_USER_HOME
@@ -18,4 +18,4 @@ fi
 WRAPPER_JAR="$MAVEN_PROJECTBASEDIR/.mvn/wrapper/maven-wrapper.jar"
 WRAPPER_LAUNCHER="org.apache.maven.wrapper.MavenWrapperMain"
 
-exec "$JAVA_EXE" $MAVEN_OPTS -classpath "$WRAPPER_JAR" "$WRAPPER_LAUNCHER" "$@"
+exec "$JAVA_EXE" $MAVEN_OPTS -classpath "$WRAPPER_JAR" "-Dmaven.multiModuleProjectDirectory=$MAVEN_PROJECTBASEDIR" "$WRAPPER_LAUNCHER" "$@"
