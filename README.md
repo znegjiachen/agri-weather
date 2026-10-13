@@ -105,7 +105,9 @@ cd weather-app-react && npm install && npm run dev
 .
 ├── agri-weather-server/              # Spring Boot 后端
 │   ├── src/main/java/com/agriweather/
-│   │   ├── ai/                       # 农事智能体（DeepSeek 客户端 + 工具注册表）
+│   │   ├── agent/                    # 智能体框架（工具调用循环，零领域知识、可复用）
+│   │   ├── ai/                       # 应用层：DeepSeek 适配、Spring 装配、提示词
+│   │   │   └── tool/                 # 7 个农事工具实现 + 地块归属校验
 │   │   ├── config/                   # 安全配置、JWT 过滤器
 │   │   ├── controller/               # REST 接口
 │   │   ├── dto/  entity/  repository/  service/

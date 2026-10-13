@@ -2,13 +2,14 @@ package com.agriweather.ai;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * DeepSeek 模型配置，对应 application.yml 的 app.deepseek 节点
+ *
+ * 不加 @Component：由 {@link AgentAutoConfiguration} 上的
+ * @EnableConfigurationProperties 注册成 Bean，这样在纯 Java 环境里也能直接 new。
  */
 @Data
-@Component
 @ConfigurationProperties(prefix = "app.deepseek")
 public class DeepSeekProperties {
 

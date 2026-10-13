@@ -1,11 +1,13 @@
 package com.agriweather.ai;
 
+import com.agriweather.agent.ChatCompletion;
+import com.agriweather.agent.ChatModel;
+import com.agriweather.agent.ToolCall;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -17,30 +19,20 @@ import java.util.Map;
 /**
  * DeepSeek 对话客户端（OpenAI 兼容协议）
  *
- * 只做一件事：发消息、收回复，支持 function calling。
- * 不含任何农事业务逻辑 —— 那是 AgriToolRegistry 和 AgriAgentService 的职责。
+ * 只做一件事：发消息、收回复，支持 function calling —— 即 {@link ChatModel} 的一个实现。
+ * 不含任何业务逻辑，也不含智能体循环 —— 那是 AgentHarness 与各 Tool 实现的职责。
+ *
+ * 没有 Spring 注解：由 {@link AgentAutoConfiguration} 显式装配成 Bean，
+ * 这样它也能在纯 Java 环境（如单元测试）里直接 new 出来。
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
-public class DeepSeekClient {
+public class DeepSeekClient implements ChatModel {
 
     private final DeepSeekProperties props;
     private final ObjectMapper mapper;
 
     private RestClient restClient;
-
-    /** 模型返回的一次工具调用请求 */
-    public record ToolCall(String id, String name, String arguments) {}
-
-    /** 一次对话补全的结果 */
-    public record Completion(String content,
-                             List<ToolCall> toolCalls,
-                             Map<String, Object> assistantMessage) {
-        public boolean hasToolCalls() {
-            return toolCalls != null && !toolCalls.isEmpty();
-        }
-    }
 
     private RestClient client() {
         if (restClient == null) {
@@ -61,8 +53,9 @@ public class DeepSeekClient {
      * @param messages 对话历史（含 system / user / assistant / tool）
      * @param tools    可用工具定义，传 null 表示禁止调用工具
      */
+    @Override
     @SuppressWarnings("unchecked")
-    public Completion chat(List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
+    public ChatCompletion chat(List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
         if (!props.isConfigured()) {
             throw new IllegalStateException("未配置 DeepSeek API Key，请设置环境变量 DEEPSEEK_API_KEY");
         }
@@ -127,7 +120,7 @@ public class DeepSeekClient {
             }
         }
 
-        return new Completion(content, toolCalls, message);
+        return new ChatCompletion(content, toolCalls, message);
     }
 
     /** 把上游 HTTP 错误翻译成人能看懂的中文 */

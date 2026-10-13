@@ -1,7 +1,10 @@
 package com.agriweather.controller;
 
-import com.agriweather.ai.AgriAgentService;
-import com.agriweather.ai.AgriToolRegistry;
+import com.agriweather.agent.AgentContext;
+import com.agriweather.agent.AgentHarness;
+import com.agriweather.agent.AgentResult;
+import com.agriweather.agent.ToolRegistry;
+import com.agriweather.ai.AgriContext;
 import com.agriweather.ai.DeepSeekClient;
 import com.agriweather.ai.DeepSeekProperties;
 import com.agriweather.dto.AgentChatRequest;
@@ -26,8 +29,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AgentController {
 
-    private final AgriAgentService agentService;
-    private final AgriToolRegistry toolRegistry;
+    private final AgentHarness agentHarness;
+    private final ToolRegistry toolRegistry;
     private final DeepSeekProperties props;
 
     /**
@@ -45,11 +48,13 @@ public class AgentController {
         }
 
         try {
-            AgriAgentService.AgentResult result =
-                    agentService.run(body.getMessage(), body.getHistory(), userId);
+            AgentResult result = agentHarness.run(
+                    body.getMessage(),
+                    body.getHistory(),
+                    AgentContext.of(new AgriContext(userId)));
 
             return new AgentChatResponse(
-                    result.reply(), result.trace(), result.rounds(),
+                    result.reply(), toDto(result.trace()), result.rounds(),
                     result.truncated(), props.getModel());
         } catch (DeepSeekClient.DeepSeekException e) {
             // 上游模型的问题：密钥、余额、限流、超时
@@ -85,5 +90,16 @@ public class AgentController {
                 "baseUrl", props.getBaseUrl(),
                 "maxIterations", props.getMaxIterations()
         );
+    }
+
+    /**
+     * 框架的轨迹类型 → 对外 DTO。
+     * 刻意做这层映射：对外接口契约不该依赖框架内部类型，否则框架一改就破坏 API。
+     */
+    private List<AgentChatResponse.ToolCallTrace> toDto(List<com.agriweather.agent.ToolCallTrace> trace) {
+        return trace.stream()
+                .map(t -> new AgentChatResponse.ToolCallTrace(
+                        t.getTool(), t.getArguments(), t.getResultSummary(), t.getElapsedMs()))
+                .toList();
     }
 }
