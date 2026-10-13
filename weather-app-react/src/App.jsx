@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -15,6 +15,17 @@ function AppContent() {
   const { user, isLoggedIn, logout } = useAuth();
   const [page, setPage] = useState('dashboard');
   const [authMode, setAuthMode] = useState('login');
+
+  // 农事助手的对话状态提升到这一层。
+  // AgentPage 是条件渲染的，切板块时会被卸载，state 放在它内部会随组件一起销毁。
+  const [agentMessages, setAgentMessages] = useState([]);
+
+  // 换用户（含主动登出、token 过期导致的登出）时清空对话，
+  // 避免同浏览器下下一位登录者看到上一位的聊天记录。
+  const userId = user?.userId;
+  useEffect(() => {
+    setAgentMessages([]);
+  }, [userId]);
 
   if (!isLoggedIn) {
     return authMode === 'login'
@@ -64,7 +75,9 @@ function AppContent() {
 
       <main className="main-content">
         {page === 'dashboard' && <Dashboard />}
-        {page === 'agent' && <AgentPage />}
+        {page === 'agent' && (
+          <AgentPage messages={agentMessages} setMessages={setAgentMessages} />
+        )}
         {page === 'crops' && <CropPage />}
         {page === 'pests' && <PestPage />}
         {page === 'alerts' && <AlertsPage />}

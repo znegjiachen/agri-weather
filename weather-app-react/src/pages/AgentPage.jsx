@@ -18,8 +18,14 @@ const SUGGESTIONS = [
   '最近有冻害或涝害风险吗？',
 ];
 
-export default function AgentPage() {
-  const [messages, setMessages] = useState([]);
+/**
+ * 农事助手对话页。
+ *
+ * messages 由 App 持有并传入 —— 本组件是条件渲染的，切板块时会被卸载，
+ * 状态放在这里会随组件一起丢失。其余状态（草稿、加载中、错误）是瞬时的，
+ * 留在本地即可。
+ */
+export default function AgentPage({ messages, setMessages }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
