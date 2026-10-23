@@ -2671,6 +2671,7 @@ main {
 }
 
 .community-editor .ql-editor img {
+  width: 100%;
   max-width: 100%;
   height: auto;
   border-radius: 8px;
@@ -2694,18 +2695,17 @@ main {
 /* ---------- 帖子正文 ---------- */
 
 /*
- * 列表封面是「预览」：宽度跟随卡片，限制预览高度避免一张竖图占满整屏，
- * 用 contain 而不是 cover，保证不裁掉两边、不改变比例。
- * 详情页的 `.community-rich img` 则完全按原比例自适应，不做限制。
+ * 列表封面是「预览」：固定成一条横向 banner，用 cover 居中裁切，
+ * 避免竖长图把整张卡片撑到几千像素。详情页能看到完整原图。
  */
 .community-cover {
   display: block;
-  width: auto;
-  max-width: 100%;
+  width: 100%;
   height: auto;
-  max-height: 280px;
+  max-height: 360px;
+  object-fit: cover;
   border-radius: 10px;
-  margin: 6px auto;
+  margin: 6px 0;
   background: rgba(0, 0, 0, 0.03);
 }
 
@@ -2767,14 +2767,17 @@ main {
   word-break: break-all;
 }
 
-/* 图片自适应：大图缩到容器宽度，小图保持原始尺寸，等比不裁切不限高 */
+/*
+ * 详情正文图片铺满内容宽度：桌面端不会再出现窄图两侧大片空白。
+ * 高度按原比例自动延伸，长截图就是长页面，不做固定高度裁切。
+ */
 .community-rich img {
   display: block;
-  width: auto;
+  width: 100%;
   max-width: 100%;
   height: auto;
   border-radius: 10px;
-  margin: 8px auto;
+  margin: 8px 0;
   background: rgba(0, 0, 0, 0.03);
 }
 
