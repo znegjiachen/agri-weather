@@ -5,6 +5,15 @@ function getToken() {
   return localStorage.getItem('token');
 }
 
+/** 统一的 401 处理：清登录态并通知全局弹层 */
+function handleUnauthorized(data) {
+  const message = data?.message || data?.error || '登录已过期，请重新登录';
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.dispatchEvent(new CustomEvent('auth:expired', { detail: message }));
+  throw new Error(message);
+}
+
 async function request(path, options = {}) {
   const token = getToken();
   const headers = {
@@ -16,14 +25,10 @@ async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json().catch(() => null);
 
-  if (res.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.dispatchEvent(new CustomEvent('auth:expired', { detail: data?.error || data?.message || '登录已过期，请重新登录' }));
-    throw new Error(data?.error || data?.message || '登录已过期，请重新登录');
-  }
+  if (res.status === 401) handleUnauthorized(data);
 
-  if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+  // 后端统一把中文提示放在 message，error 只是机器可读的 code
+  if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
   return data;
 }
 
@@ -82,6 +87,46 @@ export const operations = {
       method: 'POST',
       body: JSON.stringify(forecast),
     }),
+};
+
+// Community（农友社区）
+export const community = {
+  list: (cursor, size = 10) => {
+    const qs = new URLSearchParams({ size: String(size) });
+    if (cursor) qs.set('cursor', String(cursor));
+    return request(`/api/community/posts?${qs.toString()}`);
+  },
+  detail: (id) => request(`/api/community/posts/${id}`),
+  create: (body) => request('/api/community/posts', { method: 'POST', body: JSON.stringify(body) }),
+  comment: (id, content) =>
+    request(`/api/community/posts/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
+  like: (id) => request(`/api/community/posts/${id}/like`, { method: 'POST' }),
+  unlike: (id) => request(`/api/community/posts/${id}/like`, { method: 'DELETE' }),
+  remove: (id) => request(`/api/community/posts/${id}`, { method: 'DELETE' }),
+
+  /**
+   * 上传图片。必须走独立的 fetch：
+   * 不能自己设 Content-Type —— 浏览器要为 multipart 生成 boundary。
+   */
+  uploadImage: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+
+    const res = await fetch(`${BASE_URL}/api/community/images`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await res.json().catch(() => null);
+
+    if (res.status === 401) handleUnauthorized(data);
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    return data;
+  },
 };
 
 // Agent（农事智能体）

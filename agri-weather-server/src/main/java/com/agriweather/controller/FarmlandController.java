@@ -8,12 +8,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/farmlands")
@@ -53,9 +56,9 @@ public class FarmlandController {
     }
 
     @PutMapping("/{id}")
-    public Farmland update(@PathVariable Long id, @RequestBody String rawBody) throws Exception {
-        Farmland f = farmlandRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("地块不存在"));
+    public Farmland update(@PathVariable Long id, @RequestBody String rawBody, HttpServletRequest request) throws Exception {
+        Long userId = getUserIdOrAuthError(request);
+        Farmland f = requireOwned(id, userId);
 
         Map<String, Object> body = objectMapper.readValue(rawBody, new TypeReference<Map<String, Object>>() {});
 
@@ -76,28 +79,44 @@ public class FarmlandController {
     }
 
     @GetMapping("/{id}/weather")
-    public Map<String, Object> getWeather(@PathVariable Long id) throws Exception {
-        return farmlandWeatherService.fetchWeather(id);
+    public ResponseEntity<Map<String, Object>> getWeather(@PathVariable Long id, HttpServletRequest request) {
+        requireOwned(id, getUserIdOrAuthError(request));
+
+        Map<String, Object> body = new LinkedHashMap<>(farmlandWeatherService.fetchWeather(id));
+        // _cache 是内部标记，转成响应头后从响应体里移除
+        String cacheStatus = String.valueOf(body.remove("_cache"));
+        return ResponseEntity.ok()
+                .header("X-Weather-Cache", cacheStatus)
+                .body(body);
     }
 
     @GetMapping("/{id}/alerts")
-    public List<Map<String, Object>> checkAlerts(@PathVariable Long id) throws Exception {
+    public List<Map<String, Object>> checkAlerts(@PathVariable Long id, HttpServletRequest request) throws Exception {
+        requireOwned(id, getUserIdOrAuthError(request));
         return farmlandWeatherService.checkAlerts(id);
     }
 
     @GetMapping("/{id}/advice")
-    public List<Map<String, Object>> getAdvice(@PathVariable Long id) throws Exception {
+    public List<Map<String, Object>> getAdvice(@PathVariable Long id, HttpServletRequest request) throws Exception {
+        requireOwned(id, getUserIdOrAuthError(request));
         return farmlandWeatherService.getOperationAdvice(id);
     }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id, HttpServletRequest request) {
         Long userId = getUserIdOrAuthError(request);
-        Farmland f = farmlandRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("地块不存在"));
-        if (!f.getUserId().equals(userId))
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权删除该地块");
+        requireOwned(id, userId);
         farmlandRepository.deleteById(id);
+    }
+
+    /** 地块必须存在且属于当前用户，否则 404 / 403 */
+    private Farmland requireOwned(Long id, Long userId) {
+        Farmland f = farmlandRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "地块不存在"));
+        if (!Objects.equals(f.getUserId(), userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "无权访问该地块");
+        }
+        return f;
     }
 
     private Long getUserIdOrAuthError(HttpServletRequest request) {

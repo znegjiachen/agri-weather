@@ -83,6 +83,9 @@ docker-compose down       # 停止
 mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
 mysql -u root -p agri_weather < agri-weather-server/sql/schema.sql
 
+# 已有旧库升级到社区富文本/图片版本（新库可跳过）
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_community_rich_text.sql
+
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
 
@@ -144,10 +147,14 @@ cd weather-app-react && npm install && npm run dev
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
 | 智能体 `/api/agent` | `POST /chat` · `GET /tools` · `GET /status` |
+| 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
+| 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
+
+社区发帖支持富文本（Quill 编辑器，HTML 经服务端白名单净化后入库）和图片：JPG/PNG、单张 ≤5MB、每帖 ≤9 张，图片存 MySQL 并由后端出图；上传后 24 小时未发布会被定时清理。
 
 ### 数据库表
 
-`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide`
+`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide` · `community_post` · `community_comment` · `community_like` · `community_image`
 
 ---
 

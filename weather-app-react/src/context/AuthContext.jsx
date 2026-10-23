@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { auth } from '../api';
+import { clearApiCache } from '../utils/pwaCaches';
 
 const AuthContext = createContext(null);
 
@@ -13,6 +14,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
+    // 换了身份，之前缓存的离线数据不再适用
+    clearApiCache();
   }, []);
 
   const login = useCallback(async (username, password) => {
@@ -31,6 +34,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    clearApiCache();
   }, []);
 
   // 监听全局401事件（API层token过期时触发）

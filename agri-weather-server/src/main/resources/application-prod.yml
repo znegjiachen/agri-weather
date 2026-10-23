@@ -31,6 +31,15 @@ spring:
       hibernate:
         format_sql: false
 
+  # Redis：天气缓存，多实例共享
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
+      connect-timeout: 2s
+
 # JWT
 app:
   jwt:

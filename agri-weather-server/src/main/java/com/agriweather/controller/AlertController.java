@@ -46,8 +46,8 @@ public class AlertController {
     }
 
     @PutMapping("/{id}/read")
-    public void markRead(@PathVariable Long id) {
-        alertService.markAsRead(id);
+    public void markRead(@PathVariable Long id, HttpServletRequest request) {
+        alertService.markAsRead(id, getUserIdOrAuthError(request));
     }
 
     @PutMapping("/read-all")

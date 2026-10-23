@@ -334,3 +334,60 @@ INSERT INTO solar_term_guide (term_name, term_date_range, crop_stages, farm_task
  '备耕备种；检修农机；制定年度种植计划',
  '',
  '大寒不寒，人马不安');
+
+
+-- =============================================
+-- 农友社区（新增）
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS community_post (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  user_id        BIGINT        NOT NULL COMMENT '作者',
+  title          VARCHAR(100)  DEFAULT NULL,
+  content        MEDIUMTEXT    NOT NULL COMMENT 'TEXT 为纯文本，HTML 为净化后的富文本',
+  content_format VARCHAR(10)   NOT NULL DEFAULT 'TEXT' COMMENT 'TEXT/HTML',
+  category       VARCHAR(20)   DEFAULT 'CHAT' COMMENT 'CHAT/TECH/ALERT',
+  like_count    INT           DEFAULT 0,
+  comment_count INT           DEFAULT 0,
+  status        INT           DEFAULT 0 COMMENT '0 正常 1 已删除',
+  created_at    DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_post_status_id (status, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS community_comment (
+  id         BIGINT        NOT NULL AUTO_INCREMENT,
+  post_id    BIGINT        NOT NULL,
+  user_id    BIGINT        NOT NULL,
+  content    VARCHAR(1000) NOT NULL,
+  created_at DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_comment_post_id (post_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS community_like (
+  id         BIGINT   NOT NULL AUTO_INCREMENT,
+  post_id    BIGINT   NOT NULL,
+  user_id    BIGINT   NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_like_post_user (post_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 社区图片：二进制存库，多实例共享，无需文件挂载
+CREATE TABLE IF NOT EXISTS community_image (
+  id         BIGINT        NOT NULL AUTO_INCREMENT,
+  public_id  CHAR(32)      NOT NULL COMMENT '对外 URL 标识（随机，避免枚举）',
+  user_id    BIGINT        NOT NULL COMMENT '上传者',
+  post_id    BIGINT        DEFAULT NULL COMMENT '挂接的帖子，NULL 表示尚未发布',
+  mime_type  VARCHAR(40)   NOT NULL,
+  byte_size  INT           NOT NULL,
+  width      INT           NOT NULL,
+  height     INT           NOT NULL,
+  data       LONGBLOB      NOT NULL,
+  created_at DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_image_public_id (public_id),
+  KEY idx_image_user (user_id),
+  KEY idx_image_post (post_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

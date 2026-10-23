@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
+import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
+import { useAgent } from '../context/AgentContext';
 
 const TOOL_LABELS = {
   list_farmlands: { icon: '📍', label: '查询地块列表' },
@@ -25,7 +27,9 @@ const SUGGESTIONS = [
  * 状态放在这里会随组件一起丢失。其余状态（草稿、加载中、错误）是瞬时的，
  * 留在本地即可。
  */
-export default function AgentPage({ messages, setMessages }) {
+export default function AgentPage() {
+  // 对话状态放在 AgentContext：切 Tab 时本组件会卸载，状态留在这里会丢
+  const { messages, setMessages } = useAgent();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -154,7 +158,10 @@ export default function AgentPage({ messages, setMessages }) {
                   <ToolCallList calls={m.toolCalls} />
                 )}
 
-                <div className="agent-bubble">{m.content}</div>
+                {/* 助手回复按 Markdown 渲染；用户输入保持原文，避免被当成标记解析 */}
+                <div className="agent-bubble">
+                  {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
+                </div>
 
                 {m.truncated && (
                   <div className="agent-note">

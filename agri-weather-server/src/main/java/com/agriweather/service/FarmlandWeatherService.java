@@ -2,16 +2,16 @@ package com.agriweather.service;
 
 import com.agriweather.entity.*;
 import com.agriweather.repository.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.agriweather.weather.WeatherClient;
+import com.agriweather.weather.WeatherFetch;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,25 +21,28 @@ public class FarmlandWeatherService {
     private final CropInfoRepository cropRepo;
     private final CropGrowthStageRepository stageRepo;
     private final WeatherAlertRepository alertRepo;
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> fetchWeather(Long farmlandId) throws Exception {
+    /** 外呼与缓存都收敛在这一层，本类不再直接碰 HTTP */
+    private final WeatherClient weatherClient;
+
+    /**
+     * 取某地块的天气：先按经纬度拿（可跨地块共享的）预报，再叠加地块/作物元信息。
+     *
+     * 返回的 Map 里带一个 {@code _cache} 键表示数据来源（HIT/MISS/STALE/BYPASS），
+     * 由 Controller 取出后写进响应头并从响应体里移除。
+     */
+    public Map<String, Object> fetchWeather(Long farmlandId) {
         Farmland f = farmlandRepo.findById(farmlandId)
-                .orElseThrow(() -> new RuntimeException("地块不存在"));
+                .orElseThrow(() -> new IllegalArgumentException("地块不存在（ID=" + farmlandId + "）"));
 
-        String url = String.format(
-            "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f" +
-            "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility,surface_pressure" +
-            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max" +
-            "&timezone=auto&forecast_days=7",
-            f.getLat(), f.getLng());
+        if (f.getLat() == null || f.getLng() == null) {
+            throw new IllegalArgumentException("该地块尚未设置经纬度，无法查询天气");
+        }
 
-        HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        Map<String, Object> data = mapper.readValue(res.body(), Map.class);
+        WeatherFetch wf = weatherClient.fetch(f.getLat(), f.getLng());
 
+        // 拷贝一份：缓存里的是共享数据，不能就地修改
+        Map<String, Object> data = new LinkedHashMap<>(wf.data());
         data.put("farmlandName", f.getFieldName());
         data.put("farmlandId", f.getId());
         if (f.getCropId() != null) {
@@ -48,6 +51,7 @@ public class FarmlandWeatherService {
                 data.put("cropId", c.getId());
             });
         }
+        data.put("_cache", wf.status().name());
         return data;
     }
 
@@ -129,28 +133,40 @@ public class FarmlandWeatherService {
 
         // 去重保存：今天同类型同地块不重复插入
         LocalDate today = LocalDate.now();
+        // 只查一次库，避免在循环里反复查询
+        List<WeatherAlert> existingBefore = alertRepo.findByFarmlandIdOrderByAlertTimeDesc(f.getId());
+
+        Set<String> savedTodayTypes = existingBefore.stream()
+                .filter(e -> e.getAlertTime() != null && today.equals(e.getAlertTime().toLocalDate()))
+                .map(WeatherAlert::getAlertType)
+                .collect(Collectors.toSet());
+
         for (Map<String, Object> a : alerts) {
             String alertType = (String) a.get("type");
-            boolean exists = alertRepo.findByFarmlandIdOrderByAlertTimeDesc(f.getId())
-                .stream()
-                .anyMatch(ex -> ex.getAlertType().equals(alertType)
-                    && ex.getAlertTime().toLocalDate().equals(today));
-            if (!exists) {
-                WeatherAlert wa = WeatherAlert.builder()
+            if (savedTodayTypes.contains(alertType)) continue;
+
+            alertRepo.save(WeatherAlert.builder()
                     .userId(f.getUserId()).farmlandId(f.getId())
                     .alertType(alertType)
                     .alertLevel((String) a.get("level"))
                     .alertContent((String) a.get("content"))
                     .suggestion((String) a.get("suggestion"))
                     .alertTime(LocalDateTime.now())
-                    .build();
-                alertRepo.save(wa);
-            }
+                    .build());
+            savedTodayTypes.add(alertType);
         }
 
-        // 同时返回已有预警
-        List<WeatherAlert> existing = alertRepo.findByFarmlandIdOrderByAlertTimeDesc(f.getId());
-        for (WeatherAlert e : existing) {
+        // 追加历史预警。本次已经算出来的类型不再从库里补一遍 ——
+        // 否则刚保存的预警会被查回来重复返回。
+        Set<String> currentTypes = alerts.stream()
+                .map(m -> (String) m.get("type"))
+                .collect(Collectors.toSet());
+        for (WeatherAlert e : existingBefore) {
+            boolean sameTypeToday = currentTypes.contains(e.getAlertType())
+                    && e.getAlertTime() != null
+                    && today.equals(e.getAlertTime().toLocalDate());
+            if (sameTypeToday) continue;
+
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", e.getId());
             m.put("type", e.getAlertType());

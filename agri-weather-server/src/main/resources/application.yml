@@ -1,5 +1,9 @@
 server:
   port: 8082
+  tomcat:
+    # 默认只吞 2MB；超限上传会直接断连接，前端拿不到 413 JSON。
+    # 放开后由 MaxUploadSizeExceededException 统一回 413。
+    max-swallow-size: -1
 
 spring:
   datasource:
@@ -15,6 +19,20 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  # 社区图片上传：单张 5MB，请求体留出 multipart 边界余量
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 8MB
+
+  # Redis：天气缓存，多个实例共享同一份
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+      connect-timeout: 2s
 
 # JWT
 app:
@@ -32,3 +50,31 @@ app:
     timeout-seconds: 60
     temperature: 0.3
     max-tokens: 2048
+
+  # 天气外呼与缓存
+  weather:
+    base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 8000
+    cache-enabled: ${WEATHER_CACHE_ENABLED:true}
+    fresh-ttl-seconds: 1800      # 30 分钟内直接命中
+    stale-ttl-seconds: 86400     # 超过 30 分钟仍可兜底，也是 Redis 中的实际 TTL
+    grid-decimals: 3             # 缓存坐标精度，3 位小数约 110 米
+    forecast-days: 7
+    # 定时预取：多实例下由 Redis 锁保证每轮只有一个实例执行
+    prefetch-enabled: true
+    prefetch-interval-ms: 1200000      # 20 分钟
+    prefetch-initial-delay-ms: 60000   # 启动后 1 分钟首跑
+    prefetch-max-coords: 200
+    prefetch-spacing-ms: 250
+
+# 仅暴露健康检查，供负载均衡探活
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  health:
+    # Redis 故障时应用会降级直连上游，不应因此被判为不可用而下线
+    redis:
+      enabled: false

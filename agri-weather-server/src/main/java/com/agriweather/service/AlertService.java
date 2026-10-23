@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 智能预警引擎 — 核心业务逻辑
@@ -203,11 +204,15 @@ public class AlertService {
         return alertRepository.countByUserIdAndIsReadFalse(userId);
     }
 
-    public void markAsRead(Long id) {
-        alertRepository.findById(id).ifPresent(alert -> {
-            alert.setIsRead(true);
-            alertRepository.save(alert);
-        });
+    /** 只能标记自己的预警，否则抛 SecurityException（由全局处理器转 403） */
+    public void markAsRead(Long id, Long userId) {
+        WeatherAlert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("预警不存在"));
+        if (!Objects.equals(alert.getUserId(), userId)) {
+            throw new SecurityException("无权操作该预警");
+        }
+        alert.setIsRead(true);
+        alertRepository.save(alert);
     }
 
     public void markAllAsRead(Long userId) {
