@@ -1229,6 +1229,8 @@ main {
 .main-content {
   margin-left: 220px;
   flex: 1;
+  /* flex 子项默认 min-width:auto，手机端会被宽内容顶出视口 */
+  min-width: 0;
   padding: 24px;
   min-height: 100vh;
   /* 纵向 flex：让农事助手的对话区能撑满剩余高度 */
@@ -3333,10 +3335,8 @@ main {
   min-height: 100vh;
   padding: 18px 24px 40px;
   color: #e9f1ff;
-  background:
-    radial-gradient(110% 70% at 78% 0%, rgba(85, 125, 200, 0.38), transparent 60%),
-    radial-gradient(90% 60% at 8% 18%, rgba(64, 86, 140, 0.3), transparent 65%),
-    linear-gradient(180deg, #141d2c 0%, #0c111b 55%, #080b11 100%);
+  /* 不覆盖整站背景：沿用 body 上原有的紫色渐变 */
+  background: transparent;
 }
 
 .weather-inner {
@@ -3356,7 +3356,7 @@ main {
   height: 36px;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.16);
   color: #e9f1ff;
   font-size: 20px;
   line-height: 1;
@@ -3385,9 +3385,9 @@ main {
 .wd-search-panel {
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .wd-search-row {
@@ -3402,7 +3402,7 @@ main {
   border: 0;
   border-radius: 10px;
   outline: none;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
   font-size: 14px;
 }
@@ -3420,7 +3420,7 @@ main {
 }
 
 .wd-search-row button.ghost {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .wd-history {
@@ -3567,9 +3567,9 @@ main {
 
 .wd-day-card {
   padding: 14px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.14);
   text-align: center;
 }
 
@@ -3589,9 +3589,9 @@ main {
 
 .wd-week {
   padding: 14px 10px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.13);
 }
 
 .wd-week-days {
@@ -3703,7 +3703,8 @@ main {
 
 @media (max-width: 768px) {
   .weather-page {
-    margin: -16px;
+    /* 同时抵消 main-content(16px) 与 body(14px) 的内边距，铺满手机屏 */
+    margin: -30px;
     padding: 14px 16px calc(96px + env(safe-area-inset-bottom));
   }
 
@@ -4020,4 +4021,20 @@ main {
 .mh-agent-arrow {
   font-size: 20px;
   color: var(--text-muted);
+}
+
+/* 窄屏兜底：允许文字收缩换行，避免把布局顶宽 */
+.mh-slide-text { min-width: 0; }
+.mh-feature-text { min-width: 0; }
+.mh-hero-cta span:first-child { line-height: 1.35; }
+
+@media (max-width: 360px) {
+  .mh-slide { padding: 14px 14px 22px; }
+  .mh-slide h3 { font-size: 15px; }
+  .mh-slide-icon { font-size: 42px; }
+  .mh-feature { padding: 10px; }
+  .mh-feature-text p { font-size: 10px; }
+  .mh-feature-emoji { font-size: 22px; }
+  .mh-hero h2 { font-size: 28px; }
+  .mh-hero-cta { padding: 10px 12px; font-size: 12px; }
 }
