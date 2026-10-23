@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import useWeather from '../hooks/useWeather';
+import useWeather, { getSearchHistory } from '../hooks/useWeather';
 import { getBackgroundClass, getWeatherInfo } from '../utils/weatherCodes';
 import Header from './Header';
 import UnitToggle from './UnitToggle';
@@ -15,7 +15,8 @@ export default function WeatherWidget() {
   const [isCelsius, setIsCelsius] = useState(true);
   const { cityName, weatherData, loading, error, history, searchCity, locateUser } = useWeather();
 
-  useEffect(() => { searchCity('北京'); }, [searchCity]);
+  // 与首页天气入口保持一致：回到上次查看的城市，首次访问默认北京
+  useEffect(() => { searchCity(getSearchHistory()[0] || '北京'); }, [searchCity]);
 
   useEffect(() => {
     if (weatherData) {
@@ -25,6 +26,9 @@ export default function WeatherWidget() {
       document.body.className = getBackgroundClass(code, sunrise, sunset);
     }
   }, [weatherData]);
+
+  // 离开天气页时恢复整站背景，避免首页也被染成天气底色
+  useEffect(() => () => { document.body.className = ''; }, []);
 
   const particleBg = useMemo(() => {
     if (!weatherData) return 'default';

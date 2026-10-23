@@ -3251,3 +3251,65 @@ main {
   font-size: 10px;
   background: rgba(255, 255, 255, 0.75) !important;
 }
+
+/* 首页左上角天气入口 */
+.home-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 7px 14px 7px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.home-weather:hover {
+  background: var(--glass-bg-hover);
+  transform: translateY(-1px);
+}
+
+.home-weather.is-loading {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.hw-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.hw-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hw-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.hw-row strong {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.hw-cond {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hw-city {
+  font-size: 11px;
+  color: var(--text-muted);
+}
