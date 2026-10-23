@@ -5,7 +5,7 @@
 export const PRIMARY_NAV = [
   { to: '/', label: '首页', icon: '🏠' },
   { to: '/community', label: '社区', icon: '💬' },
-  { to: '/agent', label: '农事助手', icon: '🤖' },
+  { to: '/agent', label: '助农手', icon: '🤖' },
   { to: '/profile', label: '个人中心', icon: '👤' },
 ];
 

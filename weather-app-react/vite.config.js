@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: '曾嘉晨智慧农事气象平台',
         short_name: '农事气象',
-        description: '地块管理、天气预报、灾害预警与农事智能助手',
+        description: '地块管理、天气预报、灾害预警与助农手',
         lang: 'zh-CN',
         theme_color: '#667eea',
         background_color: '#f5f7ff',

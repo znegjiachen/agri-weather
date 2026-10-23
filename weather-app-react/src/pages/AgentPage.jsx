@@ -21,7 +21,7 @@ const SUGGESTIONS = [
 ];
 
 /**
- * 农事助手对话页。
+ * 助农手对话页。
  *
  * messages 由 App 持有并传入 —— 本组件是条件渲染的，切板块时会被卸载，
  * 状态放在这里会随组件一起丢失。其余状态（草稿、加载中、错误）是瞬时的，
@@ -104,9 +104,9 @@ export default function AgentPage() {
     <div className="agent-page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">🤖 农事智能助手</h2>
+          <h2 className="page-title">🤖 助农手</h2>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-            会自己查天气、查地块、调用决策引擎，再给你建议
+            内容由AI生成，仅供参考
           </p>
         </div>
         {messages.length > 0 && (
@@ -118,7 +118,7 @@ export default function AgentPage() {
 
       {notConfigured && (
         <div className="agent-warning">
-          <strong>⚠️ 智能助手尚未启用</strong>
+          <strong>⚠️ 助农手尚未启用</strong>
           <p>
             后端没有配置 DeepSeek API Key。请设置环境变量
             <code>DEEPSEEK_API_KEY</code> 后重启服务。
@@ -131,7 +131,7 @@ export default function AgentPage() {
           {messages.length === 0 && (
             <div className="agent-welcome">
               <div className="agent-welcome-icon">🌾</div>
-              <h3>你好，我是农事助手</h3>
+              <h3>你好，我是助农手</h3>
               <p>你可以问我关于地块、天气和农事安排的问题。</p>
 
               <div className="agent-suggestions">
@@ -199,7 +199,7 @@ export default function AgentPage() {
           <textarea
             ref={inputRef}
             rows={1}
-            placeholder="问我任何农事问题…（Enter 发送，Shift+Enter 换行）"
+            placeholder="你有什么想知道的，快来问问我"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

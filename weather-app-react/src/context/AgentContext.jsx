@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 const AgentContext = createContext(null);
 
 /**
- * 农事助手的对话状态。
+ * 助农手的对话状态。
  *
  * 放在路由之上：切到别的 Tab 时 AgentPage 会被卸载，
  * 状态若留在组件内，回来聊天记录就没了。
