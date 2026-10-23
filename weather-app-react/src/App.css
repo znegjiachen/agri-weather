@@ -3254,7 +3254,8 @@ main {
 
 /* 首页左上角天气入口 */
 .home-weather {
-  display: inline-flex;
+  /* 只为手机准备；桌面端通过侧边栏进入天气页 */
+  display: none;
   align-items: center;
   gap: 10px;
   margin: 0 0 14px;
@@ -3312,4 +3313,8 @@ main {
 .hw-city {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .home-weather { display: inline-flex; }
 }
