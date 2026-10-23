@@ -3719,3 +3719,8 @@ main {
   .wd-temp { font-size: 76px; }
   .wd-week-desc { display: none; }
 }
+
+/* 移动端首页不展示欢迎横幅，把首屏留给天气和统计数据 */
+@media (max-width: 768px) {
+  .dashboard .welcome { display: none; }
+}
