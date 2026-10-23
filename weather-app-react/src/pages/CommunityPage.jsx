@@ -181,37 +181,45 @@ export default function CommunityPage() {
         </div>
       )}
 
-      <div className="community-feed">
+      <div className="community-grid">
         {posts.map((p) => (
-          <article key={p.id} className="glass community-post">
-            <div className="community-post-head">
-              <div className="community-author">
-                <span className="community-avatar">👨‍🌾</span>
-                <div>
-                  <div className="community-author-name">{p.author}</div>
-                  <div className="community-time">{p.createdAt}</div>
+          <article key={p.id} className="glass community-note">
+            <Link to={`/community/${p.id}`} className="community-note-link">
+              <div className={`community-note-media ${p.coverImage ? '' : 'text-only'}`}>
+                {p.coverImage ? (
+                  <img
+                    className="community-note-cover"
+                    src={p.coverImage}
+                    alt={p.title || p.excerpt || '帖子图片'}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span className="community-note-text">
+                    {p.excerpt || p.title || '来自农友的分享'}
+                  </span>
+                )}
+                <span className={`community-tag community-note-tag tag-${p.category?.toLowerCase()}`}>
+                  {CATEGORY_LABEL[p.category] || p.category}
+                </span>
+              </div>
+
+              <div className="community-note-body">
+                <h3 className="community-note-title">
+                  {p.title || p.excerpt || '图片分享'}
+                </h3>
+                {p.title && p.excerpt && (
+                  <p className="community-note-excerpt">{p.excerpt}</p>
+                )}
+                <div className="community-note-author">
+                  <span className="community-avatar small">👨‍🌾</span>
+                  <span className="community-note-author-name">{p.author}</span>
+                  <span className="community-note-time">{p.createdAt}</span>
                 </div>
               </div>
-              <span className={`community-tag tag-${p.category?.toLowerCase()}`}>
-                {CATEGORY_LABEL[p.category] || p.category}
-              </span>
-            </div>
-
-            <Link to={`/community/${p.id}`} className="community-post-body">
-              {p.title && <h3 className="community-post-title">{p.title}</h3>}
-              {p.coverImage && (
-                <img
-                  className="community-cover"
-                  src={p.coverImage}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              )}
-              <p className="community-post-text">{p.excerpt}</p>
             </Link>
 
-            <div className="community-post-foot">
+            <div className="community-note-actions">
               <button
                 className={`community-like ${p.liked ? 'liked' : ''}`}
                 onClick={() => toggleLike(p)}

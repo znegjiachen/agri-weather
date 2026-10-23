@@ -17,6 +17,7 @@ export default function CommunityPostPage() {
   const [error, setError] = useState('');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [preview, setPreview] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +34,15 @@ export default function CommunityPostPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!preview) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setPreview('');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [preview]);
 
   const submitComment = async () => {
     const text = input.trim();
@@ -103,7 +113,11 @@ export default function CommunityPostPage() {
         </div>
 
         {post.title && <h3 className="community-post-title">{post.title}</h3>}
-        <PostContent content={post.content} contentFormat={post.contentFormat} />
+        <PostContent
+          content={post.content}
+          contentFormat={post.contentFormat}
+          onImageClick={setPreview}
+        />
 
         <div className="community-post-foot">
           <button
@@ -150,6 +164,29 @@ export default function CommunityPostPage() {
           </button>
         </div>
       </section>
+
+      {preview && (
+        <div
+          className="image-lightbox"
+          onClick={() => setPreview('')}
+          role="dialog"
+          aria-label="查看原图"
+        >
+          <img
+            src={preview}
+            alt="原图"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            className="image-lightbox-close"
+            onClick={() => setPreview('')}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
