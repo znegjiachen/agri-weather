@@ -3356,7 +3356,7 @@ main {
   height: 36px;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(17, 24, 39, 0.3);
   color: #e9f1ff;
   font-size: 20px;
   line-height: 1;
@@ -3385,9 +3385,9 @@ main {
 .wd-search-panel {
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(17, 24, 39, 0.3);
 }
 
 .wd-search-row {
@@ -3567,9 +3567,9 @@ main {
 
 .wd-day-card {
   padding: 14px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(17, 24, 39, 0.28);
   text-align: center;
 }
 
@@ -3589,9 +3589,9 @@ main {
 
 .wd-week {
   padding: 14px 10px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(17, 24, 39, 0.28);
 }
 
 .wd-week-days {
@@ -4037,4 +4037,25 @@ main {
   .mh-feature-emoji { font-size: 22px; }
   .mh-hero h2 { font-size: 28px; }
   .mh-hero-cta { padding: 10px 12px; font-size: 12px; }
+}
+
+/* 天气背景是动态渐变，浅色背景下给文字加一点阴影 */
+.wd-region,
+.wd-range,
+.wd-cond,
+.wd-loc,
+.wd-aqi-head,
+.wd-week-day,
+.wd-attribution {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.wd-temp { filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.22)); }
+
+.wd-week-date,
+.wd-day-name,
+.wd-day-temp,
+.wd-temp-high,
+.wd-temp-low {
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }

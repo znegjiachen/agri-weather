@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useWeather, { getSearchHistory } from '../hooks/useWeather';
-import { getWeatherInfo, getDayName } from '../utils/weatherCodes';
+import { getBackgroundClass, getWeatherInfo, getDayName } from '../utils/weatherCodes';
 
 function formatDate(dateStr) {
   const [, month, day] = dateStr.split('-');
@@ -46,14 +46,19 @@ export default function MobileWeather() {
     searchCity(getSearchHistory()[0] || '北京');
   }, [searchCity]);
 
-  // 深色页自己铺满，隐藏外层子页返回栏；离开时恢复
-  useEffect(() => {
-    document.body.className = 'weather-mobile';
-    return () => { document.body.className = ''; };
-  }, []);
-
   const current = weatherData?.current;
   const daily = weatherData?.daily;
+
+  // 沿用网页端同一套天气背景渐变，同时隐藏外层子页返回栏
+  const bgClass = useMemo(() => {
+    if (!current || !daily) return '';
+    return getBackgroundClass(current.weather_code, daily.sunrise[0], daily.sunset[0]);
+  }, [current, daily]);
+
+  useEffect(() => {
+    document.body.className = `weather-mobile${bgClass ? ` ${bgClass}` : ''}`;
+    return () => { document.body.className = ''; };
+  }, [bgClass]);
 
   const today = useMemo(() => {
     if (!daily) return null;
