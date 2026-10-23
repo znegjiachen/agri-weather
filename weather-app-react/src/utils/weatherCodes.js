@@ -27,9 +27,11 @@ export function getWeatherInfo(code) {
 }
 
 export function getDayName(dateStr) {
-  const date = new Date(dateStr);
+  // 按本地日期比较：下午看明天 00:00 只差几小时，用 24h 间隔会误判成「今天」
+  const date = new Date(`${dateStr}T00:00:00`);
   const today = new Date();
-  const diff = Math.floor((date - today) / (1000 * 60 * 60 * 24));
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((date - today) / (1000 * 60 * 60 * 24));
 
   if (diff === 0) return '今天';
   if (diff === 1) return '明天';
