@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
 
-const CATEGORY_LABEL = { CHAT: '闲聊', TECH: '技术', ALERT: '预警' };
+const CATEGORY_LABEL = { TECH: '农技', CHAT: '闲聊', ALERT: '预警' };
+const TABS = [
+  { key: 'ALL', label: '全部' },
+  { key: 'TECH', label: '农技' },
+  { key: 'CHAT', label: '闲聊' },
+  { key: 'ALERT', label: '预警' },
+];
 const MAX_TEXT = 2000;
 
 function plainText(html) {
@@ -25,6 +31,8 @@ function toSummary(post) {
     title: post.title,
     excerpt: text.length > 140 ? `${text.slice(0, 140)}…` : text,
     coverImage: post.contentFormat === 'HTML' ? firstImage(post.content) : null,
+    coverWidth: null,
+    coverHeight: null,
     contentFormat: post.contentFormat,
     category: post.category,
     likeCount: post.likeCount,
@@ -36,12 +44,45 @@ function toSummary(post) {
   };
 }
 
+/** 图片卡片比例：用原图宽高，极端长图/长横幅夹在 2:3 ~ 1.9:1，避免卡片过长 */
+function coverRatio(post) {
+  if (!post.coverWidth || !post.coverHeight) return 0.8;
+  return Math.min(1.9, Math.max(0.66, post.coverWidth / post.coverHeight));
+}
+
+/** 根据容器宽度算瀑布流列数：手机 2 列，桌面最多 4 列 */
+function useColumnCount(gridRef) {
+  const [count, setCount] = useState(() => (
+    typeof window !== 'undefined' && window.innerWidth <= 640 ? 2 : 4
+  ));
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      const width = el.clientWidth;
+      const gap = width <= 640 ? 10 : 16;
+      setCount(Math.max(2, Math.min(4, Math.floor((width + gap) / (200 + gap)))));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [gridRef]);
+
+  return count;
+}
+
 export default function CommunityPage() {
   const { user } = useAuth();
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [tab, setTab] = useState('ALL');
 
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
@@ -51,18 +92,43 @@ export default function CommunityPage() {
   const [editorState, setEditorState] = useState({ textLength: 0, imageCount: 0 });
 
   const editorRef = useRef(null);
+  const gridRef = useRef(null);
+  const columnCount = useColumnCount(gridRef);
+
+  /**
+   * 瀑布流分列：按顺序把下一张卡片放进当前「估算高度」最短的列。
+   * 这样既保持新帖靠前，又不会像 CSS columns 那样把新帖全堆在左列。
+   */
+  const columns = useMemo(() => {
+    const cols = Array.from({ length: columnCount }, () => ({ items: [], score: 0 }));
+    for (const post of posts) {
+      const target = cols.reduce((a, b) => (a.score <= b.score ? a : b));
+      target.items.push(post);
+      const media = post.coverImage ? 1 / coverRatio(post) : 1;
+      target.score += media + (post.title ? 0.28 : 0) + 0.2;
+    }
+    return cols;
+  }, [posts, columnCount]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setPosts(await community.list(null, 20));
+      setPosts(await community.list(null, 20, {
+        q: debouncedQuery,
+        category: tab === 'ALL' ? null : tab,
+      }));
       setError('');
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedQuery, tab]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -113,6 +179,17 @@ export default function CommunityPage() {
     }
   };
 
+  const removePost = async (post) => {
+    try {
+      await community.remove(post.id);
+      setPosts((prev) => prev.filter((x) => x.id !== post.id));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const filtersActive = debouncedQuery !== '' || tab !== 'ALL';
+
   return (
     <div className="community-page">
       <div className="page-header">
@@ -129,6 +206,39 @@ export default function CommunityPage() {
         >
           {composing ? '取消' : '✏️ 发帖'}
         </button>
+      </div>
+
+      <div className="community-search">
+        <span className="community-search-icon" aria-hidden>🔍</span>
+        <input
+          type="search"
+          placeholder="搜索社区热门话题"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {query && (
+          <button
+            type="button"
+            className="community-search-clear"
+            onClick={() => setQuery('')}
+            aria-label="清空搜索"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      <div className="community-tabs">
+        {TABS.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`community-tab ${tab === item.key ? 'active' : ''}`}
+            onClick={() => setTab(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       {error && <div className="agent-error">{error}</div>}
@@ -177,77 +287,88 @@ export default function CommunityPage() {
 
       {!loading && posts.length === 0 && (
         <div className="glass section-card">
-          <p className="empty-text">还没有帖子，来发第一条吧</p>
+          <p className="empty-text">
+            {filtersActive ? '没有找到相关帖子' : '还没有帖子，来发第一条吧'}
+          </p>
         </div>
       )}
 
-      <div className="community-grid">
-        {posts.map((p) => (
-          <article key={p.id} className="glass community-note">
-            <Link to={`/community/${p.id}`} className="community-note-link">
-              <div className={`community-note-media ${p.coverImage ? '' : 'text-only'}`}>
-                {p.coverImage ? (
-                  <img
-                    className="community-note-cover"
-                    src={p.coverImage}
-                    alt={p.title || p.excerpt || '帖子图片'}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <span className="community-note-text">
-                    {p.excerpt || p.title || '来自农友的分享'}
-                  </span>
-                )}
-                <span className={`community-tag community-note-tag tag-${p.category?.toLowerCase()}`}>
-                  {CATEGORY_LABEL[p.category] || p.category}
-                </span>
-              </div>
+      <div className="community-grid" ref={gridRef}>
+        {columns.map((column, columnIndex) => (
+          <div className="community-col" key={columnIndex}>
+            {column.items.map((p) => (
+              <article key={p.id} className="glass community-note">
+                <Link to={`/community/${p.id}`} className="community-note-link">
+                  <div
+                    className={`community-note-media ${p.coverImage ? '' : 'text-only'}`}
+                    style={{ aspectRatio: p.coverImage ? coverRatio(p) : 1 }}
+                  >
+                    {p.coverImage ? (
+                      <img
+                        className="community-note-cover"
+                        src={p.coverImage}
+                        alt={p.title || p.excerpt || '帖子图片'}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <span className="community-note-text">
+                        {p.excerpt || p.title || '来自农友的分享'}
+                      </span>
+                    )}
+                  </div>
 
-              <div className="community-note-body">
-                <h3 className="community-note-title">
-                  {p.title || p.excerpt || '图片分享'}
-                </h3>
-                {p.title && p.excerpt && (
-                  <p className="community-note-excerpt">{p.excerpt}</p>
-                )}
-                <div className="community-note-author">
+                  {p.title && (
+                    <div className="community-note-body">
+                      <h3 className="community-note-title">{p.title}</h3>
+                    </div>
+                  )}
+                </Link>
+
+                <div className="community-note-foot">
                   <span className="community-avatar small">👨‍🌾</span>
                   <span className="community-note-author-name">{p.author}</span>
-                  <span className="community-note-time">{p.createdAt}</span>
-                </div>
-              </div>
-            </Link>
 
-            <div className="community-note-actions">
-              <button
-                className={`community-like ${p.liked ? 'liked' : ''}`}
-                onClick={() => toggleLike(p)}
-              >
-                {p.liked ? '❤️' : '🤍'} {p.likeCount}
-              </button>
-              <Link to={`/community/${p.id}`} className="community-comment-link">
-                💬 {p.commentCount}
-              </Link>
-              {p.authorId === user?.userId && (
-                <button
-                  className="community-del"
-                  onClick={async () => {
-                    try {
-                      await community.remove(p.id);
-                      setPosts((prev) => prev.filter((x) => x.id !== p.id));
-                    } catch (e) {
-                      setError(e.message);
-                    }
-                  }}
-                >
-                  删除
-                </button>
-              )}
-            </div>
-          </article>
+                  <span className="community-note-actions">
+                    <button
+                      className={`community-like ${p.liked ? 'liked' : ''}`}
+                      onClick={() => toggleLike(p)}
+                      aria-label={p.liked ? '取消点赞' : '点赞'}
+                    >
+                      {p.liked ? '❤️' : '🤍'} {p.likeCount}
+                    </button>
+                    <Link to={`/community/${p.id}`} className="community-comment-link">
+                      💬 {p.commentCount}
+                    </Link>
+                    {p.authorId === user?.userId && (
+                      <button
+                        className="community-note-del"
+                        onClick={() => removePost(p)}
+                        aria-label="删除帖子"
+                      >
+                        🗑
+                      </button>
+                    )}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
         ))}
       </div>
+
+      {!composing && (
+        <button
+          type="button"
+          className="community-fab"
+          onClick={() => {
+            setComposing(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          <span className="community-fab-plus">＋</span> 发布内容
+        </button>
+      )}
     </div>
   );
 }

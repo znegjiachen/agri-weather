@@ -131,7 +131,7 @@ public class CommunityHtmlSanitizer {
         return html == null ? "" : Jsoup.parse(html).text();
     }
 
-    public String firstImageUrl(String html) {
+    public String firstImageId(String html) {
         if (html == null || html.isEmpty()) {
             return null;
         }
@@ -139,8 +139,13 @@ public class CommunityHtmlSanitizer {
         if (img == null) {
             return null;
         }
-        String src = img.attr("src");
-        return APP_IMAGE_PATH.matcher(src).matches() ? src : null;
+        Matcher m = APP_IMAGE_PATH.matcher(img.attr("src"));
+        return m.matches() ? m.group(1) : null;
+    }
+
+    public String firstImageUrl(String html) {
+        String id = firstImageId(html);
+        return id == null ? null : "/api/community/images/" + id;
     }
 
     /** 列表摘要：HTML 去标签，纯文本保留原字符，统一压空白并对齐长度 */

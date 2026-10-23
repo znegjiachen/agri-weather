@@ -39,17 +39,21 @@ public class CommunityService {
     private final CommunityPostRepository postRepo;
     private final CommunityCommentRepository commentRepo;
     private final CommunityLikeRepository likeRepo;
+    private final CommunityImageRepository imageRepo;
     private final UserRepository userRepo;
     private final CommunityHtmlSanitizer sanitizer;
     private final CommunityImageService imageService;
 
-    public List<PostSummary> list(Long cursor, int size, Long userId) {
+    /**
+     * 游标分页 + 可选关键词/分类过滤。
+     * 没有 q/category 时行为与旧的纯列表一致。
+     */
+    public List<PostSummary> list(Long cursor, int size, Long userId, String q, String category) {
         int limit = Math.max(1, Math.min(size, MAX_PAGE));
         Pageable page = PageRequest.of(0, limit);
 
-        List<CommunityPost> posts = (cursor == null)
-                ? postRepo.findByStatusOrderByIdDesc(NORMAL, page)
-                : postRepo.findByStatusAndIdLessThanOrderByIdDesc(NORMAL, cursor, page);
+        List<CommunityPost> posts = postRepo.search(
+                NORMAL, cursor, normalizeFilterCategory(category), normalizeQuery(q), page);
 
         return toSummaries(posts, userId);
     }
@@ -193,19 +197,53 @@ public class CommunityService {
                     .stream().map(CommunityLike::getPostId).collect(Collectors.toSet());
         }
 
+        Map<String, CommunityImageRepository.ImageMeta> covers = loadCovers(posts);
+
         final Set<Long> liked = likedIds;
         return posts.stream()
-                .map(p -> toSummary(p, liked, names))
+                .map(p -> toSummary(p, liked, names, covers))
                 .toList();
     }
 
-    private PostSummary toSummary(CommunityPost p, Set<Long> likedIds, Map<Long, String> names) {
+    /** 一次性批量取所有封面图的宽高，避免每张卡片查一次库 */
+    private Map<String, CommunityImageRepository.ImageMeta> loadCovers(List<CommunityPost> posts) {
+        Set<String> ids = posts.stream()
+                .filter(p -> FORMAT_HTML.equals(storedFormat(p.getContentFormat())))
+                .map(p -> sanitizer.firstImageId(p.getContent()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return imageRepo.findMetaByPublicIdIn(ids).stream()
+                .collect(Collectors.toMap(CommunityImageRepository.ImageMeta::getPublicId,
+                        java.util.function.Function.identity(), (a, b) -> a));
+    }
+
+    private PostSummary toSummary(CommunityPost p, Set<Long> likedIds, Map<Long, String> names,
+                                  Map<String, CommunityImageRepository.ImageMeta> covers) {
         String format = storedFormat(p.getContentFormat());
+        String coverImage = null;
+        Integer coverWidth = null;
+        Integer coverHeight = null;
+        if (FORMAT_HTML.equals(format)) {
+            String coverId = sanitizer.firstImageId(p.getContent());
+            if (coverId != null) {
+                coverImage = "/api/community/images/" + coverId;
+                CommunityImageRepository.ImageMeta meta = covers.get(coverId);
+                if (meta != null) {
+                    coverWidth = meta.getWidth();
+                    coverHeight = meta.getHeight();
+                }
+            }
+        }
         return new PostSummary(
                 p.getId(),
                 p.getTitle(),
                 sanitizer.excerpt(p.getContent(), format),
-                FORMAT_HTML.equals(format) ? sanitizer.firstImageUrl(p.getContent()) : null,
+                coverImage,
+                coverWidth,
+                coverHeight,
                 format,
                 p.getCategory(),
                 nz(p.getLikeCount()),
@@ -274,5 +312,22 @@ public class CommunityService {
         if (raw == null) return "CHAT";
         String up = raw.trim().toUpperCase(Locale.ROOT);
         return CATEGORIES.contains(up) ? up : "CHAT";
+    }
+
+    /** 列表筛选：ALL/空 表示不过滤；未知分类忽略，避免被随意参数拖慢查询 */
+    private static String normalizeFilterCategory(String raw) {
+        if (raw == null || raw.isBlank() || "ALL".equalsIgnoreCase(raw.trim())) {
+            return null;
+        }
+        String up = raw.trim().toUpperCase(Locale.ROOT);
+        return CATEGORIES.contains(up) ? up : null;
+    }
+
+    private static String normalizeQuery(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String q = raw.trim();
+        return q.length() > 50 ? q.substring(0, 50) : q;
     }
 }

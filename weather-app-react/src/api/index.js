@@ -91,9 +91,11 @@ export const operations = {
 
 // Community（农友社区）
 export const community = {
-  list: (cursor, size = 10) => {
+  list: (cursor, size = 10, { q, category } = {}) => {
     const qs = new URLSearchParams({ size: String(size) });
     if (cursor) qs.set('cursor', String(cursor));
+    if (q) qs.set('q', q);
+    if (category) qs.set('category', category);
     return request(`/api/community/posts?${qs.toString()}`);
   },
   detail: (id) => request(`/api/community/posts/${id}`),

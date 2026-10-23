@@ -28,8 +28,10 @@ public class CommunityController {
     @GetMapping("/posts")
     public List<PostSummary> list(@RequestParam(required = false) Long cursor,
                                   @RequestParam(defaultValue = "10") int size,
+                                  @RequestParam(required = false) String q,
+                                  @RequestParam(required = false) String category,
                                   HttpServletRequest request) {
-        return communityService.list(cursor, size, currentUserId(request));
+        return communityService.list(cursor, size, currentUserId(request), q, category);
     }
 
     @PostMapping("/posts")

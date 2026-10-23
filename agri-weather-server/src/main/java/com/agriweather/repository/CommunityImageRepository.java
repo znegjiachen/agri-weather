@@ -20,7 +20,8 @@ public interface CommunityImageRepository extends JpaRepository<CommunityImage, 
      * 发帖校验一次最多 9 张，若用实体查询会顺带把几十 MB 图片读进堆。
      */
     @Query("""
-            select i.publicId as publicId, i.userId as userId, i.postId as postId
+            select i.publicId as publicId, i.userId as userId, i.postId as postId,
+                   i.width as width, i.height as height
             from CommunityImage i
             where i.publicId in :publicIds
             """)
@@ -48,5 +49,9 @@ public interface CommunityImageRepository extends JpaRepository<CommunityImage, 
         Long getUserId();
 
         Long getPostId();
+
+        Integer getWidth();
+
+        Integer getHeight();
     }
 }

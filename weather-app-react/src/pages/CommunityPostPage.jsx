@@ -4,7 +4,7 @@ import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import PostContent from '../components/PostContent';
 
-const CATEGORY_LABEL = { CHAT: '闲聊', TECH: '技术', ALERT: '预警' };
+const CATEGORY_LABEL = { CHAT: '闲聊', TECH: '农技', ALERT: '预警' };
 
 export default function CommunityPostPage() {
   const { id } = useParams();

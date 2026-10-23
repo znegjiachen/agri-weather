@@ -11,6 +11,9 @@ public record PostSummary(
         String title,
         String excerpt,
         String coverImage,
+        /** 封面原始宽高，前端据此做瀑布流比例（缺失时前端回退 4:5） */
+        Integer coverWidth,
+        Integer coverHeight,
         String contentFormat,
         String category,
         int likeCount,
