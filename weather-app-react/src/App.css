@@ -1876,7 +1876,8 @@ main {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  scroll-behavior: smooth;
+  /* 进入/切回页面时要立即定位到最新消息，不要平滑动画 */
+  scroll-behavior: auto;
 }
 
 /* ---------- 欢迎屏 ---------- */
@@ -2399,8 +2400,11 @@ main {
    ============================================================ */
 
 .agent-page {
-  flex: 1;
+  /* 固定高度，让消息区自己滚动；否则整页滚动，切回来会停在顶部 */
+  flex: 0 0 auto;
   min-height: 0;
+  height: calc(100vh - 48px);
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {

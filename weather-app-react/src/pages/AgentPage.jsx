@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
 import { useAgent } from '../context/AgentContext';
@@ -122,10 +122,20 @@ export default function AgentPage() {
       .catch(() => setStatus({ configured: false }));
   }, []);
 
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
+  // 首次进入 / 从其它 Tab 切回来 / 新消息到达时，直接定位到最新一条
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+
+    const jump = () => { list.scrollTop = list.scrollHeight; };
+    jump();
+    const raf = requestAnimationFrame(jump);
+    const timer = setTimeout(jump, 80);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
   }, [messages, loading, analyzing]);
 
   const send = async (text) => {
