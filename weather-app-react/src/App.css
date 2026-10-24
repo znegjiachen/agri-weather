@@ -4082,3 +4082,38 @@ main {
     padding: 10px 14px;
   }
 }
+
+/* 手机端表单弹层：内容比屏幕高时整体可滚动，表单铺满可用宽度 */
+@media (max-width: 768px) {
+  .form-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .form-card {
+    width: calc(100vw - 24px);
+    max-width: 480px;
+    max-height: none;
+    margin: 0 auto;
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+
+  /* iOS 聚焦输入框会放大页面，16px 可以避免 */
+  .form-card input,
+  .form-card select {
+    font-size: 16px;
+  }
+}
+
+/* 覆盖基础规则的选择器需要同等或更高优先级 */
+@media (max-width: 768px) {
+  .form-card label input,
+  .form-card label select {
+    font-size: 16px;
+  }
+}
