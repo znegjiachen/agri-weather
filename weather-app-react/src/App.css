@@ -4059,3 +4059,26 @@ main {
 .wd-temp-low {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
+
+/* 助农手输入框：手机端默认提示保持单行，不换行撑高输入框 */
+@media (max-width: 768px) {
+  .agent-input-bar {
+    padding: 10px 10px;
+    gap: 6px;
+  }
+
+  .agent-input-bar textarea {
+    padding: 10px 10px;
+  }
+
+  .agent-input-bar textarea::placeholder {
+    font-size: clamp(10px, 3.4vw, 13px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agent-send {
+    padding: 10px 14px;
+  }
+}
