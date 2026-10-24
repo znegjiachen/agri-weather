@@ -3694,13 +3694,6 @@ main {
   transform: translate(-50%, 30%);
 }
 
-.wd-attribution {
-  margin-top: 18px;
-  text-align: center;
-  font-size: 11px;
-  color: #66758f;
-}
-
 @media (max-width: 768px) {
   .weather-page {
     /* 同时抵消 main-content(16px) 与 body(14px) 的内边距，铺满手机屏 */
@@ -4045,8 +4038,7 @@ main {
 .wd-cond,
 .wd-loc,
 .wd-aqi-head,
-.wd-week-day,
-.wd-attribution {
+.wd-week-day {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
 }
 

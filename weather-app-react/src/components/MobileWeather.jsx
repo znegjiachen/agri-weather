@@ -291,8 +291,6 @@ export default function MobileWeather() {
                 </div>
               </section>
             )}
-
-            <footer className="wd-attribution">天气服务由 Open-Meteo 驱动</footer>
           </>
         )}
       </div>
