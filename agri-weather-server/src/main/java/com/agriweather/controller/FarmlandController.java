@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ public class FarmlandController {
         f.setSoilType(str(body, "soilType"));
         if (body.get("cropId") != null) f.setCropId(lng(body, "cropId"));
         f.setIrrigationType(str(body, "irrigationType"));
+        f.setBoundary(normalizeBoundary(body.get("boundary")));
         String pd = str(body, "plantDate");
         if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
 
@@ -70,6 +72,7 @@ public class FarmlandController {
         if (body.containsKey("soilType")) f.setSoilType(str(body, "soilType"));
         if (body.containsKey("cropId")) f.setCropId(lng(body, "cropId"));
         if (body.containsKey("irrigationType")) f.setIrrigationType(str(body, "irrigationType"));
+        if (body.containsKey("boundary")) f.setBoundary(normalizeBoundary(body.get("boundary")));
         if (body.containsKey("plantDate")) {
             String pd = str(body, "plantDate");
             if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
@@ -141,5 +144,65 @@ public class FarmlandController {
         if (v == null) return null;
         if (v instanceof Number) return ((Number) v).longValue();
         return Long.parseLong(v.toString());
+    }
+
+    /**
+     * 边界支持传 JSON 字符串或数组；统一校验并归一为 [{lat,lng}] JSON 字符串。
+     * 只存 WGS84，显示时前端负责转 GCJ-02 叠到高德影像上。
+     */
+    private String normalizeBoundary(Object raw) {
+        if (raw == null) return null;
+
+        Object value = raw;
+        if (raw instanceof String s) {
+            if (s.isBlank()) return null;
+            try {
+                value = objectMapper.readValue(s, List.class);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("地块边界格式不正确");
+            }
+        }
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalArgumentException("地块边界格式不正确");
+        }
+        if (list.size() < 3 || list.size() > 200) {
+            throw new IllegalArgumentException("地块边界需要 3~200 个点");
+        }
+
+        List<Map<String, Object>> points = new ArrayList<>();
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> point)) {
+                throw new IllegalArgumentException("地块边界格式不正确");
+            }
+            double lat = coord(point.get("lat"), "纬度");
+            double lng = coord(point.get("lng"), "经度");
+            points.add(Map.of("lat", lat, "lng", lng));
+        }
+        try {
+            return objectMapper.writeValueAsString(points);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("地块边界格式不正确");
+        }
+    }
+
+    private double coord(Object value, String label) {
+        double v;
+        if (value instanceof Number n) {
+            v = n.doubleValue();
+        } else {
+            try {
+                v = Double.parseDouble(String.valueOf(value));
+            } catch (Exception e) {
+                throw new IllegalArgumentException(label + "格式不正确");
+            }
+        }
+        if (!Double.isFinite(v)) throw new IllegalArgumentException(label + "格式不正确");
+        if ("纬度".equals(label) && (v < -90 || v > 90)) {
+            throw new IllegalArgumentException("纬度需在 -90 ~ 90 之间");
+        }
+        if ("经度".equals(label) && (v < -180 || v > 180)) {
+            throw new IllegalArgumentException("经度需在 -180 ~ 180 之间");
+        }
+        return v;
     }
 }

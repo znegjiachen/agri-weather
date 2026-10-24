@@ -4413,3 +4413,130 @@ main {
 @media (max-width: 768px) {
   .agent-toolcall summary code { display: none; }
 }
+
+/* 地图圈地工具栏与边界标签 */
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-tool {
+  padding: 7px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.map-tool:hover { background: var(--glass-bg-hover); }
+
+.map-tool.active {
+  border-color: #93c5fd;
+  background: #e8f1ff;
+  color: #1d4ed8;
+}
+
+.map-tool.primary {
+  border-color: #16a34a;
+  background: #22c55e;
+  color: #fff;
+  font-weight: 600;
+}
+
+.map-tool:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.map-draw-area {
+  margin-left: auto;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.map-draw-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.map-draw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+}
+
+.map-draw-card h3 {
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.map-draw-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.map-draw-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 8px;
+}
+
+.map-draw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 已保存地块的面积/名称标签 */
+.field-area-label {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.field-area-label::before { display: none; }
+
+/* 正在绘制的面积标签 */
+.draft-area-label {
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: #16a34a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.draft-point-label {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #dcfce7;
+  font-size: 11px;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  box-shadow: none;
+}
+
+.draft-point-label::before { display: none; }
+
+@media (max-width: 768px) {
+  .map-toolbar { gap: 6px; }
+  .map-tool { padding: 6px 10px; font-size: 11px; }
+  .map-draw-area { margin-left: 0; width: 100%; }
+  .map-draw-form { grid-template-columns: 1fr; }
+}

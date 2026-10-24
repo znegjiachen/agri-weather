@@ -16,6 +16,7 @@
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
 | 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害 |
 | 📍 地块管理 | 地块增删改查，绑定作物与种植日期 |
+| 🗺️ 地块地图 | 卫星底图圈地：点击边界点围成地块，自动计算亩数并保存，支持定位 |
 | 🌤️ 天气预报 | 逐小时 / 逐日预报、天气详情、单位切换 |
 
 ### 农事智能体
@@ -85,8 +86,9 @@ docker-compose down       # 停止
 mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
 mysql -u root -p agri_weather < agri-weather-server/sql/schema.sql
 
-# 已有旧库升级到社区富文本/图片版本（新库可跳过）
+# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_community_rich_text.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farmland_boundary.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -143,7 +145,7 @@ cd weather-app-react && npm install && npm run dev
 | 分组 | 接口 |
 |---|---|
 | 认证 `/api/auth` | `POST /register` · `POST /login` |
-| 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice` |
+| 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice`（创建/更新支持 `boundary` 边界数组） |
 | 作物 `/api/crops` | `GET /` · `GET /{id}` · `GET /search` · `GET /{id}/stages` · `GET /{id}/weather-match` · `GET /{id}/current-stage` |
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |

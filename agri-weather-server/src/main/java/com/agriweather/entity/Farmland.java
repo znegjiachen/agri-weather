@@ -43,6 +43,10 @@ public class Farmland {
     @Column(name = "irrigation_type", length = 20)
     private String irrigationType;
 
+    /** 地块边界（JSON 数组，元素为 {lat,lng}，WGS84），为空表示只有中心点 */
+    @Column(columnDefinition = "MEDIUMTEXT")
+    private String boundary;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 }

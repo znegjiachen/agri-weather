@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS farmland (
     crop_id BIGINT,
     plant_date DATE,
     irrigation_type VARCHAR(20),
+    boundary MEDIUMTEXT COMMENT '地块边界 JSON [{lat,lng}]，WGS84',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES sys_user(id),
     FOREIGN KEY (crop_id) REFERENCES crop_info(id)
