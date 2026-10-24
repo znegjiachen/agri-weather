@@ -10,6 +10,9 @@ const WEATHER_ICONS = {
   95: '⛈️', 96: '⛈️', 99: '⛈️',
 };
 
+/** 经纬度统一保留两位小数：两位小数约 1 公里的精度，足够定位地块 */
+const roundCoord = (value) => Math.round(Number(value) * 100) / 100;
+
 export default function FarmlandsPage() {
   const [list, setList] = useState([]);
   const [cropList, setCropList] = useState([]);
@@ -52,11 +55,23 @@ export default function FarmlandsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const lat = roundCoord(form.lat);
+    const lng = roundCoord(form.lng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      setError('纬度需在 -90 ~ 90 之间，支持两位小数（如 30.27）');
+      return;
+    }
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      setError('经度需在 -180 ~ 180 之间，支持两位小数（如 120.15）');
+      return;
+    }
+
     setLoading(true);
     const body = {
       fieldName: form.fieldName,
-      lat: parseFloat(form.lat),
-      lng: parseFloat(form.lng),
+      lat,
+      lng,
       altitude: parseFloat(form.altitude) || 0,
       areaMu: parseFloat(form.areaMu) || 0,
       soilType: form.soilType,
@@ -78,7 +93,9 @@ export default function FarmlandsPage() {
 
   const handleEdit = (f) => {
     setForm({
-      fieldName: f.fieldName || '', lat: f.lat?.toString() || '', lng: f.lng?.toString() || '',
+      fieldName: f.fieldName || '',
+      lat: f.lat != null ? Number(f.lat).toFixed(2) : '',
+      lng: f.lng != null ? Number(f.lng).toFixed(2) : '',
       altitude: f.altitude?.toString() || '', areaMu: f.areaMu?.toString() || '',
       soilType: f.soilType || '壤土', cropId: f.cropId?.toString() || '',
       plantDate: f.plantDate || '', irrigationType: f.irrigationType || '滴灌',
@@ -144,8 +161,16 @@ export default function FarmlandsPage() {
                 </label>
               </div>
               <div className="form-row">
-                <label>纬度 *<input type="number" step="any" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} required /></label>
-                <label>经度 *<input type="number" step="any" value={form.lng} onChange={(e) => setForm({ ...form, lng: e.target.value })} required /></label>
+                <label>纬度 *（-90 ~ 90）
+                  <input type="number" step="0.01" min="-90" max="90" inputMode="decimal"
+                    placeholder="如 30.27" value={form.lat}
+                    onChange={(e) => setForm({ ...form, lat: e.target.value })} required />
+                </label>
+                <label>经度 *（-180 ~ 180）
+                  <input type="number" step="0.01" min="-180" max="180" inputMode="decimal"
+                    placeholder="如 120.15" value={form.lng}
+                    onChange={(e) => setForm({ ...form, lng: e.target.value })} required />
+                </label>
               </div>
               <div className="form-row">
                 <label>海拔 (m)<input type="number" step="any" value={form.altitude} onChange={(e) => setForm({ ...form, altitude: e.target.value })} /></label>
@@ -294,7 +319,7 @@ export default function FarmlandsPage() {
                 <span className="crop-badge">{getCropName(f.cropId)}</span>
               </div>
               <div className="farmland-details">
-                <p>📍 {f.lat?.toFixed(4)}, {f.lng?.toFixed(4)} {f.altitude ? `海拔${f.altitude}m` : ''}</p>
+                <p>📍 {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)} {f.altitude ? `海拔${f.altitude}m` : ''}</p>
                 <p>📐 {f.areaMu} 亩 | 🪨 {f.soilType} | 💧 {f.irrigationType}</p>
                 {f.plantDate && <p>🌱 播种：{f.plantDate}</p>}
               </div>
