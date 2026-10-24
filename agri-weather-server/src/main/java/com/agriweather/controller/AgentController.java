@@ -7,16 +7,24 @@ import com.agriweather.agent.ToolRegistry;
 import com.agriweather.ai.AgriContext;
 import com.agriweather.ai.DeepSeekClient;
 import com.agriweather.ai.DeepSeekProperties;
+import com.agriweather.ai.VisionClient;
+import com.agriweather.ai.VisionProperties;
 import com.agriweather.dto.AgentChatRequest;
 import com.agriweather.dto.AgentChatResponse;
+import com.agriweather.dto.AgentVisionResponse;
+import com.agriweather.service.CommunityImageProcessor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +40,9 @@ public class AgentController {
     private final AgentHarness agentHarness;
     private final ToolRegistry toolRegistry;
     private final DeepSeekProperties props;
+    private final VisionClient visionClient;
+    private final VisionProperties visionProps;
+    private final CommunityImageProcessor imageProcessor;
 
     /**
      * 与农事智能体对话
@@ -48,8 +59,15 @@ public class AgentController {
         }
 
         try {
+            // 有图片时，视觉模型的识别结果随本轮消息一起交给文本智能体
+            String message = body.getMessage();
+            if (body.getVisionContext() != null && !body.getVisionContext().isBlank()) {
+                message = message + "\n\n【图片识别结果（视觉模型提供，供参考）】\n"
+                        + body.getVisionContext().trim();
+            }
+
             AgentResult result = agentHarness.run(
-                    body.getMessage(),
+                    message,
                     body.getHistory(),
                     AgentContext.of(new AgriContext(userId)));
 
@@ -66,6 +84,63 @@ public class AgentController {
             log.error("智能体对话异常", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "智能体处理失败：" + e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 作物照片识别（多模态）
+     * POST /api/agent/vision
+     * multipart: files（1-4 张 JPG/PNG），note（可选，用户文字补充）
+     */
+    @PostMapping(value = "/vision", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AgentVisionResponse vision(@RequestParam("files") List<MultipartFile> files,
+                                      @RequestParam(required = false) String note,
+                                      HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
+        }
+        if (!visionProps.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "未配置视觉模型 API Key，请设置 VISION_API_KEY 或 DEEPSEEK_API_KEY");
+        }
+        if (files == null || files.isEmpty()) {
+            throw new IllegalArgumentException("请上传至少一张作物照片");
+        }
+        if (files.size() > visionProps.getMaxImages()) {
+            throw new IllegalArgumentException("一次最多识别 " + visionProps.getMaxImages() + " 张照片");
+        }
+
+        List<VisionClient.ImageInput> inputs = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) {
+                continue;
+            }
+            if (file.getSize() > visionProps.getMaxImageBytes()) {
+                throw new IllegalArgumentException("单张图片不能超过 5MB");
+            }
+            try {
+                CommunityImageProcessor.ProcessedImage processed = imageProcessor.process(file.getBytes());
+                inputs.add(new VisionClient.ImageInput(processed.data(), processed.mimeType()));
+            } catch (IOException e) {
+                throw new IllegalArgumentException("图片读取失败，请重试");
+            }
+        }
+        if (inputs.isEmpty()) {
+            throw new IllegalArgumentException("图片内容为空，请重新选择");
+        }
+
+        String cleanNote = note == null ? "" : note.trim();
+        if (cleanNote.length() > 300) {
+            cleanNote = cleanNote.substring(0, 300);
+        }
+
+        try {
+            return visionClient.analyze(inputs, cleanNote);
+        } catch (VisionClient.VisionException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         }
     }
 
@@ -88,7 +163,9 @@ public class AgentController {
                 "configured", props.isConfigured(),
                 "model", props.getModel(),
                 "baseUrl", props.getBaseUrl(),
-                "maxIterations", props.getMaxIterations()
+                "maxIterations", props.getMaxIterations(),
+                "visionConfigured", visionProps.isConfigured(),
+                "visionModel", visionProps.getModel()
         );
     }
 

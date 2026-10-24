@@ -19,12 +19,18 @@ import java.util.List;
  * 环境里直接 new（单元测试就是这么用的）。装配的职责集中在这里。
  */
 @Configuration
-@EnableConfigurationProperties(DeepSeekProperties.class)
+@EnableConfigurationProperties({DeepSeekProperties.class, VisionProperties.class})
 public class AgentAutoConfiguration {
 
     @Bean
     public ChatModel chatModel(DeepSeekProperties props, ObjectMapper mapper) {
         return new DeepSeekClient(props, mapper);
+    }
+
+    /** 植物照片识别：与文本智能体解耦，识别结果再作为上下文喂给文本模型 */
+    @Bean
+    public VisionClient visionClient(VisionProperties props, ObjectMapper mapper) {
+        return new VisionClient(props, mapper);
     }
 
     /** 所有 Tool 实现由 Spring 自动收集注入 */

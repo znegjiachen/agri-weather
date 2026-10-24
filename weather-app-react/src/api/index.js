@@ -131,13 +131,36 @@ export const community = {
   },
 };
 
-// Agent（农事智能体）
+// Agent（AgriChat 农事智能体）
 export const agent = {
-  chat: (message, history = []) =>
+  chat: (message, history = [], visionContext = '') =>
     request('/api/agent/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({
+        message,
+        history,
+        ...(visionContext ? { visionContext } : {}),
+      }),
     }),
+
+  /** 上传作物照片给视觉模型识别，返回结构化结果 */
+  vision: async (files, note = '') => {
+    const token = getToken();
+    const form = new FormData();
+    Array.from(files).forEach((file) => form.append('files', file));
+    if (note) form.append('note', note);
+
+    const res = await fetch(`${BASE_URL}/api/agent/vision`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await res.json().catch(() => null);
+
+    if (res.status === 401) handleUnauthorized(data);
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    return data;
+  },
   status: () => request('/api/agent/status'),
   tools: () => request('/api/agent/tools'),
 };

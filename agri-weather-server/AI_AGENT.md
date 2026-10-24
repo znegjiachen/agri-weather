@@ -100,6 +100,38 @@ curl -X POST http://localhost:8082/api/agent/chat \
 
 `toolCalls` 字段很有用 —— 前端可以展示"它查了什么"，排查问题时也能一眼看出模型到底调了什么。
 
+### POST /api/agent/vision —— 作物照片识别（多模态）
+
+**需要登录**。multipart 上传 1-3 张 JPG/PNG，可附带用户文字备注。
+
+```bash
+curl -X POST http://localhost:8082/api/agent/vision \
+  -H "Authorization: Bearer <你的token>" \
+  -F "files=@leaf.jpg" \
+  -F "note=番茄下部叶片有褐斑"
+```
+
+返回结构化识别结果：
+
+```json
+{
+  "plantName": "番茄",
+  "scientificName": "Solanum lycopersicum",
+  "growthStage": "结果期",
+  "healthStatus": "明显异常",
+  "issues": [
+    {"type": "disease", "name": "早疫病", "confidence": 0.82,
+     "symptoms": "下部叶片同心轮纹褐斑", "suggestion": "摘除病叶，改善通风"}
+  ],
+  "overallAssessment": "疑似早疫病早期。",
+  "careAdvice": ["减少叶面浇水", "按标签使用登记药剂"],
+  "model": "deepseek-v4-flash-vision-exp",
+  "imageCount": 1
+}
+```
+
+调用 `/chat` 时把 `formatVision(...)` 的文字放进 `visionContext`，后端会把它附在本轮用户消息后面交给文本智能体，由智能体结合地块天气和农事工具生成最终建议。视觉模型默认复用 `DEEPSEEK_API_KEY`，可用 `VISION_API_KEY` / `VISION_MODEL` 单独配置。
+
 ### GET /api/agent/tools —— 查看可用工具（调试）
 
 ### GET /api/agent/status —— 运行状态
@@ -136,7 +168,7 @@ curl -X POST http://localhost:8082/api/agent/chat \
 
 ## 前端页面
 
-已接入，侧边栏「🤖 助农手」。
+已接入，侧边栏「🤖 助农手」，页面标题「🤖 AgriChat · 助农手」。
 
 | 文件 | 说明 |
 |---|---|
@@ -151,8 +183,10 @@ curl -X POST http://localhost:8082/api/agent/chat \
 - 4 个建议问题，点击即问
 - 多轮对话，自动携带历史
 - 未配置密钥时显示明确提示，而不是静默失败
+- **多模态**：上传最多 3 张作物照片，自动压缩到 1600px 后识别；识别结果以卡片展示（植物/阶段/健康状态/问题/置信度/照护建议），再交给智能体结合地块和天气作答
+- 后续追问会带上之前的图片识别结果
 - Enter 发送、Shift+Enter 换行
-- 发送失败自动回填输入框，不留孤立的用户消息
+- 发送失败自动回填输入框与照片，不留孤立的用户消息
 
 前端请求地址由 `VITE_API_BASE` 决定（见 `api/index.js`），默认 `http://localhost:8082`。
 

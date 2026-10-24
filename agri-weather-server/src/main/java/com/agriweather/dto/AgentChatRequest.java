@@ -16,4 +16,8 @@ public class AgentChatRequest {
 
     /** 历史对话，元素形如 {"role":"user","content":"..."} */
     private List<Map<String, String>> history;
+
+    /** 视觉模型对用户照片的识别结果，后端会拼进本轮用户消息 */
+    @Size(max = 6000, message = "图片识别结果过长")
+    private String visionContext;
 }

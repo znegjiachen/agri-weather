@@ -51,6 +51,17 @@ app:
     temperature: 0.3
     max-tokens: 2048
 
+  # 作物照片识别（多模态）
+  # 默认复用 DeepSeek Key 与地址；可单独配置 VISION_API_KEY / VISION_BASE_URL
+  vision:
+    api-key: ${VISION_API_KEY:${DEEPSEEK_API_KEY:}}
+    base-url: ${VISION_BASE_URL:${DEEPSEEK_BASE_URL:https://api.deepseek.com}}
+    model: ${VISION_MODEL:deepseek-v4-flash-vision-exp}
+    timeout-seconds: 120
+    max-tokens: 3000
+    max-images: 3
+    max-image-bytes: 5242880
+
   # 天气外呼与缓存
   weather:
     base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}

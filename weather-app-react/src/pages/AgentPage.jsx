@@ -3,6 +3,8 @@ import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
 import { useAgent } from '../context/AgentContext';
 
+const MAX_IMAGES = 3;
+
 const TOOL_LABELS = {
   list_farmlands: { icon: '📍', label: '查询地块列表' },
   get_farmland_detail: { icon: '📋', label: '读取地块详情' },
@@ -20,23 +22,99 @@ const SUGGESTIONS = [
   '最近有冻害或涝害风险吗？',
 ];
 
+/** 上传前压到最长边 1600px，减少视觉模型等待时间和流量 */
+async function compressImage(file) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请选择图片文件');
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    throw new Error('图片过大，请选择 20MB 以内的照片');
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close?.();
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    if (!blob) throw new Error('图片处理失败');
+    return new File([blob], `${file.name.replace(/\.\w+$/, '') || 'photo'}.jpg`, {
+      type: 'image/jpeg',
+    });
+  } catch (e) {
+    // 浏览器解不了的格式（如部分 HEIC）交给后端报错，小图直接上传
+    if (file.size <= 5 * 1024 * 1024) return file;
+    throw new Error('图片处理失败，请换一张 JPG/PNG 照片');
+  }
+}
+
+/** 把结构化识别结果转成文字，用于展示给智能体和历史消息 */
+function formatVision(vision) {
+  if (!vision) return '';
+  const lines = [];
+  lines.push(`植物：${vision.plantName || '未识别'}${vision.scientificName ? `（${vision.scientificName}）` : ''}`);
+  lines.push(`生长阶段：${vision.growthStage || '无法判断'}`);
+  lines.push(`健康状态：${vision.healthStatus || '无法判断'}`);
+
+  if (vision.issues?.length) {
+    lines.push('发现的问题：');
+    vision.issues.forEach((issue, index) => {
+      const confidence = typeof issue.confidence === 'number'
+        ? `，置信度 ${Math.round(issue.confidence * 100)}%`
+        : '';
+      lines.push(`${index + 1}. [${issue.type || 'unknown'}] ${issue.name || '未知问题'}${confidence}`);
+      if (issue.symptoms) lines.push(`   症状：${issue.symptoms}`);
+      if (issue.suggestion) lines.push(`   建议：${issue.suggestion}`);
+    });
+  } else {
+    lines.push('未发现明显问题。');
+  }
+
+  if (vision.overallAssessment) lines.push(`综合判断：${vision.overallAssessment}`);
+  if (vision.careAdvice?.length) {
+    lines.push('照护建议：');
+    vision.careAdvice.forEach((advice, index) => lines.push(`${index + 1}. ${advice}`));
+  }
+  return lines.join('\n');
+}
+
 /**
- * 助农手对话页。
+ * AgriChat（助农手）对话页。
  *
  * messages 由 App 持有并传入 —— 本组件是条件渲染的，切板块时会被卸载，
- * 状态放在这里会随组件一起丢失。其余状态（草稿、加载中、错误）是瞬时的，
- * 留在本地即可。
+ * 状态放在这里会随组件一起丢失。草稿、附件、加载状态留在本地。
  */
 export default function AgentPage() {
-  // 对话状态放在 AgentContext：切 Tab 时本组件会卸载，状态留在这里会丢
   const { messages, setMessages } = useAgent();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState(null);
+  const [attachments, setAttachments] = useState([]);
 
   const listRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const attachmentsRef = useRef(attachments);
+
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
+
+  // 离开页面时只清理还没发出去的照片
+  useEffect(() => () => {
+    attachmentsRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
+  }, []);
 
   useEffect(() => {
     agentApi.status()
@@ -44,28 +122,50 @@ export default function AgentPage() {
       .catch(() => setStatus({ configured: false }));
   }, []);
 
-  // 新消息进来时滚到底部
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages, loading, analyzing]);
 
   const send = async (text) => {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    const files = attachments.map((item) => item.file);
+    const previews = attachments.map((item) => item.preview);
+    if ((!content && files.length === 0) || loading) return;
 
+    const question = content || '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。';
     setError('');
     setInput('');
+    setAttachments([]);
 
-    // 历史只取 user/assistant 的纯文本，工具轨迹不往上传
-    const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    const userMsg = { role: 'user', content };
-    setMessages((prev) => [...prev, userMsg]);
+    // 历史里把之前的图片识别结果带上，后续追问时模型仍能参考
+    const history = messages.map((m) => ({
+      role: m.role,
+      content: m.role === 'user' && m.vision
+        ? `${m.content}\n\n【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`
+        : m.content,
+    }));
+
+    setMessages((prev) => [...prev, { role: 'user', content: question, images: previews }]);
     setLoading(true);
 
     try {
-      const res = await agentApi.chat(content, history);
+      let vision = null;
+      let visionContext = '';
+
+      if (files.length > 0) {
+        setAnalyzing(true);
+        vision = await agentApi.vision(files, content);
+        visionContext = formatVision(vision);
+        // 识别结果先挂到本轮用户消息上，用户能立刻看到
+        setMessages((prev) => prev.map((m, index) => (
+          index === prev.length - 1 ? { ...m, vision } : m
+        )));
+        setAnalyzing(false);
+      }
+
+      const res = await agentApi.chat(question, history, visionContext);
       setMessages((prev) => [
         ...prev,
         {
@@ -78,12 +178,50 @@ export default function AgentPage() {
       ]);
     } catch (e) {
       setError(e.message || '调用失败');
-      // 失败时把用户消息撤掉，避免历史里留下没有回复的孤条
+      // 失败时撤回用户消息，保留输入和照片方便重试
       setMessages((prev) => prev.slice(0, -1));
       setInput(content);
+      if (files.length > 0) {
+        setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
+      }
+    } finally {
+      setAnalyzing(false);
+      setLoading(false);
+      inputRef.current?.focus();
     }
-    setLoading(false);
-    inputRef.current?.focus();
+  };
+
+  const handleFiles = async (event) => {
+    const picked = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (picked.length === 0) return;
+
+    if (attachments.length + picked.length > MAX_IMAGES) {
+      setError(`一次最多识别 ${MAX_IMAGES} 张照片`);
+      return;
+    }
+
+    setError('');
+    const prepared = [];
+    for (const file of picked) {
+      try {
+        const compressed = await compressImage(file);
+        prepared.push({ file: compressed, preview: URL.createObjectURL(compressed) });
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+    if (prepared.length > 0) {
+      setAttachments((prev) => [...prev, ...prepared].slice(0, MAX_IMAGES));
+    }
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments((prev) => {
+      const target = prev[index];
+      if (target) URL.revokeObjectURL(target.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleKeyDown = (e) => {
@@ -94,17 +232,23 @@ export default function AgentPage() {
   };
 
   const clearChat = () => {
+    messages.forEach((m) => {
+      (m.images || []).forEach((url) => URL.revokeObjectURL(url));
+    });
+    attachments.forEach((item) => URL.revokeObjectURL(item.preview));
+    setAttachments([]);
     setMessages([]);
     setError('');
   };
 
   const notConfigured = status && status.configured === false;
+  const canSend = !loading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
 
   return (
     <div className="agent-page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">🤖 助农手</h2>
+          <h2 className="page-title">🤖 AgriChat · 助农手</h2>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
             内容由AI生成，仅供参考
           </p>
@@ -122,6 +266,7 @@ export default function AgentPage() {
           <p>
             后端没有配置 DeepSeek API Key。请设置环境变量
             <code>DEEPSEEK_API_KEY</code> 后重启服务。
+            图片识别默认复用同一个 Key，也可以单独设置 <code>VISION_API_KEY</code>。
           </p>
         </div>
       )}
@@ -131,8 +276,11 @@ export default function AgentPage() {
           {messages.length === 0 && (
             <div className="agent-welcome">
               <div className="agent-welcome-icon">🌾</div>
-              <h3>你好，我是助农手</h3>
-              <p>你可以问我关于地块、天气和农事安排的问题。</p>
+              <h3>你好，我是 AgriChat（助农手）</h3>
+              <p>
+                可以问地块、天气和农事安排，也可以直接上传作物照片，
+                我帮你看植物种类、生长阶段和病害。
+              </p>
 
               <div className="agent-suggestions">
                 {SUGGESTIONS.map((s) => (
@@ -153,7 +301,14 @@ export default function AgentPage() {
             <div key={i} className={`agent-msg agent-msg-${m.role}`}>
               <div className="agent-avatar">{m.role === 'user' ? '👨‍🌾' : '🤖'}</div>
               <div className="agent-bubble-wrap">
-                {/* 工具调用过程 —— 让用户看见它查了什么 */}
+                {m.images?.length > 0 && (
+                  <div className="agent-msg-images">
+                    {m.images.map((src) => (
+                      <img key={src} src={src} alt="上传的作物照片" />
+                    ))}
+                  </div>
+                )}
+
                 {m.toolCalls?.length > 0 && (
                   <ToolCallList calls={m.toolCalls} />
                 )}
@@ -162,6 +317,8 @@ export default function AgentPage() {
                 <div className="agent-bubble">
                   {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
                 </div>
+
+                {m.vision && <VisionCard vision={m.vision} />}
 
                 {m.truncated && (
                   <div className="agent-note">
@@ -181,7 +338,7 @@ export default function AgentPage() {
                   <span className="agent-dot" />
                   <span className="agent-dot" />
                   <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-                    正在查阅数据…
+                    {analyzing ? '正在识别作物照片…' : '正在查阅数据…'}
                   </span>
                 </div>
               </div>
@@ -195,7 +352,45 @@ export default function AgentPage() {
           </div>
         )}
 
+        {attachments.length > 0 && (
+          <div className="agent-attachments">
+            {attachments.map((item, index) => (
+              <div className="agent-attach-item" key={item.preview}>
+                <img src={item.preview} alt={`待上传照片 ${index + 1}`} />
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  aria-label="移除这张照片"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <span className="agent-attach-hint">
+              最多 {MAX_IMAGES} 张，可拍叶片正反面或整株
+            </span>
+          </div>
+        )}
+
         <div className="agent-input-bar">
+          <button
+            type="button"
+            className="agent-attach-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading || notConfigured}
+            aria-label="上传作物照片"
+            title="上传作物照片"
+          >
+            📷
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={handleFiles}
+          />
           <textarea
             ref={inputRef}
             rows={1}
@@ -208,12 +403,80 @@ export default function AgentPage() {
           <button
             className="btn-primary agent-send"
             onClick={() => send()}
-            disabled={loading || !input.trim() || notConfigured}
+            disabled={!canSend}
           >
-            {loading ? '…' : '发送'}
+            {analyzing ? '识别中' : loading ? '…' : '发送'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 图片识别结果卡片 */
+function VisionCard({ vision }) {
+  const [open, setOpen] = useState(false);
+  const healthClass = vision.healthStatus?.includes('异常')
+    ? 'warn'
+    : vision.healthStatus === '健康' ? 'ok' : 'unknown';
+  const undetermined = !vision.plantName
+    || vision.plantName === '未识别'
+    || vision.healthStatus === '无法判断';
+
+  return (
+    <div className="agent-vision-card">
+      <div className="agent-vision-head">
+        <span className="agent-vision-title">🔎 图片识别</span>
+        <span className="agent-vision-tag">{vision.plantName || '未识别'}</span>
+        <span className="agent-vision-tag">{vision.growthStage || '无法判断'}</span>
+        <span className={`agent-vision-tag health-${healthClass}`}>
+          {vision.healthStatus || '无法判断'}
+        </span>
+      </div>
+
+      {vision.issues?.length > 0 ? (
+        <div className="agent-vision-issues">
+          {vision.issues.map((issue, index) => (
+            <div key={index} className="agent-vision-issue">
+              <div className="agent-vision-issue-head">
+                <strong>{issue.name || '未知问题'}</strong>
+                {typeof issue.confidence === 'number' && (
+                  <span>{Math.round(issue.confidence * 100)}%</span>
+                )}
+              </div>
+              {issue.symptoms && <p>症状：{issue.symptoms}</p>}
+              {issue.suggestion && <p>建议：{issue.suggestion}</p>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="agent-vision-clean">
+          {undetermined ? '图片信息不足，无法判断病虫害情况。' : '未发现明显病害或虫害迹象。'}
+        </p>
+      )}
+
+      {vision.overallAssessment && (
+        <p className="agent-vision-summary">{vision.overallAssessment}</p>
+      )}
+
+      {vision.careAdvice?.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="agent-vision-toggle"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? '收起照护建议 ▲' : '查看照护建议 ▼'}
+          </button>
+          {open && (
+            <ul className="agent-vision-advice">
+              {vision.careAdvice.map((advice, index) => (
+                <li key={index}>{advice}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </div>
   );
 }

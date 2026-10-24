@@ -11,7 +11,7 @@
 | 模块 | 说明 |
 |---|---|
 | 📊 工作台 | 汇总各地块当日天气、生长阶段与待处理预警 |
-| 🤖 助农手 | 对话式顾问。模型自主决定调哪个工具、查哪块地，全程用真实数据作答 |
+| 🤖 AgriChat / 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，也会自主调用工具查询真实地块与天气数据 |
 | 🌱 作物适配 | 作物知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
 | 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害 |
@@ -31,6 +31,8 @@
 ```
 
 全程没有编造数据——风速是 Open-Meteo 的实时值。
+
+**多模态识图**：在对话里直接上传作物照片（最多 3 张），视觉模型会先识别植物名称、生长阶段、健康状态和可见的病害/虫害/缺素，再由助农手结合地块天气和农事工具给出建议。识别结果以卡片展示，低置信度或无法判断时会明确提示补拍。
 
 可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
 
@@ -146,7 +148,7 @@ cd weather-app-react && npm install && npm run dev
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
-| 智能体 `/api/agent` | `POST /chat` · `GET /tools` · `GET /status` |
+| 智能体 `/api/agent` | `POST /chat` · `POST /vision`（multipart，需要登录）· `GET /tools` · `GET /status` |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
 
@@ -169,6 +171,8 @@ cd weather-app-react && npm install && npm run dev
 | `JWT_SECRET` | JWT 签名密钥，至少 256 位随机串 |
 | `CORS_ORIGINS` | 允许的前端域名，逗号分隔 |
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥（[申请地址](https://platform.deepseek.com/api_keys)） |
+| `VISION_API_KEY` | 可选，视觉模型密钥；不填默认复用 `DEEPSEEK_API_KEY` |
+| `VISION_MODEL` | 可选，默认 `deepseek-v4-flash-vision-exp` |
 | `SERVER_PORT` | 后端端口，默认 8082 |
 
 **不要把密钥写进 `application.yml` 并提交**——该文件会进 Git。本地开发用环境变量注入。
