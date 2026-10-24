@@ -19,20 +19,20 @@ public class DeepSeekProperties {
     /** 接口地址，兼容 OpenAI 协议的中转服务改这里即可 */
     private String baseUrl = "https://api.deepseek.com";
 
-    /** 模型名：deepseek-chat（V3 通用）/ deepseek-reasoner（R1 推理） */
-    private String model = "deepseek-chat";
+    /** 模型名：deepseek-reasoner（默认，支持工具调用并返回思考内容）/ deepseek-chat */
+    private String model = "deepseek-reasoner";
 
     /** 工具调用最大轮数，防止模型无限循环调用工具 */
     private int maxIterations = 6;
 
     /** 单次请求超时（秒） */
-    private int timeoutSeconds = 60;
+    private int timeoutSeconds = 120;
 
     /** 温度：农事建议需要稳定，不宜过高 */
     private double temperature = 0.3;
 
-    /** 单次回复最大 token */
-    private int maxTokens = 2048;
+    /** 单次回复最大 token（reasoner 的思考 token 也算在内） */
+    private int maxTokens = 4096;
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank();

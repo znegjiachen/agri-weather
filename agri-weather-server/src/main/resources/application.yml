@@ -45,11 +45,11 @@ app:
   deepseek:
     api-key: ${DEEPSEEK_API_KEY:}
     base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
-    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    model: ${DEEPSEEK_MODEL:deepseek-reasoner}
     max-iterations: 6
-    timeout-seconds: 60
+    timeout-seconds: 120
     temperature: 0.3
-    max-tokens: 2048
+    max-tokens: 4096
 
   # 作物照片识别（多模态）
   # 默认复用 DeepSeek Key 与地址；可单独配置 VISION_API_KEY / VISION_BASE_URL

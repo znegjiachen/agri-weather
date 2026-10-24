@@ -104,6 +104,8 @@ public class DeepSeekClient implements ChatModel {
         }
 
         String content = (String) message.get("content");
+        // reasoner 模型会返回内部思考；只用于展示，不回传上游
+        String reasoning = (String) message.get("reasoning_content");
 
         List<ToolCall> toolCalls = new ArrayList<>();
         Object rawToolCalls = message.get("tool_calls");
@@ -120,7 +122,10 @@ public class DeepSeekClient implements ChatModel {
             }
         }
 
-        return new ChatCompletion(content, toolCalls, message);
+        Map<String, Object> assistantMessage = new LinkedHashMap<>(message);
+        assistantMessage.remove("reasoning_content");
+
+        return new ChatCompletion(content, reasoning, toolCalls, assistantMessage);
     }
 
     /** 把上游 HTTP 错误翻译成人能看懂的中文 */

@@ -4293,3 +4293,127 @@ main {
     font-size: clamp(9px, 3.2vw, 12.5px);
   }
 }
+
+/* AgriChat 工作轨迹（reasoner 思考 + 工具调用） */
+.agent-work {
+  max-width: 620px;
+  margin: 0 0 8px;
+  border: 1px solid rgba(102, 126, 234, 0.18);
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.06);
+  overflow: hidden;
+}
+
+.agent-work-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-work-title { font-weight: 600; color: #4f46e5; }
+.agent-work-meta { color: var(--text-muted); }
+.agent-work-caret { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+.agent-work-body { padding: 0 10px 10px; }
+
+.agent-work-hint {
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-work-round {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(102, 126, 234, 0.25);
+}
+
+.agent-work-round-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-thought { margin-bottom: 6px; }
+
+.agent-thought-label {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(102, 126, 234, 0.12);
+  color: #4f46e5;
+  font-size: 10px;
+}
+
+.agent-thought p {
+  max-height: 220px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+.agent-toolcall {
+  margin-top: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+}
+
+.agent-toolcall summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.agent-toolcall summary::-webkit-details-marker { display: none; }
+.agent-toolcall-name { font-weight: 500; color: var(--text-primary); }
+.agent-toolcall summary code { font-size: 10px; color: var(--text-muted); }
+.agent-toolcall-time { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+
+.agent-toolcall-args,
+.agent-toolcall-result {
+  padding: 0 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.agent-toolcall-result {
+  max-height: 160px;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .agent-thought p { max-height: 160px; font-size: 11.5px; }
+  .agent-toolcall summary { font-size: 11.5px; }
+}
+
+.agent-toolcall summary code {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .agent-toolcall summary code { display: none; }
+}

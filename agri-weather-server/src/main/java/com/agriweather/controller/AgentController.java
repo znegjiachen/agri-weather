@@ -24,6 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -59,8 +61,12 @@ public class AgentController {
         }
 
         try {
+            // 把服务器当前时间一起给模型，避免它把「明天」算错
+            String message = "【当前时间】"
+                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                    + "\n\n" + body.getMessage();
+
             // 有图片时，视觉模型的识别结果随本轮消息一起交给文本智能体
-            String message = body.getMessage();
             if (body.getVisionContext() != null && !body.getVisionContext().isBlank()) {
                 message = message + "\n\n【图片识别结果（视觉模型提供，供参考）】\n"
                         + body.getVisionContext().trim();
@@ -72,8 +78,8 @@ public class AgentController {
                     AgentContext.of(new AgriContext(userId)));
 
             return new AgentChatResponse(
-                    result.reply(), toDto(result.trace()), result.rounds(),
-                    result.truncated(), props.getModel());
+                    result.reply(), toDto(result.trace()), toThoughts(result.thoughts()),
+                    result.rounds(), result.truncated(), props.getModel());
         } catch (DeepSeekClient.DeepSeekException e) {
             // 上游模型的问题：密钥、余额、限流、超时
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
@@ -176,7 +182,15 @@ public class AgentController {
     private List<AgentChatResponse.ToolCallTrace> toDto(List<com.agriweather.agent.ToolCallTrace> trace) {
         return trace.stream()
                 .map(t -> new AgentChatResponse.ToolCallTrace(
-                        t.getTool(), t.getArguments(), t.getResultSummary(), t.getElapsedMs()))
+                        t.getRound(), t.getTool(), t.getArguments(),
+                        t.getResultSummary(), t.getElapsedMs()))
+                .toList();
+    }
+
+    private List<AgentChatResponse.ThoughtTrace> toThoughts(List<com.agriweather.agent.AgentThought> thoughts) {
+        if (thoughts == null) return List.of();
+        return thoughts.stream()
+                .map(t -> new AgentChatResponse.ThoughtTrace(t.round(), t.content()))
                 .toList();
     }
 }

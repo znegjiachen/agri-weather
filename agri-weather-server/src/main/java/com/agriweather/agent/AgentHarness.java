@@ -59,19 +59,21 @@ public class AgentHarness {
         messages.add(msg("user", userMessage));
 
         List<ToolCallTrace> trace = new ArrayList<>();
+        List<AgentThought> thoughts = new ArrayList<>();
         List<Map<String, Object>> schemas = tools.toolSchemas();
 
         for (int round = 1; round <= options.getMaxIterations(); round++) {
             ChatCompletion completion = model.chat(messages, schemas);
+            addThought(thoughts, round, completion.reasoning());
 
             // 模型不再调用工具 —— 说明它已经准备好回答
             if (!completion.hasToolCalls()) {
                 return new AgentResult(
                         completion.content() != null ? completion.content() : "(模型未返回内容)",
-                        trace, round, false);
+                        trace, thoughts, round, false);
             }
 
-            // 把模型这轮的「工具调用请求」原样加回历史
+            // 把模型这轮的「工具调用请求」加回历史
             messages.add(completion.assistantMessage());
 
             // 逐个执行工具，结果作为 tool 消息回喂
@@ -79,6 +81,7 @@ public class AgentHarness {
                 long start = System.currentTimeMillis();
                 String result = tools.execute(call.name(), call.arguments(), context);
                 trace.add(new ToolCallTrace(
+                        round,
                         call.name(),
                         call.arguments(),
                         summarize(result),
@@ -91,10 +94,17 @@ public class AgentHarness {
         log.warn("智能体达到最大工具调用轮数 {}，强制生成最终回答", options.getMaxIterations());
         messages.add(msg("user", options.getForcedFinalInstruction()));
         ChatCompletion forced = model.chat(messages, null);
+        addThought(thoughts, options.getMaxIterations() + 1, forced.reasoning());
 
         return new AgentResult(
                 forced.content() != null ? forced.content() : "(模型未能生成回答)",
-                trace, options.getMaxIterations(), true);
+                trace, thoughts, options.getMaxIterations(), true);
+    }
+
+    private void addThought(List<AgentThought> thoughts, int round, String reasoning) {
+        if (reasoning != null && !reasoning.isBlank()) {
+            thoughts.add(new AgentThought(round, reasoning.trim()));
+        }
     }
 
     private Map<String, Object> msg(String role, String content) {

@@ -172,6 +172,7 @@ export default function AgentPage() {
           role: 'assistant',
           content: res.reply,
           toolCalls: res.toolCalls || [],
+          thoughts: res.thoughts || [],
           rounds: res.rounds,
           truncated: res.truncated,
         },
@@ -309,8 +310,12 @@ export default function AgentPage() {
                   </div>
                 )}
 
-                {m.toolCalls?.length > 0 && (
-                  <ToolCallList calls={m.toolCalls} />
+                {m.role === 'assistant' && (m.thoughts?.length > 0 || m.toolCalls?.length > 0) && (
+                  <AgentWorkTrace
+                    thoughts={m.thoughts || []}
+                    calls={m.toolCalls || []}
+                    defaultOpen={i === messages.length - 1}
+                  />
                 )}
 
                 {/* 助手回复按 Markdown 渲染；用户输入保持原文，避免被当成标记解析 */}
@@ -481,40 +486,67 @@ function VisionCard({ vision }) {
   );
 }
 
-/** 工具调用轨迹：默认折叠，点开看详情 */
-function ToolCallList({ calls }) {
-  const [open, setOpen] = useState(false);
+/** 工作轨迹：每轮思考 + 工具调用，按时间顺序展示 */
+function AgentWorkTrace({ thoughts = [], calls = [], defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const rounds = [...new Set([
+    ...thoughts.map((t) => t.round),
+    ...calls.map((c) => c.round ?? 1),
+  ])].sort((a, b) => a - b);
+
+  if (rounds.length === 0) return null;
+
+  const summary = [
+    thoughts.length > 0 ? `${thoughts.length} 次思考` : '',
+    calls.length > 0 ? `${calls.length} 次工具调用` : '',
+  ].filter(Boolean).join(' · ');
 
   return (
-    <div className="tool-trace">
-      <button className="tool-trace-toggle" onClick={() => setOpen(!open)}>
-        <span className="tool-trace-summary">
-          {calls.map((c) => TOOL_LABELS[c.tool]?.icon || '🔧').join(' ')}
-          {' '}已查询 {calls.length} 项数据
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          {open ? '收起 ▲' : '展开 ▼'}
-        </span>
+    <div className="agent-work">
+      <button type="button" className="agent-work-toggle" onClick={() => setOpen((v) => !v)}>
+        <span className="agent-work-title">🧠 工作轨迹</span>
+        <span className="agent-work-meta">{summary}</span>
+        <span className="agent-work-caret">{open ? '收起 ▲' : '展开 ▼'}</span>
       </button>
 
       {open && (
-        <div className="tool-trace-body">
-          {calls.map((c, i) => {
-            const meta = TOOL_LABELS[c.tool] || { icon: '🔧', label: c.tool };
-            return (
-              <div key={i} className="tool-trace-item">
-                <div className="tool-trace-head">
-                  <span>{meta.icon} {meta.label}</span>
-                  <code>{c.tool}</code>
-                  <span className="tool-trace-time">{c.elapsedMs}ms</span>
+        <div className="agent-work-body">
+          {thoughts.length === 0 && (
+            <div className="agent-work-hint">
+              当前模型未返回思考内容，以下为工具调用轨迹。
+            </div>
+          )}
+
+          {rounds.map((round) => (
+            <div className="agent-work-round" key={round}>
+              <div className="agent-work-round-label">第 {round} 轮</div>
+
+              {thoughts.filter((t) => t.round === round).map((thought, index) => (
+                <div className="agent-thought" key={`t-${index}`}>
+                  <span className="agent-thought-label">思考</span>
+                  <p>{thought.content}</p>
                 </div>
-                {c.arguments && c.arguments !== '{}' && (
-                  <div className="tool-trace-args">参数：{c.arguments}</div>
-                )}
-                <div className="tool-trace-result">{c.resultSummary}</div>
-              </div>
-            );
-          })}
+              ))}
+
+              {calls.filter((c) => (c.round ?? 1) === round).map((call, index) => {
+                const meta = TOOL_LABELS[call.tool] || { icon: '🔧', label: call.tool };
+                return (
+                  <details className="agent-toolcall" key={`c-${index}`}>
+                    <summary>
+                      <span className="agent-toolcall-name">{meta.icon} {meta.label}</span>
+                      <code>{call.tool}</code>
+                      <span className="agent-toolcall-time">{call.elapsedMs}ms</span>
+                    </summary>
+                    {call.arguments && call.arguments !== '{}' && (
+                      <div className="agent-toolcall-args">参数：{call.arguments}</div>
+                    )}
+                    <div className="agent-toolcall-result">{call.resultSummary}</div>
+                  </details>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>

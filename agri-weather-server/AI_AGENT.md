@@ -54,11 +54,12 @@ mvn spring-boot:run
 
 | 配置项 | 默认值 | 说明 |
 |---|---|---|
-| `model` | `deepseek-chat` | 也可用 `deepseek-reasoner`（R1，推理更强但慢） |
+| `model` | `deepseek-reasoner` | 支持工具调用并返回 `reasoning_content`，用于工作轨迹；可改回 `deepseek-chat` |
 | `base-url` | `https://api.deepseek.com` | 走中转服务时改这里 |
 | `max-iterations` | 6 | 工具调用轮数上限，防止死循环 |
 | `temperature` | 0.3 | 农事建议需要稳定，不建议调高 |
-| `timeout-seconds` | 60 | 单次请求超时 |
+| `timeout-seconds` | 120 | 单次请求超时（推理模型更慢） |
+| `max-tokens` | 4096 | 单次回复上限，reasoner 的思考 token 也计入 |
 
 ## 接口
 
@@ -89,12 +90,16 @@ curl -X POST http://localhost:8082/api/agent/chat \
 {
   "reply": "明天风速 14km/h，药液会飘移，建议改到周四上午。",
   "toolCalls": [
-    {"tool": "list_farmlands", "arguments": "{}", "resultSummary": "[...]", "elapsedMs": 32},
-    {"tool": "get_weather", "arguments": "{\"farmlandId\": 5}", "resultSummary": "{...}", "elapsedMs": 1561}
+    {"round": 1, "tool": "list_farmlands", "arguments": "{}", "resultSummary": "[...]", "elapsedMs": 32},
+    {"round": 2, "tool": "get_weather", "arguments": "{\"farmlandId\": 5}", "resultSummary": "{...}", "elapsedMs": 1561}
+  ],
+  "thoughts": [
+    {"round": 1, "content": "需要先知道用户有哪些地块……"},
+    {"round": 2, "content": "只有一块地，查天气和农事规则……"}
   ],
   "rounds": 3,
   "truncated": false,
-  "model": "deepseek-chat"
+  "model": "deepseek-reasoner"
 }
 ```
 
@@ -179,7 +184,7 @@ curl -X POST http://localhost:8082/api/agent/vision \
 
 功能：
 - 对话气泡，用户/助手左右分栏
-- **工具调用轨迹可视化** —— 折叠展示智能体查了哪些数据、参数、耗时、原始返回
+- **工作轨迹可视化** —— 每轮展示模型思考（reasoner 的 reasoning_content）+ 工具调用、参数、耗时与返回结果，可折叠
 - 4 个建议问题，点击即问
 - 多轮对话，自动携带历史
 - 未配置密钥时显示明确提示，而不是静默失败
@@ -202,5 +207,5 @@ mvn test -Dtest=AgriAgentIntegrationTest
 
 ## 费用
 
-`deepseek-chat` 便宜，一次农事咨询约 3 轮模型调用 + 若干工具执行，
-单次成本在**分币级别**。天气数据来自 open-meteo（免费）。
+`deepseek-reasoner` 会先推理再作答，一次农事咨询约 3 轮模型调用 + 若干工具执行，
+单次成本仍在**分币级别**，但响应时间比 `deepseek-chat` 长。天气数据来自 open-meteo（免费）。

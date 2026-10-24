@@ -14,6 +14,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ToolCallTrace {
 
+    /** 第几轮工具循环，与思考内容对齐 */
+    private int round;
+
     /** 工具名 */
     private String tool;
 

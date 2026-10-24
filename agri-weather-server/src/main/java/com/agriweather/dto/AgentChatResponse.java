@@ -17,6 +17,9 @@ public class AgentChatResponse {
     /** 本次回答过程中调用了哪些工具 —— 便于前端展示「它查了什么」和排查问题 */
     private List<ToolCallTrace> toolCalls;
 
+    /** 每轮模型的思考内容（reasoner 模型才有） */
+    private List<ThoughtTrace> thoughts;
+
     /** 经过了几轮模型交互 */
     private int rounds;
 
@@ -30,6 +33,8 @@ public class AgentChatResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ToolCallTrace {
+        /** 第几轮工具循环 */
+        private int round;
         /** 工具名，如 get_weather */
         private String tool;
         /** 模型传入的参数（JSON 字符串） */
@@ -38,5 +43,15 @@ public class AgentChatResponse {
         private String resultSummary;
         /** 耗时毫秒 */
         private long elapsedMs;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ThoughtTrace {
+        /** 第几轮 */
+        private int round;
+        /** 思考原文 */
+        private String content;
     }
 }
