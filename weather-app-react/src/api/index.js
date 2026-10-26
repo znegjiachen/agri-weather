@@ -143,6 +143,90 @@ export const agent = {
       }),
     }),
 
+  /**
+   * 流式对话：思考、工具开始/结束实时回调，最后返回 done 事件里的完整结果。
+   * SSE 用 fetch + ReadableStream 读，因为 EventSource 不支持 POST/Authorization。
+   */
+  chatStream: async (message, history = [], visionContext = '', handlers = {}) => {
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}/api/agent/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        message,
+        history,
+        ...(visionContext ? { visionContext } : {}),
+      }),
+    });
+
+    if (res.status === 401) {
+      const data = await res.json().catch(() => null);
+      handleUnauthorized(data);
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    }
+    if (!res.body) throw new Error('当前浏览器不支持流式响应');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let finalResult = null;
+
+    const dispatch = (frame) => {
+      let event = 'message';
+      const dataLines = [];
+      frame.split(/\r?\n/).forEach((line) => {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+      });
+      if (dataLines.length === 0) return;
+
+      let payload;
+      try {
+        payload = JSON.parse(dataLines.join('\n'));
+      } catch {
+        return;
+      }
+
+      if (event === 'round') handlers.onRound?.(payload);
+      else if (event === 'thought') handlers.onThought?.(payload);
+      else if (event === 'tool_start') handlers.onToolStarted?.(payload);
+      else if (event === 'tool_end') handlers.onToolFinished?.(payload);
+      else if (event === 'done') finalResult = payload;
+      else if (event === 'error') throw new Error(payload.message || '智能体处理失败');
+    };
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        let match = buffer.match(/\r?\n\r?\n/);
+        while (match) {
+          const frame = buffer.slice(0, match.index);
+          buffer = buffer.slice(match.index + match[0].length);
+          if (frame.trim()) dispatch(frame);
+          match = buffer.match(/\r?\n\r?\n/);
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) dispatch(buffer);
+    } finally {
+      try { reader.releaseLock(); } catch { /* 已释放 */ }
+    }
+
+    if (!finalResult) throw new Error('连接中断，请重试');
+    return finalResult;
+  },
+
   /** 上传作物照片给视觉模型识别，返回结构化结果 */
   vision: async (files, note = '') => {
     const token = getToken();

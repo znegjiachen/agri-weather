@@ -137,6 +137,21 @@ curl -X POST http://localhost:8082/api/agent/vision \
 
 调用 `/chat` 时把 `formatVision(...)` 的文字放进 `visionContext`，后端会把它附在本轮用户消息后面交给文本智能体，由智能体结合地块天气和农事工具生成最终建议。视觉模型默认复用 `DEEPSEEK_API_KEY`，可用 `VISION_API_KEY` / `VISION_MODEL` 单独配置。
 
+### POST /api/agent/chat/stream —— 流式对话（SSE）
+
+请求体与 `/chat` 相同，响应为 `text/event-stream`，用于实时展示工作轨迹：
+
+| 事件 | 数据 | 说明 |
+|---|---|---|
+| `round` | `{round}` | 第 N 轮开始 |
+| `thought` | `{round, content}` | 该轮模型思考（reasoner） |
+| `tool_start` | `{round, tool, arguments}` | 工具开始执行 |
+| `tool_end` | `{round, tool, arguments, resultSummary, elapsedMs}` | 工具完成 |
+| `done` | `{reply, toolCalls, thoughts, rounds, truncated, model}` | 最终结果 |
+| `error` | `{message}` | 失败原因 |
+
+前端用 `fetch + ReadableStream` 读取（EventSource 不支持 POST 和 Authorization）。部署时 Nginx 的 `/api/agent/` 必须关闭 `proxy_buffering`，否则事件会被攒到最后一次性返回。
+
 ### GET /api/agent/tools —— 查看可用工具（调试）
 
 ### GET /api/agent/status —— 运行状态

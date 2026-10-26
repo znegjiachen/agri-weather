@@ -42,6 +42,14 @@ public class AgentHarness {
     public AgentResult run(String userMessage,
                            List<Map<String, String>> history,
                            AgentContext<?> context) {
+        return run(userMessage, history, context, AgentObserver.NOOP);
+    }
+
+    /** 带过程回调的版本：SSE 接口用它实时推送思考与工具调用 */
+    public AgentResult run(String userMessage,
+                           List<Map<String, String>> history,
+                           AgentContext<?> context,
+                           AgentObserver observer) {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(msg("system", options.getSystemPrompt()));
@@ -63,8 +71,11 @@ public class AgentHarness {
         List<Map<String, Object>> schemas = tools.toolSchemas();
 
         for (int round = 1; round <= options.getMaxIterations(); round++) {
+            if (observer.isCancelled()) throw new AgentCancelledException();
+            observer.onRoundStarted(round);
+
             ChatCompletion completion = model.chat(messages, schemas);
-            addThought(thoughts, round, completion.reasoning());
+            addThought(thoughts, round, completion.reasoning(), observer);
 
             // 模型不再调用工具 —— 说明它已经准备好回答
             if (!completion.hasToolCalls()) {
@@ -78,32 +89,39 @@ public class AgentHarness {
 
             // 逐个执行工具，结果作为 tool 消息回喂
             for (ToolCall call : completion.toolCalls()) {
+                if (observer.isCancelled()) throw new AgentCancelledException();
+                observer.onToolStarted(round, call);
+
                 long start = System.currentTimeMillis();
                 String result = tools.execute(call.name(), call.arguments(), context);
-                trace.add(new ToolCallTrace(
-                        round,
-                        call.name(),
-                        call.arguments(),
-                        summarize(result),
-                        System.currentTimeMillis() - start));
+                long elapsed = System.currentTimeMillis() - start;
+                String summary = summarize(result);
+
+                trace.add(new ToolCallTrace(round, call.name(), call.arguments(), summary, elapsed));
+                observer.onToolFinished(round, call, summary, elapsed);
                 messages.add(toolMsg(call.id(), result));
             }
         }
 
         // 轮数用尽仍未收敛：再问一次，但这次禁用工具，逼模型基于已有信息作答
+        if (observer.isCancelled()) throw new AgentCancelledException();
         log.warn("智能体达到最大工具调用轮数 {}，强制生成最终回答", options.getMaxIterations());
+        observer.onRoundStarted(options.getMaxIterations() + 1);
         messages.add(msg("user", options.getForcedFinalInstruction()));
         ChatCompletion forced = model.chat(messages, null);
-        addThought(thoughts, options.getMaxIterations() + 1, forced.reasoning());
+        addThought(thoughts, options.getMaxIterations() + 1, forced.reasoning(), observer);
 
         return new AgentResult(
                 forced.content() != null ? forced.content() : "(模型未能生成回答)",
                 trace, thoughts, options.getMaxIterations(), true);
     }
 
-    private void addThought(List<AgentThought> thoughts, int round, String reasoning) {
+    private void addThought(List<AgentThought> thoughts, int round,
+                            String reasoning, AgentObserver observer) {
         if (reasoning != null && !reasoning.isBlank()) {
-            thoughts.add(new AgentThought(round, reasoning.trim()));
+            String content = reasoning.trim();
+            thoughts.add(new AgentThought(round, content));
+            observer.onThought(round, content);
         }
     }
 

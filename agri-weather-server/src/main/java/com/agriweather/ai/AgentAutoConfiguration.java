@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 把框架组件装配成 Spring Bean。
@@ -52,5 +54,15 @@ public class AgentAutoConfiguration {
     @Bean
     public AgentHarness agentHarness(ChatModel model, ToolRegistry tools, AgentOptions options) {
         return new AgentHarness(model, tools, options);
+    }
+
+    /** SSE 会话跑在独立线程池，避免占满 Tomcat 请求线程 */
+    @Bean(name = "agentStreamExecutor", destroyMethod = "shutdown")
+    public ExecutorService agentStreamExecutor() {
+        return Executors.newFixedThreadPool(4, r -> {
+            Thread thread = new Thread(r, "agent-stream");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 }

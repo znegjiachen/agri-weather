@@ -11,7 +11,7 @@
 | 模块 | 说明 |
 |---|---|
 | 📊 工作台 | 汇总各地块当日天气、生长阶段与待处理预警 |
-| 🤖 AgriChat / 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并展示每轮思考与工具调用轨迹 |
+| 🤖 AgriChat / 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并实时展示每轮思考与工具调用轨迹 |
 | 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
 | 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害 |
@@ -151,7 +151,7 @@ cd weather-app-react && npm install && npm run dev
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
-| 智能体 `/api/agent` | `POST /chat` · `POST /vision`（multipart，需要登录）· `GET /tools` · `GET /status` |
+| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `GET /tools` · `GET /status` |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
 

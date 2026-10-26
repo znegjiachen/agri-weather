@@ -26,6 +26,11 @@ spring:
       max-file-size: 5MB
       max-request-size: 8MB
 
+  # SSE 流式智能体的异步请求超时（思考 + 多轮工具可能较久）
+  mvc:
+    async:
+      request-timeout: 200000
+
   # Redis：天气缓存，多个实例共享同一份
   data:
     redis:

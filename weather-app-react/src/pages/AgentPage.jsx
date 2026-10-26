@@ -138,6 +138,19 @@ export default function AgentPage() {
     };
   }, [messages, loading, analyzing]);
 
+  const updateStreamingMessage = (updater) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i -= 1) {
+        if (next[i].role === 'assistant' && next[i].streaming) {
+          next[i] = updater(next[i]);
+          break;
+        }
+      }
+      return next;
+    });
+  };
+
   const send = async (text) => {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
@@ -175,22 +188,90 @@ export default function AgentPage() {
         setAnalyzing(false);
       }
 
-      const res = await agentApi.chat(question, history, visionContext);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.reply,
-          toolCalls: res.toolCalls || [],
-          thoughts: res.thoughts || [],
-          rounds: res.rounds,
-          truncated: res.truncated,
+      // 先占位一条助手消息，SSE 的思考/工具事件会实时填进工作轨迹
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        content: '',
+        thoughts: [],
+        toolCalls: [],
+        streaming: true,
+      }]);
+
+      const done = await agentApi.chatStream(question, history, visionContext, {
+        onRound: ({ round }) => {
+          updateStreamingMessage((m) => ({ ...m, currentRound: round }));
         },
-      ]);
+        onThought: ({ round, content: thought }) => {
+          updateStreamingMessage((m) => ({
+            ...m,
+            thoughts: [...m.thoughts, { round, content: thought }],
+          }));
+        },
+        onToolStarted: ({ round, tool, arguments: args }) => {
+          updateStreamingMessage((m) => ({
+            ...m,
+            toolCalls: [...m.toolCalls, {
+              round,
+              tool,
+              arguments: args,
+              resultSummary: '',
+              elapsedMs: null,
+            }],
+          }));
+        },
+        onToolFinished: ({ round, tool, arguments: args, resultSummary, elapsedMs }) => {
+          updateStreamingMessage((m) => {
+            const calls = [...m.toolCalls];
+            let index = -1;
+            for (let i = calls.length - 1; i >= 0; i -= 1) {
+              if (calls[i].round === round && calls[i].tool === tool && calls[i].elapsedMs == null) {
+                index = i;
+                break;
+              }
+            }
+            if (index >= 0) {
+              calls[index] = { ...calls[index], resultSummary, elapsedMs };
+            } else {
+              calls.push({ round, tool, arguments: args, resultSummary, elapsedMs });
+            }
+            return { ...m, toolCalls: calls };
+          });
+        },
+      });
+
+      setLoading(false);
+      setMessages((prev) => {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0; i -= 1) {
+          if (next[i].streaming) {
+            next[i] = {
+              role: 'assistant',
+              content: done.reply,
+              toolCalls: done.toolCalls || [],
+              thoughts: done.thoughts || [],
+              rounds: done.rounds,
+              truncated: done.truncated,
+              streaming: false,
+            };
+            break;
+          }
+        }
+        return next;
+      });
     } catch (e) {
       setError(e.message || '调用失败');
-      // 失败时撤回用户消息，保留输入和照片方便重试
-      setMessages((prev) => prev.slice(0, -1));
+      // 失败时移除占位消息和本轮用户消息，保留输入与照片方便重试
+      setMessages((prev) => {
+        const next = [...prev];
+        if (next.length > 0 && next[next.length - 1].role === 'assistant'
+          && next[next.length - 1].streaming) {
+          next.pop();
+        }
+        if (next.length > 0 && next[next.length - 1].role === 'user') {
+          next.pop();
+        }
+        return next;
+      });
       setInput(content);
       if (files.length > 0) {
         setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
@@ -320,18 +401,34 @@ export default function AgentPage() {
                   </div>
                 )}
 
+                {m.role === 'assistant' && m.streaming
+                  && !(m.thoughts?.length > 0) && !(m.toolCalls?.length > 0) && (
+                    <div className="agent-bubble agent-thinking">
+                      <span className="agent-dot" />
+                      <span className="agent-dot" />
+                      <span className="agent-dot" />
+                      <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                        正在思考…
+                      </span>
+                    </div>
+                  )}
+
                 {m.role === 'assistant' && (m.thoughts?.length > 0 || m.toolCalls?.length > 0) && (
                   <AgentWorkTrace
                     thoughts={m.thoughts || []}
                     calls={m.toolCalls || []}
+                    streaming={m.streaming}
+                    currentRound={m.currentRound}
                     defaultOpen={i === messages.length - 1}
                   />
                 )}
 
                 {/* 助手回复按 Markdown 渲染；用户输入保持原文，避免被当成标记解析 */}
-                <div className="agent-bubble">
-                  {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
-                </div>
+                {!m.streaming && (
+                  <div className="agent-bubble">
+                    {m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}
+                  </div>
+                )}
 
                 {m.vision && <VisionCard vision={m.vision} />}
 
@@ -344,7 +441,7 @@ export default function AgentPage() {
             </div>
           ))}
 
-          {loading && (
+          {loading && !messages.some((m) => m.streaming) && (
             <div className="agent-msg agent-msg-assistant">
               <div className="agent-avatar">🤖</div>
               <div className="agent-bubble-wrap">
@@ -497,7 +594,13 @@ function VisionCard({ vision }) {
 }
 
 /** 工作轨迹：每轮思考 + 工具调用，按时间顺序展示 */
-function AgentWorkTrace({ thoughts = [], calls = [], defaultOpen = false }) {
+function AgentWorkTrace({
+  thoughts = [],
+  calls = [],
+  streaming = false,
+  currentRound = null,
+  defaultOpen = false,
+}) {
   const [open, setOpen] = useState(defaultOpen);
 
   const rounds = [...new Set([
@@ -511,6 +614,11 @@ function AgentWorkTrace({ thoughts = [], calls = [], defaultOpen = false }) {
     thoughts.length > 0 ? `${thoughts.length} 次思考` : '',
     calls.length > 0 ? `${calls.length} 次工具调用` : '',
   ].filter(Boolean).join(' · ');
+
+  const waitingForRound = streaming
+    && currentRound
+    && !thoughts.some((t) => t.round === currentRound)
+    && !calls.some((c) => c.round === currentRound);
 
   return (
     <div className="agent-work">
@@ -546,7 +654,9 @@ function AgentWorkTrace({ thoughts = [], calls = [], defaultOpen = false }) {
                     <summary>
                       <span className="agent-toolcall-name">{meta.icon} {meta.label}</span>
                       <code>{call.tool}</code>
-                      <span className="agent-toolcall-time">{call.elapsedMs}ms</span>
+                      <span className={`agent-toolcall-time ${call.elapsedMs == null ? 'running' : ''}`}>
+                        {call.elapsedMs == null ? '进行中…' : `${call.elapsedMs}ms`}
+                      </span>
                     </summary>
                     {call.arguments && call.arguments !== '{}' && (
                       <div className="agent-toolcall-args">参数：{call.arguments}</div>
@@ -557,6 +667,18 @@ function AgentWorkTrace({ thoughts = [], calls = [], defaultOpen = false }) {
               })}
             </div>
           ))}
+
+          {waitingForRound && (
+            <div className="agent-work-round agent-work-round-live">
+              <div className="agent-work-round-label">第 {currentRound} 轮</div>
+              <div className="agent-work-waiting">
+                <span className="agent-dot" />
+                <span className="agent-dot" />
+                <span className="agent-dot" />
+                <span>思考中…</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

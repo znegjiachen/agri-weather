@@ -4555,3 +4555,19 @@ main {
 }
 
 .geolocation-label::before { display: none; }
+
+.agent-toolcall-time.running {
+  color: #4f46e5;
+  font-weight: 600;
+}
+
+.agent-work-round-live { border-left-color: rgba(102, 126, 234, 0.5); }
+
+.agent-work-waiting {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

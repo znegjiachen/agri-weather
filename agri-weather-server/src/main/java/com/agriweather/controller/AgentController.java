@@ -1,8 +1,11 @@
 package com.agriweather.controller;
 
+import com.agriweather.agent.AgentCancelledException;
 import com.agriweather.agent.AgentContext;
 import com.agriweather.agent.AgentHarness;
+import com.agriweather.agent.AgentObserver;
 import com.agriweather.agent.AgentResult;
+import com.agriweather.agent.ToolCall;
 import com.agriweather.agent.ToolRegistry;
 import com.agriweather.ai.AgriContext;
 import com.agriweather.ai.DeepSeekClient;
@@ -13,6 +16,7 @@ import com.agriweather.dto.AgentChatRequest;
 import com.agriweather.dto.AgentChatResponse;
 import com.agriweather.dto.AgentVisionResponse;
 import com.agriweather.service.CommunityImageProcessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +26,18 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 农事智能体接口
@@ -45,6 +54,8 @@ public class AgentController {
     private final VisionClient visionClient;
     private final VisionProperties visionProps;
     private final CommunityImageProcessor imageProcessor;
+    private final ObjectMapper objectMapper;
+    private final ExecutorService agentStreamExecutor;
 
     /**
      * 与农事智能体对话
@@ -61,19 +72,8 @@ public class AgentController {
         }
 
         try {
-            // 把服务器当前时间一起给模型，避免它把「明天」算错
-            String message = "【当前时间】"
-                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                    + "\n\n" + body.getMessage();
-
-            // 有图片时，视觉模型的识别结果随本轮消息一起交给文本智能体
-            if (body.getVisionContext() != null && !body.getVisionContext().isBlank()) {
-                message = message + "\n\n【图片识别结果（视觉模型提供，供参考）】\n"
-                        + body.getVisionContext().trim();
-            }
-
             AgentResult result = agentHarness.run(
-                    message,
+                    buildUserMessage(body),
                     body.getHistory(),
                     AgentContext.of(new AgriContext(userId)));
 
@@ -91,6 +91,131 @@ public class AgentController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "智能体处理失败：" + e.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * 流式对话：每轮思考、工具开始/结束、最终回答通过 SSE 实时推送。
+     * POST /api/agent/chat/stream
+     */
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStream(@Valid @RequestBody AgentChatRequest body, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
+        }
+
+        String message = buildUserMessage(body);
+        SseEmitter emitter = new SseEmitter(180_000L);
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+
+        emitter.onCompletion(() -> cancelled.set(true));
+        emitter.onTimeout(() -> {
+            cancelled.set(true);
+            emitter.complete();
+        });
+        emitter.onError(e -> cancelled.set(true));
+
+        try {
+            agentStreamExecutor.execute(() -> {
+                try {
+                    AgentResult result = agentHarness.run(
+                            message,
+                            body.getHistory(),
+                            AgentContext.of(new AgriContext(userId)),
+                            new AgentObserver() {
+                                @Override
+                                public void onRoundStarted(int round) {
+                                    if (!sendEvent(emitter, "round", Map.of("round", round))) {
+                                        cancelled.set(true);
+                                    }
+                                }
+
+                                @Override
+                                public void onThought(int round, String content) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("round", round);
+                                    payload.put("content", content);
+                                    if (!sendEvent(emitter, "thought", payload)) cancelled.set(true);
+                                }
+
+                                @Override
+                                public void onToolStarted(int round, ToolCall call) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("round", round);
+                                    payload.put("tool", call.name());
+                                    payload.put("arguments", call.arguments());
+                                    if (!sendEvent(emitter, "tool_start", payload)) cancelled.set(true);
+                                }
+
+                                @Override
+                                public void onToolFinished(int round, ToolCall call,
+                                                           String resultSummary, long elapsedMs) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("round", round);
+                                    payload.put("tool", call.name());
+                                    payload.put("arguments", call.arguments());
+                                    payload.put("resultSummary", resultSummary);
+                                    payload.put("elapsedMs", elapsedMs);
+                                    if (!sendEvent(emitter, "tool_end", payload)) cancelled.set(true);
+                                }
+
+                                @Override
+                                public boolean isCancelled() {
+                                    return cancelled.get();
+                                }
+                            });
+
+                    Map<String, Object> done = new LinkedHashMap<>();
+                    done.put("reply", result.reply());
+                    done.put("toolCalls", toDto(result.trace()));
+                    done.put("thoughts", toThoughts(result.thoughts()));
+                    done.put("rounds", result.rounds());
+                    done.put("truncated", result.truncated());
+                    done.put("model", props.getModel());
+                    sendEvent(emitter, "done", done);
+                    emitter.complete();
+                } catch (AgentCancelledException e) {
+                    emitter.complete();
+                } catch (DeepSeekClient.DeepSeekException | IllegalStateException e) {
+                    sendEvent(emitter, "error", Map.of("message", String.valueOf(e.getMessage())));
+                    emitter.complete();
+                } catch (Exception e) {
+                    log.error("智能体流式对话异常", e);
+                    sendEvent(emitter, "error",
+                            Map.of("message", "智能体处理失败：" + e.getClass().getSimpleName()));
+                    emitter.complete();
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "当前咨询人数较多，请稍后再试");
+        }
+
+        return emitter;
+    }
+
+    /** SSE 事件统一序列化成 JSON 字符串，前端按 event 名分发 */
+    private boolean sendEvent(SseEmitter emitter, String name, Object payload) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name(name)
+                    .data(objectMapper.writeValueAsString(payload)));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 当前时间 + 用户问题 + 可选图片识别结果 */
+    private String buildUserMessage(AgentChatRequest body) {
+        String message = "【当前时间】"
+                + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                + "\n\n" + body.getMessage();
+
+        if (body.getVisionContext() != null && !body.getVisionContext().isBlank()) {
+            message = message + "\n\n【图片识别结果（视觉模型提供，供参考）】\n"
+                    + body.getVisionContext().trim();
+        }
+        return message;
     }
 
     /**
