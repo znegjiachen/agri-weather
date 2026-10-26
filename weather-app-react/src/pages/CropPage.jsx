@@ -147,7 +147,7 @@ export default function CropPage() {
           <h3>📋 {selected?.cropName} 生长阶段</h3>
           <div className="stages-timeline">
             {stages.map((s, i) => (
-              <div key={s.id} className={`stage-item risk-${s.pestRiskLevel?.toLowerCase()}`}>
+              <div key={s.id ?? `${s.stageOrder}-${i}`} className={`stage-item risk-${s.pestRiskLevel?.toLowerCase()}`}>
                 <div className="stage-order">{s.stageOrder}</div>
                 <div className="stage-name">{s.stageName}</div>
                 <div className="stage-days">{s.stageDays}天</div>

@@ -12,7 +12,7 @@
 |---|---|
 | 📊 工作台 | 汇总各地块当日天气、生长阶段与待处理预警 |
 | 🤖 AgriChat / 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并展示每轮思考与工具调用轨迹 |
-| 🌱 作物适配 | 作物知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
+| 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
 | 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害 |
 | 📍 地块管理 | 地块增删改查，绑定作物与种植日期 |
@@ -86,9 +86,10 @@ docker-compose down       # 停止
 mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
 mysql -u root -p agri_weather < agri-weather-server/sql/schema.sql
 
-# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界
+# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界 + 作物库扩充
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_community_rich_text.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farmland_boundary.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261026_more_crops.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥

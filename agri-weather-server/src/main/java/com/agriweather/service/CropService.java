@@ -32,19 +32,61 @@ public class CropService {
     }
 
     public List<CropGrowthStage> getGrowthStages(Long cropId) {
-        return growthStageRepository.findByCropIdOrderByStageOrder(cropId);
+        List<CropGrowthStage> stages = growthStageRepository.findByCropIdOrderByStageOrder(cropId);
+        if (!stages.isEmpty()) {
+            return stages;
+        }
+        // 新增作物没有逐条维护阶段时，用通用四阶段兜底，避免详情页空白
+        return defaultStages(getById(cropId));
     }
 
     public CropGrowthStage getCurrentStage(Long cropId, LocalDate plantDate) {
-        CropInfo crop = getById(cropId);
         long daysSincePlant = ChronoUnit.DAYS.between(plantDate, LocalDate.now());
-        List<CropGrowthStage> stages = growthStageRepository.findByCropIdOrderByStageOrder(cropId);
+        List<CropGrowthStage> stages = getGrowthStages(cropId);
         int accumulatedDays = 0;
         for (CropGrowthStage stage : stages) {
             accumulatedDays += stage.getStageDays() != null ? stage.getStageDays() : 0;
             if (daysSincePlant <= accumulatedDays) return stage;
         }
         return stages.isEmpty() ? null : stages.get(stages.size() - 1);
+    }
+
+    private List<CropGrowthStage> defaultStages(CropInfo crop) {
+        int cycle = crop.getGrowthCycleDays() != null && crop.getGrowthCycleDays() > 0
+                ? crop.getGrowthCycleDays() : 120;
+        int[] percent = {20, 30, 30, 20};
+        String[] names = {"播种/定植期", "营养生长期", "开花/产量形成期", "成熟采收期"};
+        String[] risks = {"LOW", "MEDIUM", "HIGH", "MEDIUM"};
+        String[] warnings = {
+                "关注土壤墒情，确保出苗或定植成活",
+                "加强水肥管理，定期巡查病虫",
+                "产量形成关键期，保持适宜温湿度",
+                "关注天气变化，适时采收"
+        };
+
+        double rainfall = crop.getSuitableRainfall() != null ? crop.getSuitableRainfall() : 400;
+        List<CropGrowthStage> stages = new ArrayList<>();
+        int allocated = 0;
+        for (int i = 0; i < 4; i++) {
+            int days = i == 3 ? Math.max(1, cycle - allocated)
+                    : Math.max(1, (int) Math.round(cycle * percent[i] / 100.0));
+            allocated += days;
+            stages.add(CropGrowthStage.builder()
+                    .cropId(crop.getId())
+                    .stageName(names[i])
+                    .stageOrder(i + 1)
+                    .stageDays(days)
+                    .tempMin(crop.getSuitableTempMin())
+                    .tempMax(crop.getSuitableTempMax())
+                    .humidityMin(crop.getSuitableHumidityMin())
+                    .humidityMax(crop.getSuitableHumidityMax())
+                    .rainfallNeed((double) Math.round(rainfall / 4))
+                    .lightNeed(crop.getSuitableLightHours())
+                    .pestRiskLevel(risks[i])
+                    .keyWarnings(warnings[i])
+                    .build());
+        }
+        return stages;
     }
 
     /**
