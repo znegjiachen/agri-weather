@@ -20,4 +20,22 @@ public interface ChatModel {
      * @param tools    可用工具定义；传 null 或空表示禁止调用工具
      */
     ChatCompletion chat(List<Map<String, Object>> messages, List<Map<String, Object>> tools);
+
+    /**
+     * 流式补全。默认实现退化为普通补全，并在结束时一次性回调完整内容；
+     * 支持 SSE 的 provider 覆盖它以提供真正的 token 级增量。
+     */
+    default ChatCompletion chatStream(List<Map<String, Object>> messages,
+                                      List<Map<String, Object>> tools,
+                                      ChatStreamListener listener) {
+        ChatCompletion completion = chat(messages, tools);
+        if (completion.reasoning() != null && !completion.reasoning().isBlank()) {
+            listener.onReasoningDelta(completion.reasoning());
+        }
+        if (!completion.hasToolCalls() && completion.content() != null
+                && !completion.content().isBlank()) {
+            listener.onContentDelta(completion.content());
+        }
+        return completion;
+    }
 }

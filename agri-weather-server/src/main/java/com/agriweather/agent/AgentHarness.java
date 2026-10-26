@@ -74,7 +74,7 @@ public class AgentHarness {
             if (observer.isCancelled()) throw new AgentCancelledException();
             observer.onRoundStarted(round);
 
-            ChatCompletion completion = model.chat(messages, schemas);
+            ChatCompletion completion = callModel(messages, schemas, round, observer);
             addThought(thoughts, round, completion.reasoning(), observer);
 
             // 模型不再调用工具 —— 说明它已经准备好回答
@@ -108,12 +108,32 @@ public class AgentHarness {
         log.warn("智能体达到最大工具调用轮数 {}，强制生成最终回答", options.getMaxIterations());
         observer.onRoundStarted(options.getMaxIterations() + 1);
         messages.add(msg("user", options.getForcedFinalInstruction()));
-        ChatCompletion forced = model.chat(messages, null);
+        ChatCompletion forced = callModel(messages, null,
+                options.getMaxIterations() + 1, observer);
         addThought(thoughts, options.getMaxIterations() + 1, forced.reasoning(), observer);
 
         return new AgentResult(
                 forced.content() != null ? forced.content() : "(模型未能生成回答)",
                 trace, thoughts, options.getMaxIterations(), true);
+    }
+
+    private ChatCompletion callModel(List<Map<String, Object>> messages,
+                                     List<Map<String, Object>> schemas,
+                                     int round, AgentObserver observer) {
+        if (!observer.wantsTokenStream()) {
+            return model.chat(messages, schemas);
+        }
+        return model.chatStream(messages, schemas, new ChatStreamListener() {
+            @Override
+            public void onReasoningDelta(String delta) {
+                observer.onReasoningDelta(round, delta);
+            }
+
+            @Override
+            public void onContentDelta(String delta) {
+                observer.onContentDelta(round, delta);
+            }
+        });
     }
 
     private void addThought(List<AgentThought> thoughts, int round,

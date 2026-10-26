@@ -106,14 +106,16 @@ export default function AgentPage() {
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const attachmentsRef = useRef(attachments);
+  const liveRef = useRef({ thought: '', content: '', round: null, timer: null });
 
   useEffect(() => {
     attachmentsRef.current = attachments;
   }, [attachments]);
 
-  // 离开页面时只清理还没发出去的照片
+  // 离开页面时只清理还没发出去的照片和流式缓冲
   useEffect(() => () => {
     attachmentsRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
+    if (liveRef.current.timer) clearTimeout(liveRef.current.timer);
   }, []);
 
   useEffect(() => {
@@ -151,6 +153,30 @@ export default function AgentPage() {
     });
   };
 
+  const clearLiveBuffer = () => {
+    const live = liveRef.current;
+    if (live.timer) clearTimeout(live.timer);
+    live.timer = null;
+    live.thought = '';
+    live.content = '';
+  };
+
+  const flushLive = () => {
+    const live = liveRef.current;
+    live.timer = null;
+    updateStreamingMessage((m) => ({
+      ...m,
+      liveThought: live.thought,
+      liveContent: live.content,
+      liveThoughtRound: live.round,
+    }));
+  };
+
+  const scheduleLiveFlush = () => {
+    if (liveRef.current.timer) return;
+    liveRef.current.timer = setTimeout(flushLive, 50);
+  };
+
   const send = async (text) => {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
@@ -170,6 +196,8 @@ export default function AgentPage() {
         : m.content,
     }));
 
+    clearLiveBuffer();
+    liveRef.current.round = null;
     setMessages((prev) => [...prev, { role: 'user', content: question, images: previews }]);
     setLoading(true);
 
@@ -199,12 +227,33 @@ export default function AgentPage() {
 
       const done = await agentApi.chatStream(question, history, visionContext, {
         onRound: ({ round }) => {
-          updateStreamingMessage((m) => ({ ...m, currentRound: round }));
+          clearLiveBuffer();
+          liveRef.current.round = round;
+          updateStreamingMessage((m) => ({
+            ...m,
+            currentRound: round,
+            liveThought: '',
+            liveContent: '',
+            liveThoughtRound: round,
+          }));
+        },
+        onReasoningDelta: ({ round, delta }) => {
+          liveRef.current.round = round;
+          liveRef.current.thought += delta;
+          scheduleLiveFlush();
+        },
+        onContentDelta: ({ round, delta }) => {
+          liveRef.current.round = round;
+          liveRef.current.content += delta;
+          scheduleLiveFlush();
         },
         onThought: ({ round, content: thought }) => {
+          clearLiveBuffer();
           updateStreamingMessage((m) => ({
             ...m,
             thoughts: [...m.thoughts, { round, content: thought }],
+            liveThought: '',
+            liveThoughtRound: null,
           }));
         },
         onToolStarted: ({ round, tool, arguments: args }) => {
@@ -239,6 +288,7 @@ export default function AgentPage() {
         },
       });
 
+      clearLiveBuffer();
       setLoading(false);
       setMessages((prev) => {
         const next = [...prev];
@@ -259,6 +309,7 @@ export default function AgentPage() {
         return next;
       });
     } catch (e) {
+      clearLiveBuffer();
       setError(e.message || '调用失败');
       // 失败时移除占位消息和本轮用户消息，保留输入与照片方便重试
       setMessages((prev) => {
@@ -277,6 +328,7 @@ export default function AgentPage() {
         setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
       }
     } finally {
+      clearLiveBuffer();
       setAnalyzing(false);
       setLoading(false);
       inputRef.current?.focus();
@@ -324,6 +376,7 @@ export default function AgentPage() {
   };
 
   const clearChat = () => {
+    clearLiveBuffer();
     messages.forEach((m) => {
       (m.images || []).forEach((url) => URL.revokeObjectURL(url));
     });
@@ -402,7 +455,8 @@ export default function AgentPage() {
                 )}
 
                 {m.role === 'assistant' && m.streaming
-                  && !(m.thoughts?.length > 0) && !(m.toolCalls?.length > 0) && (
+                  && !(m.thoughts?.length > 0) && !(m.toolCalls?.length > 0)
+                  && !m.liveThought && !m.liveContent && (
                     <div className="agent-bubble agent-thinking">
                       <span className="agent-dot" />
                       <span className="agent-dot" />
@@ -413,14 +467,23 @@ export default function AgentPage() {
                     </div>
                   )}
 
-                {m.role === 'assistant' && (m.thoughts?.length > 0 || m.toolCalls?.length > 0) && (
+                {m.role === 'assistant' && (
+                  m.thoughts?.length > 0 || m.toolCalls?.length > 0 || m.liveThought
+                ) && (
                   <AgentWorkTrace
                     thoughts={m.thoughts || []}
                     calls={m.toolCalls || []}
+                    liveThought={m.liveThought}
+                    liveThoughtRound={m.liveThoughtRound}
+                    liveContent={m.liveContent}
                     streaming={m.streaming}
                     currentRound={m.currentRound}
                     defaultOpen={i === messages.length - 1}
                   />
+                )}
+
+                {m.streaming && m.liveContent && (
+                  <div className="agent-bubble agent-live-answer">{m.liveContent}</div>
                 )}
 
                 {/* 助手回复按 Markdown 渲染；用户输入保持原文，避免被当成标记解析 */}
@@ -597,6 +660,9 @@ function VisionCard({ vision }) {
 function AgentWorkTrace({
   thoughts = [],
   calls = [],
+  liveThought = '',
+  liveThoughtRound = null,
+  liveContent = '',
   streaming = false,
   currentRound = null,
   defaultOpen = false,
@@ -608,7 +674,7 @@ function AgentWorkTrace({
     ...calls.map((c) => c.round ?? 1),
   ])].sort((a, b) => a - b);
 
-  if (rounds.length === 0) return null;
+  if (rounds.length === 0 && !liveThought) return null;
 
   const summary = [
     thoughts.length > 0 ? `${thoughts.length} 次思考` : '',
@@ -617,6 +683,8 @@ function AgentWorkTrace({
 
   const waitingForRound = streaming
     && currentRound
+    && !liveThought
+    && !liveContent
     && !thoughts.some((t) => t.round === currentRound)
     && !calls.some((c) => c.round === currentRound);
 
@@ -630,7 +698,7 @@ function AgentWorkTrace({
 
       {open && (
         <div className="agent-work-body">
-          {thoughts.length === 0 && (
+          {thoughts.length === 0 && !liveThought && (
             <div className="agent-work-hint">
               当前模型未返回思考内容，以下为工具调用轨迹。
             </div>
@@ -667,6 +735,18 @@ function AgentWorkTrace({
               })}
             </div>
           ))}
+
+          {liveThought && (
+            <div className="agent-work-round agent-work-round-live">
+              <div className="agent-work-round-label">
+                第 {liveThoughtRound || '…'} 轮 · 思考中
+              </div>
+              <div className="agent-thought live">
+                <span className="agent-thought-label">思考</span>
+                <p>{liveThought}</p>
+              </div>
+            </div>
+          )}
 
           {waitingForRound && (
             <div className="agent-work-round agent-work-round-live">

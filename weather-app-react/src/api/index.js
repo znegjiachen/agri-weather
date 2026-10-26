@@ -195,6 +195,8 @@ export const agent = {
       }
 
       if (event === 'round') handlers.onRound?.(payload);
+      else if (event === 'reasoning_delta') handlers.onReasoningDelta?.(payload);
+      else if (event === 'content_delta') handlers.onContentDelta?.(payload);
       else if (event === 'thought') handlers.onThought?.(payload);
       else if (event === 'tool_start') handlers.onToolStarted?.(payload);
       else if (event === 'tool_end') handlers.onToolFinished?.(payload);

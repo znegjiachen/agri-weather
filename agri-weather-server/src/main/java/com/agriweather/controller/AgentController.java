@@ -160,6 +160,31 @@ public class AgentController {
                                 }
 
                                 @Override
+                                public void onReasoningDelta(int round, String delta) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("round", round);
+                                    payload.put("delta", delta);
+                                    if (!sendEvent(emitter, "reasoning_delta", payload)) {
+                                        cancelled.set(true);
+                                    }
+                                }
+
+                                @Override
+                                public void onContentDelta(int round, String delta) {
+                                    Map<String, Object> payload = new LinkedHashMap<>();
+                                    payload.put("round", round);
+                                    payload.put("delta", delta);
+                                    if (!sendEvent(emitter, "content_delta", payload)) {
+                                        cancelled.set(true);
+                                    }
+                                }
+
+                                @Override
+                                public boolean wantsTokenStream() {
+                                    return true;
+                                }
+
+                                @Override
                                 public boolean isCancelled() {
                                     return cancelled.get();
                                 }

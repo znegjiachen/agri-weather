@@ -4571,3 +4571,13 @@ main {
   color: var(--text-muted);
   font-size: 12px;
 }
+
+/* token 级流式输出 */
+.agent-live-answer {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-thought.live p {
+  border: 1px dashed rgba(102, 126, 234, 0.35);
+}

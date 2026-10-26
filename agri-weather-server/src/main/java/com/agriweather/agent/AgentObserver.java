@@ -15,8 +15,21 @@ public interface AgentObserver {
     default void onRoundStarted(int round) {
     }
 
-    /** 模型这一轮的思考内容（reasoner 才有） */
+    /** 模型这一轮的思考内容（reasoner 才有；流式模式下为完整内容） */
     default void onThought(int round, String content) {
+    }
+
+    /** token 级思考增量；只有 wantsTokenStream() 为 true 时才会收到 */
+    default void onReasoningDelta(int round, String delta) {
+    }
+
+    /** token 级回答增量 */
+    default void onContentDelta(int round, String delta) {
+    }
+
+    /** 是否要求模型使用流式协议（SSE 接口返回 true） */
+    default boolean wantsTokenStream() {
+        return false;
     }
 
     /** 开始执行一次工具调用 */

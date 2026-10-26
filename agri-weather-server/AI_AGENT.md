@@ -144,7 +144,9 @@ curl -X POST http://localhost:8082/api/agent/vision \
 | 事件 | 数据 | 说明 |
 |---|---|---|
 | `round` | `{round}` | 第 N 轮开始 |
-| `thought` | `{round, content}` | 该轮模型思考（reasoner） |
+| `reasoning_delta` | `{round, delta}` | 思考 token 增量（实时） |
+| `content_delta` | `{round, delta}` | 回答 token 增量（实时） |
+| `thought` | `{round, content}` | 该轮完整思考（流结束后） |
 | `tool_start` | `{round, tool, arguments}` | 工具开始执行 |
 | `tool_end` | `{round, tool, arguments, resultSummary, elapsedMs}` | 工具完成 |
 | `done` | `{reply, toolCalls, thoughts, rounds, truncated, model}` | 最终结果 |
