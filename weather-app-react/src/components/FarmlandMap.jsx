@@ -62,6 +62,7 @@ const FarmlandMap = forwardRef(function FarmlandMap({
   const polygonsRef = useRef(new Map());
   const draftLayerRef = useRef(null);
   const userMarkerRef = useRef(null);
+  const locatedOnceRef = useRef(false);
   const hasFitRef = useRef(false);
 
   const drawingRef = useRef(drawing);
@@ -112,15 +113,41 @@ const FarmlandMap = forwardRef(function FarmlandMap({
     });
 
     map.on('locationfound', (event) => {
+      // 浏览器定位返回 WGS84，高德瓦片是 GCJ-02，不转换会偏几百米
+      const [lat, lng] = wgs84ToGcj02(event.latlng.lat, event.latlng.lng);
+      const accuracy = Math.max(10, Math.round(event.accuracy || 0));
+
       if (userMarkerRef.current) userMarkerRef.current.remove();
-      userMarkerRef.current = L.circleMarker(event.latlng, {
-        radius: 8,
+      const group = L.layerGroup().addTo(map);
+
+      const circle = L.circle([lat, lng], {
+        radius: accuracy,
         color: '#2563eb',
-        weight: 2,
+        weight: 1.5,
         fillColor: '#3b82f6',
-        fillOpacity: 0.9,
-      }).addTo(map).bindTooltip('我的位置');
-      map.setView(event.latlng, Math.max(map.getZoom(), 15));
+        fillOpacity: 0.12,
+        interactive: false,
+      }).addTo(group);
+
+      L.circleMarker([lat, lng], {
+        radius: 8,
+        color: '#fff',
+        weight: 2,
+        fillColor: '#2563eb',
+        fillOpacity: 1,
+      }).addTo(group).bindTooltip(`我的位置 · 精度约 ±${accuracy} 米`, {
+        permanent: true,
+        direction: 'top',
+        className: 'geolocation-label',
+      });
+
+      userMarkerRef.current = group;
+
+      // 只在首次定位时缩放；持续 watch 更新时不再反复移动地图
+      if (!locatedOnceRef.current) {
+        locatedOnceRef.current = true;
+        map.fitBounds(circle.getBounds(), { padding: [40, 40], maxZoom: 18 });
+      }
     });
 
     map.on('locationerror', () => {
@@ -350,11 +377,17 @@ const FarmlandMap = forwardRef(function FarmlandMap({
 
   useImperativeHandle(ref, () => ({
     locate() {
-      mapRef.current?.locate({
-        setView: true,
-        maxZoom: 16,
+      const map = mapRef.current;
+      if (!map) return;
+      map.stopLocate();
+      locatedOnceRef.current = false;
+      map.locate({
+        setView: false,
+        // 持续监听，GPS/Wi-Fi 精度稳定后再绘制最终位置
+        watch: true,
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 15000,
+        maximumAge: 0,
       });
     },
     fitAll,
