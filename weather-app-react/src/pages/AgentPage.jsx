@@ -88,7 +88,7 @@ function formatVision(vision) {
 }
 
 /**
- * AgriChat（助农手）对话页。
+ * 助农手（问田农事顾问）对话页。
  *
  * messages 由 App 持有并传入 —— 本组件是条件渲染的，切板块时会被卸载，
  * 状态放在这里会随组件一起丢失。草稿、附件、加载状态留在本地。
@@ -393,7 +393,7 @@ export default function AgentPage() {
     <div className="agent-page">
       <div className="page-header">
         <div>
-          <h2 className="page-title">🤖 AgriChat · 助农手</h2>
+          <h2 className="page-title">🤖 问田 · 助农手</h2>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
             内容由AI生成，仅供参考
           </p>
@@ -421,7 +421,7 @@ export default function AgentPage() {
           {messages.length === 0 && (
             <div className="agent-welcome">
               <div className="agent-welcome-icon">🌾</div>
-              <h3>你好，我是 AgriChat（助农手）</h3>
+              <h3>你好，我是助农手，问田的农事顾问</h3>
               <p>
                 可以问地块、天气和农事安排，也可以直接上传作物照片，
                 我帮你看植物种类、生长阶段和病害。

@@ -13,7 +13,7 @@
     <groupId>com.agriweather</groupId>
     <artifactId>agri-weather-server</artifactId>
     <version>1.0.0</version>
-    <name>智慧农事气象服务平台</name>
+    <name>问田</name>
     <description>Smart Agricultural Weather Service Platform</description>
 
     <properties>

@@ -20,7 +20,7 @@ export default function Dashboard() {
     <div className="dashboard">
       <div className="welcome glass">
         <h2>👨‍🌾 欢迎，{user?.username}</h2>
-        <p>{user?.region || '曾嘉晨智慧农事气象服务平台'}</p>
+        <p>{user?.region || '问田 · 农事气象服务平台'}</p>
       </div>
 
       <div className="stats-row">

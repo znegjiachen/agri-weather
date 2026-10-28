@@ -30,7 +30,7 @@ public class VisionClient {
     }
 
     private static final String SYSTEM_PROMPT = """
-            你是「AgriChat」的植物视觉识别模块，服务中国农户。
+            你是问田「助农手」的植物视觉识别模块，服务中国农户。
             请分析用户上传的作物照片，判断植物名称、生长阶段、健康状态，
             以及可见的病害、虫害、缺素或环境胁迫。
 

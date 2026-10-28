@@ -131,7 +131,7 @@ export const community = {
   },
 };
 
-// Agent（AgriChat 农事智能体）
+// Agent（助农手 农事智能体）
 export const agent = {
   chat: (message, history = [], visionContext = '') =>
     request('/api/agent/chat', {

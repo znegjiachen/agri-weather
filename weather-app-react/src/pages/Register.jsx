@@ -24,7 +24,7 @@ export default function Register({ onSwitch }) {
     <div className="auth-page">
       <div className="auth-card glass-heavy">
         <h2>🌾 注册账号</h2>
-        <p className="auth-subtitle">加入曾嘉晨智慧农事气象平台</p>
+        <p className="auth-subtitle">加入问田</p>
         {error && <div className="auth-error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <input

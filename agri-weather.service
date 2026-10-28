@@ -1,5 +1,5 @@
 [Unit]
-Description=智慧农业天气系统 后端服务
+Description=问田 后端服务
 After=network.target mysql.service
 
 [Service]

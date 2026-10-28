@@ -23,7 +23,7 @@ export default function Login({ onSwitch }) {
   return (
     <div className="auth-page">
       <div className="auth-card glass-heavy">
-        <h2>🌾 曾嘉晨智慧农事气象平台</h2>
+        <h2>🌾 问田</h2>
         <p className="auth-subtitle">登录您的账号</p>
         {error && <div className="auth-error">{error}</div>}
         <form onSubmit={handleSubmit}>

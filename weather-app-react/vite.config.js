@@ -12,9 +12,9 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: '曾嘉晨智慧农事气象平台',
-        short_name: '农事气象',
-        description: '地块管理、天气预报、灾害预警与助农手',
+        name: '问田 · 农事气象平台',
+        short_name: '问田',
+        description: '问田 · 地块管理、天气预报、灾害预警与 AI 助农手',
         lang: 'zh-CN',
         theme_color: '#667eea',
         background_color: '#f5f7ff',

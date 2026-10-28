@@ -10,7 +10,7 @@ export default function Sidebar() {
     <nav className="sidebar glass-heavy">
       <div className="nav-brand">
         <span className="nav-logo">🌾</span>
-        <span>曾嘉晨农事气象</span>
+        <span>问田</span>
       </div>
 
       <div className="nav-links">

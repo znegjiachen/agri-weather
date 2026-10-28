@@ -34,7 +34,7 @@ export default function ProfilePage() {
 
       <div className="profile-about glass">
         <h3>关于</h3>
-        <p>曾嘉晨智慧农事气象服务平台</p>
+        <p>问田 · 农事气象服务平台</p>
         <p className="profile-version">Spring Boot 3.5 · React 19 · Redis</p>
       </div>
     </div>
