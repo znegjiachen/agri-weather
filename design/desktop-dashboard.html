@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>问田 · 桌面端驾驶舱（效果图）</title>
+<style>
+  :root{
+    --primary:#667eea;
+    --primary-dark:#4c5bd4;
+    --primary-2:#764ba2;
+    --green:#16a34a;
+    --green-soft:#e9f8ef;
+    --amber:#d97706;
+    --amber-soft:#fff7e6;
+    --red:#ef4444;
+    --text:#1f2437;
+    --muted:#6f7688;
+    --faint:#9aa1b2;
+    --line:rgba(31,36,55,.08);
+    --glass:rgba(255,255,255,.72);
+    --shadow:0 10px 30px rgba(63,72,152,.08);
+    --shadow-lg:0 18px 44px rgba(63,72,152,.13);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:ui-sans-serif,-apple-system,"SF Pro SC","PingFang SC","Inter","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 620px at 8% -12%, rgba(102,126,234,.17), transparent 60%),
+      radial-gradient(900px 560px at 102% 6%, rgba(22,163,74,.11), transparent 58%),
+      radial-gradient(820px 560px at 68% 112%, rgba(118,75,162,.12), transparent 62%),
+      #f4f6fb;
+    -webkit-font-smoothing:antialiased;
+    font-variant-numeric:tabular-nums;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit}
+  .ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .ic-sm{width:15px;height:15px}
+  .glass{
+    background:var(--glass);
+    border:1px solid rgba(255,255,255,.78);
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+  }
+  .app{display:flex;height:100vh;min-height:720px;overflow:hidden}
+
+  /* ============ Sidebar ============ */
+  .sidebar{
+    width:240px;flex:0 0 240px;
+    display:flex;flex-direction:column;
+    padding:22px 14px 16px;
+    background:rgba(255,255,255,.55);
+    border-right:1px solid rgba(255,255,255,.7);
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:2px 10px 20px}
+  .logo{
+    width:38px;height:38px;border-radius:12px;flex:none;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    color:#fff;display:grid;place-items:center;
+    font-size:19px;font-weight:600;letter-spacing:.06em;
+    box-shadow:0 8px 18px rgba(102,126,234,.34);
+  }
+  .brand-name{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+  .brand-sub{font-size:10px;color:var(--faint);letter-spacing:.18em;margin-top:3px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 12px;border-radius:10px;
+    color:#4b5162;font-size:14px;line-height:1;
+    transition:background .16s,color .16s,box-shadow .16s;
+  }
+  .nav a:hover{background:rgba(102,126,234,.08);color:var(--primary-dark)}
+  .nav a.active{
+    background:linear-gradient(90deg,rgba(102,126,234,.16),rgba(102,126,234,.05));
+    color:var(--primary-dark);font-weight:600;
+    box-shadow:inset 0 0 0 1px rgba(102,126,234,.18);
+    position:relative;
+  }
+  .nav a.active::before{
+    content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;
+    border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--primary),var(--primary-2));
+  }
+  .nav .label{font-size:10.5px;letter-spacing:.14em;color:var(--faint);padding:18px 12px 7px;font-weight:500}
+  .badge{
+    margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:rgba(239,68,68,.12);color:#dc2626;
+    font-size:10.5px;font-weight:600;display:grid;place-items:center;
+  }
+  .spacer{flex:1}
+  .side-weather{
+    margin:0 4px 12px;padding:12px 13px;border-radius:12px;
+    background:linear-gradient(135deg,rgba(102,126,234,.10),rgba(22,163,74,.07));
+    border:1px solid rgba(102,126,234,.12);
+    display:flex;align-items:center;gap:10px;
+  }
+  .side-weather .ic{color:var(--primary-dark)}
+  .side-weather b{font-size:13px;font-weight:600;display:block;line-height:1.2}
+  .side-weather span{font-size:10.5px;color:var(--muted)}
+  .user-card{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 10px;border-top:1px solid var(--line);
+  }
+  .avatar{
+    width:34px;height:34px;border-radius:50%;flex:none;
+    display:grid;place-items:center;color:#fff;font-size:13px;font-weight:600;
+    background:linear-gradient(135deg,#fbbf24,#f97316);
+    box-shadow:0 4px 10px rgba(249,115,22,.25);
+  }
+  .user-meta{min-width:0;flex:1}
+  .user-meta b{display:block;font-size:13px;font-weight:600;line-height:1.3}
+  .user-meta span{font-size:10.5px;color:var(--faint)}
+  .user-card .ic{color:var(--faint)}
+  .user-card button{background:none;border:0;padding:4px;border-radius:6px;cursor:pointer;color:var(--faint)}
+  .user-card button:hover{background:rgba(31,36,55,.06);color:var(--muted)}
+
+  /* ============ Main ============ */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{
+    height:64px;flex:none;display:flex;align-items:center;gap:14px;
+    padding:0 26px;
+    border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.38);
+    backdrop-filter:blur(14px);
+  }
+  .crumb{font-size:12px;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .crumb b{color:var(--text);font-weight:600;font-size:13px}
+  .titles h1{font-size:16.5px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.25}
+  .titles p{font-size:11.5px;color:var(--muted);margin:2px 0 0}
+  .top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .search{
+    width:230px;height:38px;border-radius:10px;border:1px solid var(--line);
+    background:rgba(255,255,255,.72);
+    display:flex;align-items:center;gap:8px;padding:0 11px;
+    color:#8a90a2;font-size:12.5px;cursor:text;
+  }
+  .search .ic{width:15px;height:15px}
+  .kbd{margin-left:auto;font-size:10px;color:var(--faint);border:1px solid var(--line);background:#fff;border-radius:5px;padding:2px 5px}
+  .icon-btn{
+    width:38px;height:38px;border-radius:10px;flex:none;
+    border:1px solid var(--line);background:rgba(255,255,255,.72);
+    display:grid;place-items:center;color:#5b6172;cursor:pointer;position:relative;
+    transition:background .15s,box-shadow .15s;
+  }
+  .icon-btn:hover{background:#fff;box-shadow:0 6px 14px rgba(63,72,152,.10)}
+  .icon-btn .dot{position:absolute;top:9px;right:10px;width:6px;height:6px;border-radius:50%;background:var(--red);border:1.5px solid #fff}
+  .btn-primary{
+    height:38px;padding:0 15px;border:0;border-radius:10px;cursor:pointer;
+    display:flex;align-items:center;gap:7px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    color:#fff;font-size:12.5px;font-weight:600;
+    box-shadow:0 8px 18px rgba(102,126,234,.28);
+    transition:transform .15s,box-shadow .15s;
+  }
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 11px 22px rgba(102,126,234,.34)}
+  .btn-primary .ic{width:15px;height:15px}
+
+  .scroll{flex:1;overflow:auto;padding:22px 26px 28px}
+  .scroll::-webkit-scrollbar{width:8px}
+  .scroll::-webkit-scrollbar-thumb{background:rgba(31,36,55,.12);border-radius:8px}
+
+  /* ============ Hero ============ */
+  .hero{border-radius:18px;padding:17px 20px 18px;margin-bottom:18px}
+  .hero-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .field-select{
+    display:flex;align-items:center;gap:8px;
+    height:32px;padding:0 11px;border-radius:9px;
+    background:rgba(255,255,255,.85);border:1px solid var(--line);
+    font-size:12.5px;cursor:pointer;transition:box-shadow .15s;
+  }
+  .field-select:hover{box-shadow:0 6px 16px rgba(63,72,152,.10)}
+  .field-select strong{font-weight:600}
+  .fs-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(34,197,94,.14)}
+  .field-select .ic{width:14px;height:14px;color:var(--faint)}
+  .chip{font-size:10.5px;padding:3px 8px;border-radius:6px;font-weight:500;line-height:1.2}
+  .chip-green{background:var(--green-soft);color:#15803d}
+  .chip-amber{background:var(--amber-soft);color:var(--amber)}
+  .chip-blue{background:rgba(59,130,246,.09);color:#2563eb}
+  .update{font-size:11px;color:var(--faint)}
+  .hero-body{display:flex;align-items:center;gap:24px}
+  .now{display:flex;align-items:center;gap:14px;min-width:150px}
+  .now-icon{
+    width:52px;height:52px;border-radius:16px;flex:none;
+    display:grid;place-items:center;color:#f59e0b;
+    background:linear-gradient(135deg,#fff7e0,#ffedb8);
+    box-shadow:inset 0 0 0 1px rgba(245,158,11,.12);
+  }
+  .now-icon .ic{width:28px;height:28px;stroke-width:1.4}
+  .now-temp{font-size:36px;font-weight:600;letter-spacing:-.035em;line-height:1}
+  .now-temp span{font-size:20px;vertical-align:top;color:var(--muted);font-weight:500}
+  .now-cond{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .metrics{display:flex;align-items:center;gap:8px;flex:1}
+  .metric{
+    flex:1;min-width:0;padding:8px 10px;border-radius:10px;
+    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);
+  }
+  .metric-top{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted)}
+  .metric-top .ic{width:13px;height:13px}
+  .metric-val{font-size:15px;font-weight:600;margin-top:3px;letter-spacing:-.01em}
+  .metric-val small{font-size:10px;font-weight:500;color:var(--faint);margin-left:2px}
+  .metric-val.warn{color:var(--amber)}
+  .advice{
+    width:200px;flex:none;display:flex;align-items:center;gap:9px;
+    padding:10px 12px;border-radius:11px;
+    background:linear-gradient(135deg,rgba(245,158,11,.10),rgba(245,158,11,.04));
+    border:1px solid rgba(245,158,11,.18);
+  }
+  .advice .ic{width:18px;height:18px;color:var(--amber)}
+  .advice b{display:block;font-size:11.5px;font-weight:600;color:#b45309;line-height:1.3}
+  .advice span{font-size:10.5px;color:#a16207}
+
+  /* ============ Sections ============ */
+  .section-head{display:flex;align-items:flex-end;justify-content:space-between;margin:0 2px 11px}
+  .section-head h2{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+  .section-head .count-sep{font-size:11px;color:var(--faint);font-weight:400;letter-spacing:0}
+  .link{font-size:11.5px;color:var(--primary-dark);display:flex;align-items:center;gap:3px;cursor:pointer;background:none;border:0;padding:0}
+  .link:hover{color:var(--primary-2)}
+  .link .ic{width:13px;height:13px}
+
+  .fields{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+  .field-card{
+    border-radius:14px;padding:14px 15px 12px;
+    transition:transform .18s,box-shadow .18s;
+    cursor:pointer;
+  }
+  .field-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .field-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .field-name{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+  .field-meta{font-size:10.5px;color:var(--muted);margin-top:3px}
+  .field-weather{display:flex;align-items:center;gap:7px;color:#f59e0b}
+  .field-weather .ic{width:20px;height:20px}
+  .field-temp{font-size:21px;font-weight:600;color:var(--text);letter-spacing:-.03em;line-height:1.05}
+  .field-cond{font-size:10px;color:var(--faint);text-align:right;margin-top:2px}
+  .field-foot{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+    font-size:10.5px;color:var(--muted);
+  }
+  .status{display:flex;align-items:center;gap:5px}
+  .status::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+  .status.ok{color:#15803d}
+  .status.warn{color:#b45309}
+  .add-field{
+    border:1.5px dashed rgba(102,126,234,.34);
+    background:rgba(102,126,234,.03);
+    border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+    color:var(--primary-dark);font-size:12px;cursor:pointer;min-height:112px;
+    transition:background .16s,border-color .16s;
+  }
+  .add-field:hover{background:rgba(102,126,234,.07);border-color:rgba(102,126,234,.55)}
+  .add-field .plus{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(102,126,234,.10)}
+  .add-field .ic{width:16px;height:16px}
+
+  .bottom-grid{display:grid;grid-template-columns:1.75fr 1fr;gap:16px;align-items:stretch}
+  .col-right{display:flex;flex-direction:column;gap:14px;min-width:0}
+
+  .card{border-radius:var(--radius);padding:16px 17px}
+  .trend{display:flex;flex-direction:column}
+  .trend .chart{flex:1;display:flex;flex-direction:column;justify-content:center}
+  .card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .card-head h3{font-size:13.5px;font-weight:600;margin:0;letter-spacing:-.01em;display:flex;align-items:center;gap:7px}
+  .card-head p{font-size:10.5px;color:var(--faint);margin:3px 0 0}
+  .count-pill{font-size:10px;font-weight:600;color:#dc2626;background:rgba(239,68,68,.10);padding:2px 7px;border-radius:8px}
+  .legend{display:flex;align-items:center;gap:12px;font-size:10.5px;color:var(--muted)}
+  .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+  .chart{position:relative;margin-top:2px}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .chart text{font-family:inherit}
+  .chart-notes{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+  }
+  .note{
+    display:flex;align-items:center;gap:6px;
+    font-size:10.5px;color:var(--muted);
+    background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.75);
+    border-radius:8px;padding:6px 9px;
+  }
+  .note b{color:var(--text);font-weight:600}
+  .note i{width:6px;height:6px;border-radius:50%;flex:none}
+  .note.blue i{background:#60a5fa}
+  .note.amber i{background:#f59e0b}
+  .note.green i{background:#22c55e}
+  .chart-notes .link{margin-left:auto;font-size:10.5px}
+  .soil{margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
+  .soil-head{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-bottom:6px}
+  .soil-head b{font-weight:600;color:var(--text);font-size:11px}
+  .soil-row{display:flex;align-items:center;gap:9px;font-size:10.5px;color:var(--muted);padding:4px 0}
+  .soil-name{width:44px;flex:none}
+  .bar{flex:1;height:6px;border-radius:4px;background:rgba(31,36,55,.07);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,#34d399,#16a34a)}
+  .bar.warn i{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
+  .soil-row b{width:34px;text-align:right;font-weight:600;color:var(--text)}
+  .soil-row b.warn{color:#b45309}
+
+  .alert-list{display:flex;flex-direction:column;gap:9px}
+  .alert{display:flex;gap:9px;padding:9px;border-radius:10px;border:1px solid transparent;transition:background .15s}
+  .alert:hover{background:rgba(255,255,255,.55)}
+  .alert.blue{background:rgba(59,130,246,.055);border-color:rgba(59,130,246,.12)}
+  .alert.amber{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.14)}
+  .alert-icon{width:28px;height:28px;border-radius:8px;flex:none;display:grid;place-items:center}
+  .alert.blue .alert-icon{background:rgba(59,130,246,.12);color:#2563eb}
+  .alert.amber .alert-icon{background:rgba(245,158,11,.14);color:#b45309}
+  .alert-icon .ic{width:15px;height:15px}
+  .alert-body{min-width:0;flex:1}
+  .alert-title{font-size:11.5px;font-weight:600;line-height:1.35}
+  .alert-meta{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.45}
+  .alert-time{font-size:9.5px;color:var(--faint);flex:none;margin-top:1px}
+
+  .todo{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+  .todo li{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}
+  .todo li:last-child{border-bottom:0;padding-bottom:0}
+  .todo li:first-child{padding-top:0}
+  .checkbox{
+    width:16px;height:16px;border-radius:5px;flex:none;margin-top:1px;
+    border:1.5px solid rgba(31,36,55,.22);background:#fff;
+    display:grid;place-items:center;cursor:pointer;transition:all .15s;
+  }
+  .checkbox:hover{border-color:var(--primary)}
+  .checkbox.checked{background:linear-gradient(135deg,var(--primary),var(--primary-2));border-color:transparent;color:#fff}
+  .checkbox .ic{width:10px;height:10px;stroke-width:2.5}
+  .todo-body{min-width:0;flex:1}
+  .todo-title{font-size:11.5px;font-weight:500;line-height:1.35}
+  .todo-title.done{color:var(--faint);text-decoration:line-through}
+  .todo-sub{font-size:10px;color:var(--faint);margin-top:2px}
+  .tag{font-size:9.5px;padding:2px 6px;border-radius:5px;flex:none;margin-top:1px;font-weight:500}
+  .tag.warn{background:var(--amber-soft);color:var(--amber)}
+  .tag.night{background:rgba(102,126,234,.10);color:var(--primary-dark)}
+
+  .tip{
+    border-radius:14px;padding:13px 14px;
+    background:linear-gradient(135deg,rgba(102,126,234,.09),rgba(118,75,162,.06));
+    border:1px solid rgba(102,126,234,.14);
+  }
+  .tip-head{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--primary-dark);margin-bottom:6px}
+  .tip-head .ic{width:14px;height:14px}
+  .tip p{margin:0;font-size:10.8px;line-height:1.65;color:#4b5162}
+  .tip .link{margin-top:8px;font-size:10.5px}
+
+  /* ============ AI Dock ============ */
+  .ai-dock{
+    width:360px;flex:0 0 360px;
+    display:flex;flex-direction:column;
+    background:rgba(255,255,255,.60);
+    border-left:1px solid rgba(255,255,255,.75);
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+  }
+  .ai-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);flex:none}
+  .ai-avatar{
+    width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;
+    box-shadow:0 8px 16px rgba(102,126,234,.30);
+  }
+  .ai-avatar .ic{width:19px;height:19px}
+  .ai-id{min-width:0;flex:1}
+  .ai-title{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.3}
+  .ai-tag{font-size:9px;font-weight:600;letter-spacing:.06em;color:var(--primary-dark);background:rgba(102,126,234,.12);padding:2px 5px;border-radius:4px}
+  .ai-status{font-size:10.5px;color:var(--green);display:flex;align-items:center;gap:5px;margin-top:2px}
+  .live{width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.14);flex:none}
+  .ai-head .icon-btn{width:30px;height:30px;border:0;background:transparent;color:var(--faint)}
+  .ai-head .icon-btn:hover{background:rgba(31,36,55,.05)}
+
+  .ai-body{flex:1;overflow:auto;padding:14px 16px 6px;display:flex;flex-direction:column;gap:11px}
+  .ai-body::-webkit-scrollbar{width:6px}
+  .ai-body::-webkit-scrollbar-thumb{background:rgba(31,36,55,.10);border-radius:6px}
+  .ctx{
+    align-self:flex-start;display:flex;align-items:center;gap:5px;
+    font-size:10.5px;color:var(--primary-dark);
+    background:rgba(102,126,234,.08);border:1px solid rgba(102,126,234,.14);
+    padding:5px 9px;border-radius:999px;
+  }
+  .ctx .ic{width:12px;height:12px}
+  .msg-user{
+    align-self:flex-end;max-width:84%;
+    padding:9px 12px;border-radius:13px 13px 3px 13px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    color:#fff;font-size:12.5px;line-height:1.55;
+    box-shadow:0 6px 16px rgba(102,126,234,.22);
+  }
+  .msg-bot{display:flex;flex-direction:column;gap:8px;max-width:94%}
+  .bot-text{font-size:12.5px;line-height:1.65;color:#3d4356}
+  .trace{display:flex;flex-wrap:wrap;gap:6px}
+  .trace-chip{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:10px;color:#4b5162;
+    background:rgba(255,255,255,.85);border:1px solid var(--line);
+    padding:4px 7px;border-radius:6px;
+  }
+  .trace-chip .ic{width:11px;height:11px;color:var(--green)}
+  .trace-chip em{font-style:normal;color:var(--faint);border-left:1px solid var(--line);padding-left:5px}
+  .answer{
+    background:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.9);
+    border-left:3px solid var(--green);
+    border-radius:4px 12px 12px 4px;padding:11px 12px;
+    box-shadow:0 8px 20px rgba(63,72,152,.07);
+  }
+  .answer-title{font-size:11.5px;font-weight:600;color:#15803d;display:flex;align-items:center;gap:5px;margin-bottom:5px}
+  .answer-title .ic{width:13px;height:13px}
+  .answer p{margin:0;font-size:11.5px;line-height:1.65;color:#4b5162}
+  .answer p b{color:#b45309;font-weight:600}
+  .divider{display:flex;align-items:center;gap:8px;font-size:9.5px;color:var(--faint);margin:1px 0}
+  .divider::before,.divider::after{content:"";height:1px;background:var(--line);flex:1}
+  .ctx-card{
+    background:rgba(255,255,255,.72);
+    border:1px solid rgba(255,255,255,.85);
+    border-radius:12px;padding:11px 12px;
+    box-shadow:0 6px 16px rgba(63,72,152,.05);
+  }
+  .ctx-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .ctx-card-head b{font-size:11px;font-weight:600}
+  .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+  .mini-grid div{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font-size:10px;color:var(--faint)}
+  .mini-grid b{font-size:11px;color:#3d4356;font-weight:600}
+  .proactive{
+    border-radius:12px;padding:11px 12px;
+    background:linear-gradient(135deg,rgba(245,158,11,.09),rgba(245,158,11,.03));
+    border:1px solid rgba(245,158,11,.16);
+  }
+  .proactive .tip-head{color:#b45309;margin-bottom:5px}
+  .proactive p{margin:0;font-size:10.8px;line-height:1.6;color:#5a4a2f}
+  .proactive-actions{display:flex;gap:6px;margin-top:8px}
+  .mini-btn{
+    font-size:10px;padding:4px 9px;border-radius:6px;cursor:pointer;
+    border:1px solid rgba(245,158,11,.28);background:#fff;color:#b45309;
+  }
+  .mini-btn:hover{background:var(--amber-soft)}
+  .mini-btn.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+  .suggestions{margin-top:auto;padding-top:4px;display:flex;flex-direction:column;gap:6px}
+  .sug-label{font-size:10px;color:var(--faint);letter-spacing:.06em}
+  .sug{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    border:1px solid var(--line);background:rgba(255,255,255,.65);
+    border-radius:9px;padding:8px 10px;font-size:11px;color:#4b5162;cursor:pointer;
+    transition:background .15s,border-color .15s,color .15s;
+  }
+  .sug:hover{background:#fff;border-color:rgba(102,126,234,.3);color:var(--primary-dark)}
+  .sug .ic{width:12px;height:12px;color:var(--faint)}
+  .composer{flex:none;padding:10px 16px 14px;border-top:1px solid var(--line)}
+  .composer-box{
+    border:1px solid rgba(102,126,234,.18);border-radius:13px;
+    background:#fff;padding:10px 11px 8px;
+    box-shadow:0 8px 20px rgba(63,72,152,.06);
+  }
+  .placeholder{font-size:11.5px;color:var(--faint);line-height:1.5;padding:1px 1px 12px}
+  .composer-tools{display:flex;align-items:center;gap:4px}
+  .tool-btn{
+    width:28px;height:28px;border-radius:8px;border:0;background:transparent;
+    color:var(--faint);display:grid;place-items:center;cursor:pointer;
+  }
+  .tool-btn:hover{background:rgba(31,36,55,.05);color:var(--muted)}
+  .tool-btn .ic{width:15px;height:15px}
+  .send{
+    margin-left:auto;width:30px;height:30px;border-radius:9px;border:0;cursor:pointer;
+    display:grid;place-items:center;color:#fff;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));
+    box-shadow:0 5px 12px rgba(102,126,234,.28);
+    transition:transform .15s;
+  }
+  .send:hover{transform:translateY(-1px)}
+  .send .ic{width:14px;height:14px}
+  .disclaimer{font-size:9.5px;color:var(--faint);text-align:center;margin-top:7px}
+
+  @media (max-width:1240px){
+    .ai-dock{display:none}
+  }
+  @media (max-width:980px){
+    .sidebar{width:76px;flex-basis:76px;padding-left:9px;padding-right:9px}
+    .brand{justify-content:center;padding-left:0;padding-right:0}
+    .brand-text,.nav .label,.nav a span,.side-weather,.user-meta,.user-card button{display:none}
+    .nav a{justify-content:center;padding:12px 0}
+    .nav a.active::before{display:none}
+    .badge{position:absolute;margin:0;top:4px;right:6px}
+  }
+</style>
+</head>
+<body>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5h-4.3V14a1.2 1.2 0 0 0-1.2-1.2h-4a1.2 1.2 0 0 0-1.2 1.2v7.5H4.5A1.5 1.5 0 0 1 3 20z"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 14.5a2 2 0 0 1-2 2H8l-4.5 4V5a2 2 0 0 1 2-2h13.5a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M19 15.5v3M17.5 17h3M5 3.5v2M4 4.5h2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 21v-1.6A5.4 5.4 0 0 1 9.9 14h4.2a5.4 5.4 0 0 1 5.4 5.4V21"/></symbol>
+  <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="M12 13C8 13 5 10 5 6c4.5 0 7 2.5 7 7Z"/><path d="M12 11c0-4.5 2.5-7 7-7 0 4-3 7-7 7Z"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 24 24"><path d="M8.5 6.5a3.5 3.5 0 0 1 7 0"/><rect x="8" y="7" width="8" height="10.5" rx="4"/><path d="M8 10.5H4.5M8 15H4.5M8 18l-2.8 2M16 10.5h3.5M16 15h3.5M16 18l2.8 2M12 6V3.5M9.7 4 8.2 2.5M14.3 4l1.5-1.5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8.5a6 6 0 0 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5Z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10.5c0 6-8 11.5-8 11.5S4 16.5 4 10.5a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10.5" r="2.8"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5z"/><path d="M9 4v14M15 6.5v14"/></symbol>
+  <symbol id="i-cloud-sun" viewBox="0 0 24 24"><circle cx="8" cy="7.5" r="3"/><path d="M8 2v1.3M8 11.7V13M2 7.5h1.3M12.7 7.5H14M3.8 3.3l.9.9M11.3 10.8l.9.9M3.8 11.7l.9-.9"/><path d="M10.5 20a4 4 0 0 1 .8-7.9A5.5 5.5 0 0 1 21 13.5a3.3 3.3 0 0 1-.5 6.5z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.5-4.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-wind" viewBox="0 0 24 24"><path d="M17.5 7.5a2.5 2.5 0 1 1 2 4H3"/><path d="M9.5 4.5A2 2 0 1 1 11 8H3"/><path d="M12.5 19.5A2 2 0 1 0 14 16H3"/></symbol>
+  <symbol id="i-droplet" viewBox="0 0 24 24"><path d="M12 2.7 17.4 8a7.6 7.6 0 1 1-10.8 0Z"/></symbol>
+  <symbol id="i-humidity" viewBox="0 0 24 24"><path d="M7 15.5a4.5 4.5 0 0 1 9 0"/><path d="M6 10.2 10.5 5 15 10.2"/><path d="M3.5 19.5h17"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 0 1 0 9Z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4 1.9 18.2A2 2 0 0 0 3.6 21h16.8a2 2 0 0 0 1.7-2.8L13.7 4a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r=".7" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m20 6.5-11 11-5-5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21.5 2.5 11 13"/><path d="M21.5 2.5 15 21l-4-8-8-4z"/></symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="M21.4 11.05 12.2 20.25a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 1 1 5.65 5.66l-9.19 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 21v-6M4 11V3M12 21v-9M12 8V3M20 21v-4M20 13V3"/><circle cx="4" cy="13" r="2"/><circle cx="12" cy="10" r="2"/><circle cx="20" cy="15" r="2"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+  <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 14.8V4.5a2.5 2.5 0 0 0-5 0v10.3a4.5 4.5 0 1 0 5 0Z"/><path d="M11.5 14V8"/></symbol>
+  <symbol id="i-uv" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></symbol>
+</svg>
+
+<div class="app">
+
+  <!-- ===================== Sidebar ===================== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">田</div>
+      <div class="brand-text">
+        <div class="brand-name">问田</div>
+        <div class="brand-sub">WÈN TIÁN</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#" class="active"><svg class="ic"><use href="#i-home"/></svg><span>首页</span></a>
+      <a href="#"><svg class="ic"><use href="#i-message"/></svg><span>社区</span></a>
+      <a href="#"><svg class="ic"><use href="#i-sparkles"/></svg><span>助农手</span></a>
+      <a href="#"><svg class="ic"><use href="#i-user"/></svg><span>个人中心</span></a>
+
+      <div class="label">功能</div>
+      <a href="#"><svg class="ic"><use href="#i-sprout"/></svg><span>作物适配</span></a>
+      <a href="#"><svg class="ic"><use href="#i-bug"/></svg><span>病虫害库</span></a>
+      <a href="#"><svg class="ic"><use href="#i-bell"/></svg><span>预警中心</span><span class="badge">2</span></a>
+      <a href="#"><svg class="ic"><use href="#i-pin"/></svg><span>地块管理</span></a>
+      <a href="#"><svg class="ic"><use href="#i-map"/></svg><span>地块地图</span></a>
+      <a href="#"><svg class="ic"><use href="#i-cloud-sun"/></svg><span>天气预报</span></a>
+    </nav>
+
+    <div class="spacer"></div>
+
+    <div class="side-weather">
+      <svg class="ic"><use href="#i-sun"/></svg>
+      <div><b>18° / 27°</b><span>晴 · 适宜田间作业</span></div>
+    </div>
+
+    <div class="user-card">
+      <div class="avatar">曾</div>
+      <div class="user-meta"><b>曾嘉晨</b><span>农场管理员</span></div>
+      <button title="设置"><svg class="ic ic-sm"><use href="#i-settings"/></svg></button>
+      <button title="退出"><svg class="ic ic-sm"><use href="#i-logout"/></svg></button>
+    </div>
+  </aside>
+
+  <!-- ===================== Main ===================== -->
+  <main class="main">
+    <header class="topbar">
+      <div class="titles">
+        <h1>早上好，曾嘉晨</h1>
+        <p>10月28日 星期二 · 08:42 更新</p>
+      </div>
+      <div class="top-actions">
+        <div class="search">
+          <svg class="ic"><use href="#i-search"/></svg>
+          <span>搜索地块、作物或问题</span>
+          <span class="kbd">⌘K</span>
+        </div>
+        <button class="icon-btn" title="通知">
+          <svg class="ic"><use href="#i-bell"/></svg>
+          <span class="dot"></span>
+        </button>
+        <button class="btn-primary"><svg class="ic"><use href="#i-plus"/></svg>添加地块</button>
+      </div>
+    </header>
+
+    <div class="scroll">
+      <!-- Hero -->
+      <section class="hero glass">
+        <div class="hero-head">
+          <div class="field-select">
+            <span class="fs-dot"></span>
+            <strong>3号田 · 玉米</strong>
+            <span class="chip chip-green">抽雄期</span>
+            <svg class="ic"><use href="#i-chevron-down"/></svg>
+          </div>
+          <span class="update">数据来源 Open-Meteo · 08:42 更新</span>
+        </div>
+
+        <div class="hero-body">
+          <div class="now">
+            <div class="now-icon"><svg class="ic"><use href="#i-sun"/></svg></div>
+            <div>
+              <div class="now-temp">24<span>°</span></div>
+              <div class="now-cond">晴 · 体感 26°</div>
+            </div>
+          </div>
+
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-top"><svg class="ic"><use href="#i-wind"/></svg>风速</div>
+              <div class="metric-val warn">9.7<small>km/h · 偏大</small></div>
+            </div>
+            <div class="metric">
+              <div class="metric-top"><svg class="ic"><use href="#i-droplet"/></svg>降水</div>
+              <div class="metric-val">0<small>mm</small></div>
+            </div>
+            <div class="metric">
+              <div class="metric-top"><svg class="ic"><use href="#i-humidity"/></svg>湿度</div>
+              <div class="metric-val">62<small>%</small></div>
+            </div>
+            <div class="metric">
+              <div class="metric-top"><svg class="ic"><use href="#i-uv"/></svg>紫外线</div>
+              <div class="metric-val">中等</div>
+            </div>
+          </div>
+
+          <div class="advice">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <div><b>午后阵风 5 级</b><span>建议推迟施药</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Fields -->
+      <div class="section-head">
+        <h2>我的地块 <span class="count-sep">3 块 · 共 21 亩</span></h2>
+        <button class="link">在地图上查看 <svg class="ic"><use href="#i-chevron-right"/></svg></button>
+      </div>
+      <div class="fields">
+        <article class="field-card glass">
+          <div class="field-top">
+            <div>
+              <div class="field-name">3号田</div>
+              <div class="field-meta">玉米 · 12.4 亩 · 抽雄期</div>
+            </div>
+            <div class="field-weather">
+              <svg class="ic"><use href="#i-sun"/></svg>
+              <div><div class="field-temp">24°</div><div class="field-cond">晴</div></div>
+            </div>
+          </div>
+          <div class="field-foot">
+            <span class="status ok">墒情良好</span>
+            <span>24h 降水 0 mm</span>
+          </div>
+        </article>
+
+        <article class="field-card glass">
+          <div class="field-top">
+            <div>
+              <div class="field-name">5号田</div>
+              <div class="field-meta">小麦 · 8.6 亩 · 拔节期</div>
+            </div>
+            <div class="field-weather" style="color:#64748b">
+              <svg class="ic"><use href="#i-cloud"/></svg>
+              <div><div class="field-temp">22°</div><div class="field-cond">多云</div></div>
+            </div>
+          </div>
+          <div class="field-foot">
+            <span class="status warn">今夜 3° 需防霜</span>
+            <span>土壤偏干</span>
+          </div>
+        </article>
+
+        <button class="add-field">
+          <span class="plus"><svg class="ic"><use href="#i-plus"/></svg></span>
+          添加地块
+        </button>
+      </div>
+
+      <!-- Bottom grid -->
+      <div class="bottom-grid">
+        <!-- Trend -->
+        <section class="card glass trend">
+          <div class="card-head">
+            <div>
+              <h3>未来 7 天</h3>
+              <p>最高 / 最低气温 · 降水量</p>
+            </div>
+            <div class="legend">
+              <span><i style="background:#667eea"></i>最高</span>
+              <span><i style="background:#c4b5fd"></i>最低</span>
+              <span><i style="background:#93c5fd"></i>降水</span>
+            </div>
+          </div>
+
+          <div class="chart">
+            <svg viewBox="0 0 560 238" role="img" aria-label="未来 7 天气温与降水趋势">
+              <defs>
+                <linearGradient id="areaHigh" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#667eea" stop-opacity=".22"/>
+                  <stop offset="1" stop-color="#667eea" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="lineHigh" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#667eea"/>
+                  <stop offset="1" stop-color="#764ba2"/>
+                </linearGradient>
+              </defs>
+
+              <!-- grid -->
+              <g stroke="#1f2437" stroke-opacity=".07" stroke-dasharray="3 5">
+                <line x1="36" y1="46" x2="536" y2="46"/>
+                <line x1="36" y1="86" x2="536" y2="86"/>
+                <line x1="36" y1="126" x2="536" y2="126"/>
+                <line x1="36" y1="166" x2="536" y2="166"/>
+              </g>
+              <g fill="#9aa1b2" font-size="9" text-anchor="end">
+                <text x="28" y="49">30°</text>
+                <text x="28" y="89">25°</text>
+                <text x="28" y="129">20°</text>
+                <text x="28" y="169">15°</text>
+              </g>
+
+              <!-- rain bars -->
+              <g fill="#93c5fd" opacity=".55">
+                <rect x="196" y="198" width="16" height="20" rx="3"/>
+                <rect x="276" y="186" width="16" height="32" rx="3"/>
+                <rect x="356" y="192" width="16" height="26" rx="3"/>
+              </g>
+
+              <!-- area under high -->
+              <path d="M40 70 C60 70 100 62 120 62 C140 62 180 78 200 78 C220 78 260 94 280 94 C300 94 340 86 360 86 C380 86 420 54 440 54 C460 54 500 46 520 46 L520 210 L40 210 Z" fill="url(#areaHigh)"/>
+
+              <!-- low line -->
+              <path d="M40 142 C60 142 100 134 120 134 C140 134 180 150 200 150 C220 150 260 174 280 174 C300 174 340 166 360 166 C380 166 420 142 440 142 C460 142 500 126 520 126"
+                    fill="none" stroke="#c4b5fd" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 0"/>
+
+              <!-- high line -->
+              <path d="M40 70 C60 70 100 62 120 62 C140 62 180 78 200 78 C220 78 260 94 280 94 C300 94 340 86 360 86 C380 86 420 54 440 54 C460 54 500 46 520 46"
+                    fill="none" stroke="url(#lineHigh)" stroke-width="2.6" stroke-linecap="round"/>
+
+              <!-- high points -->
+              <g fill="#fff" stroke="#667eea" stroke-width="2">
+                <circle cx="40" cy="70" r="3.4"/>
+                <circle cx="120" cy="62" r="3.4"/>
+                <circle cx="200" cy="78" r="3.4"/>
+                <circle cx="280" cy="94" r="3.4"/>
+                <circle cx="360" cy="86" r="3.4"/>
+                <circle cx="440" cy="54" r="3.4"/>
+              </g>
+              <g fill="#fff" stroke="#764ba2" stroke-width="2.4">
+                <circle cx="520" cy="46" r="4.1"/>
+              </g>
+
+              <!-- tooltip on last -->
+              <g>
+                <rect x="474" y="14" width="76" height="24" rx="7" fill="#fff" stroke="#e8ebf5"/>
+                <text x="512" y="30" font-size="10" fill="#1f2437" font-weight="600" text-anchor="middle">周一 30° / 20°</text>
+              </g>
+
+              <!-- x labels -->
+              <g fill="#6f7688" font-size="10" text-anchor="middle">
+                <text x="40" y="228" font-weight="600" fill="#1f2437">今天</text>
+                <text x="120" y="228">周三</text>
+                <text x="200" y="228">周四</text>
+                <text x="280" y="228">周五</text>
+                <text x="360" y="228">周六</text>
+                <text x="440" y="228">周日</text>
+                <text x="520" y="228">周一</text>
+              </g>
+            </svg>
+          </div>
+
+          <div class="chart-notes">
+            <span class="note blue"><i></i><b>周四</b>中雨 8 mm</span>
+            <span class="note amber"><i></i><b>周五</b>降温 6°C</span>
+            <span class="note green"><i></i><b>周日</b>回暖至 29°C</span>
+            <button class="link">未来 3 天无有效降水，注意保墒 <svg class="ic"><use href="#i-chevron-right"/></svg></button>
+          </div>
+
+          <div class="soil">
+            <div class="soil-head"><b>土壤墒情</b><span>适宜区间 60–80%</span></div>
+            <div class="soil-row">
+              <span class="soil-name">3号田</span>
+              <div class="bar"><i style="width:64%"></i></div>
+              <b>64%</b>
+            </div>
+            <div class="soil-row">
+              <span class="soil-name">5号田</span>
+              <div class="bar warn"><i style="width:41%"></i></div>
+              <b class="warn">41%</b>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right column -->
+        <div class="col-right">
+          <section class="card glass" style="padding-bottom:13px">
+            <div class="card-head" style="margin-bottom:9px">
+              <h3><svg class="ic ic-sm" style="color:#b45309"><use href="#i-alert"/></svg>预警中心 <span class="count-pill">2</span></h3>
+              <button class="link">全部 <svg class="ic"><use href="#i-chevron-right"/></svg></button>
+            </div>
+            <div class="alert-list">
+              <div class="alert blue">
+                <div class="alert-icon"><svg class="ic"><use href="#i-alert"/></svg></div>
+                <div class="alert-body">
+                  <div class="alert-title">霜冻蓝色预警 · 5号田</div>
+                  <div class="alert-meta">今夜最低 3°C，建议 22:00 前熏烟防霜</div>
+                </div>
+                <span class="alert-time">08:12</span>
+              </div>
+              <div class="alert amber">
+                <div class="alert-icon"><svg class="ic"><use href="#i-wind"/></svg></div>
+                <div class="alert-body">
+                  <div class="alert-title">大风蓝色预警 · 3号田</div>
+                  <div class="alert-meta">午后阵风 5 级，暂停喷施作业</div>
+                </div>
+                <span class="alert-time">07:40</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card glass">
+            <div class="card-head" style="margin-bottom:8px">
+              <h3>今日农事</h3>
+              <button class="link">＋ 添加</button>
+            </div>
+            <ul class="todo">
+              <li>
+                <span class="checkbox"></span>
+                <div class="todo-body">
+                  <div class="todo-title">3号田 · 施药</div>
+                  <div class="todo-sub">建议延后至后天 7:00–10:00</div>
+                </div>
+                <span class="tag warn">待定</span>
+              </li>
+              <li>
+                <span class="checkbox"></span>
+                <div class="todo-body">
+                  <div class="todo-title">5号田 · 夜间熏烟防霜</div>
+                  <div class="todo-sub">今夜 22:00 前完成</div>
+                </div>
+                <span class="tag night">今晚</span>
+              </li>
+              <li>
+                <span class="checkbox checked"><svg class="ic"><use href="#i-check"/></svg></span>
+                <div class="todo-body">
+                  <div class="todo-title done">巡田拍照记录</div>
+                  <div class="todo-sub">已于 07:30 完成</div>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <div class="tip">
+            <div class="tip-head"><svg class="ic"><use href="#i-sparkles"/></svg>AI 建议</div>
+            <p>抽雄期是玉米需水高峰，未来 3 天无有效降水，建议周六前滴灌 15–20mm。</p>
+            <button class="link">加入待办 <svg class="ic"><use href="#i-chevron-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ===================== AI Dock ===================== -->
+  <aside class="ai-dock">
+    <div class="ai-head">
+      <div class="ai-avatar"><svg class="ic"><use href="#i-sparkles"/></svg></div>
+      <div class="ai-id">
+        <div class="ai-title">助农手 <span class="ai-tag">AI</span></div>
+        <div class="ai-status"><span class="live"></span>在线 · 已接入 7 项农事工具</div>
+      </div>
+      <button class="icon-btn" title="收起面板"><svg class="ic ic-sm"><use href="#i-panel"/></svg></button>
+    </div>
+
+    <div class="ai-body">
+      <div class="ctx"><svg class="ic"><use href="#i-pin"/></svg>当前地块 · 3号田 玉米</div>
+
+      <div class="divider">今天 08:42</div>
+
+      <div class="msg-user">明天适合打药吗？</div>
+
+      <div class="msg-bot">
+        <div class="bot-text">我先查一下 3 号田的天气和地块信息。</div>
+        <div class="trace">
+          <span class="trace-chip"><svg class="ic"><use href="#i-check"/></svg>get_weather<em>风速 9.7</em></span>
+          <span class="trace-chip"><svg class="ic"><use href="#i-check"/></svg>get_farmland_detail<em>抽雄期</em></span>
+        </div>
+        <div class="answer">
+          <div class="answer-title"><svg class="ic"><use href="#i-cloud"/></svg>不建议明天施药</div>
+          <p>午后阵风可达 <b>5 级</b>，药液飘移风险较高。后天 7:00–10:00 风速 2 级、无降水，更适合施药。</p>
+        </div>
+      </div>
+
+      <div class="ctx-card">
+        <div class="ctx-card-head">
+          <b>3号田 · 今日概况</b>
+          <span class="chip chip-green">抽雄期</span>
+        </div>
+        <div class="mini-grid">
+          <div><span>土壤湿度</span><b>64%</b></div>
+          <div><span>累计积温</span><b>1,284°C</b></div>
+          <div><span>距成熟</span><b>28 天</b></div>
+          <div><span>下次灌溉</span><b>周六</b></div>
+        </div>
+      </div>
+
+      <div class="proactive">
+        <div class="tip-head"><svg class="ic"><use href="#i-sparkles"/></svg>主动提醒</div>
+        <p>5号田今夜最低 3°C，低于小麦拔节期耐受阈值，建议 22:00 前熏烟。</p>
+        <div class="proactive-actions">
+          <button class="mini-btn">设为待办</button>
+          <button class="mini-btn ghost">忽略</button>
+        </div>
+      </div>
+
+      <div class="suggestions">
+        <div class="sug-label">继续问</div>
+        <button class="sug">5号田今晚需要防霜吗？<svg class="ic"><use href="#i-chevron-right"/></svg></button>
+        <button class="sug">玉米抽雄期怎么管理？<svg class="ic"><use href="#i-chevron-right"/></svg></button>
+        <button class="sug">生成下周农事清单<svg class="ic"><use href="#i-chevron-right"/></svg></button>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-box">
+        <div class="placeholder">问问地块、天气，或上传作物照片…</div>
+        <div class="composer-tools">
+          <button class="tool-btn" title="上传照片"><svg class="ic"><use href="#i-paperclip"/></svg></button>
+          <button class="tool-btn" title="选择地块"><svg class="ic"><use href="#i-pin"/></svg></button>
+          <button class="send" title="发送"><svg class="ic"><use href="#i-send"/></svg></button>
+        </div>
+      </div>
+      <div class="disclaimer">内容由 AI 生成，仅供参考</div>
+    </div>
+  </aside>
+
+</div>
+</body>
+</html>
