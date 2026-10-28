@@ -2,18 +2,9 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
 import { useAgent } from '../context/AgentContext';
-
-const MAX_IMAGES = 3;
-
-const TOOL_LABELS = {
-  list_farmlands: { icon: '📍', label: '查询地块列表' },
-  get_farmland_detail: { icon: '📋', label: '读取地块详情' },
-  get_weather: { icon: '🌤️', label: '获取天气预报' },
-  get_crop_stage: { icon: '🌱', label: '判断生长阶段' },
-  get_operation_advice: { icon: '📅', label: '调用农事决策引擎' },
-  check_alerts: { icon: '⚠️', label: '检查灾害预警' },
-  search_crop: { icon: '📚', label: '检索作物知识库' },
-};
+import { MAX_IMAGES, compressImage } from '../utils/image';
+import { formatVision } from '../utils/agentVision';
+import { TOOL_LABELS } from '../utils/agentTools';
 
 const SUGGESTIONS = [
   '我那块地明天适合打药吗？',
@@ -21,71 +12,6 @@ const SUGGESTIONS = [
   '我的作物现在处于什么生长阶段？',
   '最近有冻害或涝害风险吗？',
 ];
-
-/** 上传前压到最长边 1600px，减少视觉模型等待时间和流量 */
-async function compressImage(file) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('请选择图片文件');
-  }
-  if (file.size > 20 * 1024 * 1024) {
-    throw new Error('图片过大，请选择 20MB 以内的照片');
-  }
-
-  try {
-    const bitmap = await createImageBitmap(file);
-    const maxSide = 1600;
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-    const width = Math.max(1, Math.round(bitmap.width * scale));
-    const height = Math.max(1, Math.round(bitmap.height * scale));
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    bitmap.close?.();
-
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-    if (!blob) throw new Error('图片处理失败');
-    return new File([blob], `${file.name.replace(/\.\w+$/, '') || 'photo'}.jpg`, {
-      type: 'image/jpeg',
-    });
-  } catch (e) {
-    // 浏览器解不了的格式（如部分 HEIC）交给后端报错，小图直接上传
-    if (file.size <= 5 * 1024 * 1024) return file;
-    throw new Error('图片处理失败，请换一张 JPG/PNG 照片');
-  }
-}
-
-/** 把结构化识别结果转成文字，用于展示给智能体和历史消息 */
-function formatVision(vision) {
-  if (!vision) return '';
-  const lines = [];
-  lines.push(`植物：${vision.plantName || '未识别'}${vision.scientificName ? `（${vision.scientificName}）` : ''}`);
-  lines.push(`生长阶段：${vision.growthStage || '无法判断'}`);
-  lines.push(`健康状态：${vision.healthStatus || '无法判断'}`);
-
-  if (vision.issues?.length) {
-    lines.push('发现的问题：');
-    vision.issues.forEach((issue, index) => {
-      const confidence = typeof issue.confidence === 'number'
-        ? `，置信度 ${Math.round(issue.confidence * 100)}%`
-        : '';
-      lines.push(`${index + 1}. [${issue.type || 'unknown'}] ${issue.name || '未知问题'}${confidence}`);
-      if (issue.symptoms) lines.push(`   症状：${issue.symptoms}`);
-      if (issue.suggestion) lines.push(`   建议：${issue.suggestion}`);
-    });
-  } else {
-    lines.push('未发现明显问题。');
-  }
-
-  if (vision.overallAssessment) lines.push(`综合判断：${vision.overallAssessment}`);
-  if (vision.careAdvice?.length) {
-    lines.push('照护建议：');
-    vision.careAdvice.forEach((advice, index) => lines.push(`${index + 1}. ${advice}`));
-  }
-  return lines.join('\n');
-}
 
 /**
  * 助农手（问田农事顾问）对话页。

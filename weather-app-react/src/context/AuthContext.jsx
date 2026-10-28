@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { auth } from '../api';
 import { clearApiCache } from '../utils/pwaCaches';
+import { clearFieldContext } from '../utils/fieldContext';
 
 const AuthContext = createContext(null);
 
@@ -35,6 +36,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
     setUser(null);
     clearApiCache();
+    // 避免下一位登录者看到上一位用户的地块上下文
+    clearFieldContext();
   }, []);
 
   // 监听全局401事件（API层token过期时触发）
