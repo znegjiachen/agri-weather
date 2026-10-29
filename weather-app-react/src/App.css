@@ -5934,12 +5934,9 @@ main {
 .agent-dock-tab-text { writing-mode: vertical-rl; }
 .agent-dock-tab-icon { font-size: 16px; }
 
-/*
- * 桌面应用统一浅色画布，和登录页的紫色品牌底色区分开。
- * 天气页会挂 body.bg-* 使用自己的动态背景，这里显式排除。
- */
+/* 只有驾驶舱使用浅色画布；社区、助农手等页面保留原来的紫色渐变 */
 @media (min-width: 769px) {
-  body:has(.app-layout):not(.bg-sunny):not(.bg-cloudy):not(.bg-rainy):not(.bg-snowy):not(.bg-night):not(.bg-thunder):not(.bg-default) {
+  body:has(.desktop-home) {
     background:
       radial-gradient(1100px 620px at 8% -12%, rgba(102, 126, 234, 0.17), transparent 60%),
       radial-gradient(900px 560px at 102% 6%, rgba(22, 163, 74, 0.11), transparent 58%),
