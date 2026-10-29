@@ -5934,13 +5934,30 @@ main {
 .agent-dock-tab-text { writing-mode: vertical-rl; }
 .agent-dock-tab-icon { font-size: 16px; }
 
-/* 只有驾驶舱使用浅色画布；社区、助农手等页面保留原来的紫色渐变 */
+/* 驾驶舱沿用整站紫色渐变，仅把直接落在背景上的文字提亮 */
 @media (min-width: 769px) {
-  body:has(.desktop-home) {
-    background:
-      radial-gradient(1100px 620px at 8% -12%, rgba(102, 126, 234, 0.17), transparent 60%),
-      radial-gradient(900px 560px at 102% 6%, rgba(22, 163, 74, 0.11), transparent 58%),
-      radial-gradient(820px 560px at 68% 112%, rgba(118, 75, 162, 0.12), transparent 62%),
-      #f4f6fb;
+  .desktop-home .dh-greeting h1 {
+    color: #fff;
+    text-shadow: 0 2px 12px rgba(31, 36, 55, 0.16);
+  }
+
+  .desktop-home .dh-greeting p {
+    color: rgba(255, 255, 255, 0.76);
+  }
+
+  .desktop-home .dh-section-head h2 {
+    color: #fff;
+  }
+
+  .desktop-home .dh-count {
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .desktop-home .dh-section-head .dh-link {
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .desktop-home .dh-loading {
+    color: rgba(255, 255, 255, 0.8);
   }
 }
