@@ -5436,6 +5436,36 @@ main {
   z-index: 6;
 }
 
+.agent-dock-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  z-index: 4;
+  width: 9px;
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.agent-dock-resize::before {
+  content: "";
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+
+.agent-dock-resize:hover::before,
+.agent-dock-resize:focus-visible::before,
+.agent-dock.resizing .agent-dock-resize::before {
+  background: rgba(102, 126, 234, 0.42);
+}
+
+.agent-dock-resize:focus-visible { outline: none; }
+
 .agent-dock-head {
   flex: none;
   display: flex;

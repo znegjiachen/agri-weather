@@ -14,6 +14,18 @@ const SUGGESTIONS = [
   '作物现在是什么生长阶段？',
 ];
 
+const DOCK_WIDTH_KEY = 'wentin:dockWidth';
+const DOCK_DEFAULT_WIDTH = 360;
+const DOCK_MIN_WIDTH = 300;
+const DOCK_MAX_WIDTH = 600;
+
+function clampDockWidth(value) {
+  // 给左侧主内容至少留 400px，避免在 1200 附近把驾驶舱挤扁
+  const available = typeof window !== 'undefined' ? window.innerWidth - 240 - 400 : DOCK_MAX_WIDTH;
+  const max = Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, available));
+  return Math.min(max, Math.max(DOCK_MIN_WIDTH, value));
+}
+
 /**
  * 桌面端常驻的助农手浮窗。
  *
@@ -25,6 +37,11 @@ export default function AgentDock() {
   const { messages, setMessages } = useAgent();
 
   const [collapsed, setCollapsed] = useState(false);
+  const [width, setWidth] = useState(() => {
+    const saved = Number(localStorage.getItem(DOCK_WIDTH_KEY));
+    return clampDockWidth(Number.isFinite(saved) && saved > 0 ? saved : DOCK_DEFAULT_WIDTH);
+  });
+  const [resizing, setResizing] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -60,6 +77,53 @@ export default function AgentDock() {
     window.addEventListener('wentin:field', onField);
     return () => window.removeEventListener('wentin:field', onField);
   }, []);
+
+  // 记住用户拖拽后的宽度
+  useEffect(() => {
+    localStorage.setItem(DOCK_WIDTH_KEY, String(width));
+  }, [width]);
+
+  // 窗口变窄时把面板收回到允许范围内
+  useEffect(() => {
+    const onResize = () => setWidth((w) => clampDockWidth(w));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const startResize = (event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+
+    setResizing(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const onMove = (moveEvent) => {
+      // 面板贴在右侧：向左拖变宽，向右拖变窄
+      setWidth(clampDockWidth(startWidth + (startX - moveEvent.clientX)));
+    };
+    const onUp = () => {
+      setResizing(false);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const handleResizeKeyDown = (event) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setWidth((w) => clampDockWidth(w + 24));
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setWidth((w) => clampDockWidth(w - 24));
+    }
+  };
 
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -296,7 +360,21 @@ export default function AgentDock() {
   }
 
   return (
-    <aside className="agent-dock glass-heavy">
+    <aside
+      className={`agent-dock glass-heavy ${resizing ? 'resizing' : ''}`}
+      style={{ width, flexBasis: width }}
+    >
+      <div
+        className="agent-dock-resize"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整助农手面板宽度"
+        tabIndex={0}
+        onPointerDown={startResize}
+        onKeyDown={handleResizeKeyDown}
+        onDoubleClick={() => setWidth(DOCK_DEFAULT_WIDTH)}
+        title="拖动调整宽度，双击恢复默认"
+      />
       <header className="agent-dock-head">
         <div className="agent-dock-avatar">🤖</div>
         <div className="agent-dock-id">
