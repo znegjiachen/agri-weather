@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
-import { agent as agentApi } from '../api';
+import { agent as agentApi, agents as agentsApi } from '../api';
 import { useAgent } from '../context/AgentContext';
 import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
@@ -20,7 +21,24 @@ const SUGGESTIONS = [
  * 状态放在这里会随组件一起丢失。草稿、附件、加载状态留在本地。
  */
 export default function AgentPage() {
-  const { messages, setMessages } = useAgent();
+  const [searchParams] = useSearchParams();
+  const queryAgentId = Number(searchParams.get('agentId')) || null;
+
+  const [agents, setAgents] = useState([]);
+  const [manualAgentId, setSelectedId] = useState(null);
+  const selectedId = useMemo(() => {
+    if (manualAgentId && agents.some((item) => item.id === manualAgentId)) return manualAgentId;
+    if (queryAgentId && agents.some((item) => item.id === queryAgentId)) return queryAgentId;
+    return agents[0]?.id ?? null;
+  }, [agents, manualAgentId, queryAgentId]);
+  const selectedAgent = useMemo(
+    () => agents.find((item) => item.id === selectedId) || null,
+    [agents, selectedId],
+  );
+
+  // 一个智能体一个会话；没选到智能体时使用全局 default 会话
+  const { messages, setMessages, clearMessages } = useAgent(selectedId || 'default');
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -48,6 +66,12 @@ export default function AgentPage() {
     agentApi.status()
       .then(setStatus)
       .catch(() => setStatus({ configured: false }));
+
+    let alive = true;
+    agentsApi.list()
+      .then((data) => { if (alive) setAgents(Array.isArray(data) ? data : []); })
+      .catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   // 首次进入 / 从其它 Tab 切回来 / 新消息到达时，直接定位到最新一条
@@ -212,7 +236,7 @@ export default function AgentPage() {
             return { ...m, toolCalls: calls };
           });
         },
-      });
+      }, { agentId: selectedId, farmlandId: selectedAgent?.farmlandId });
 
       clearLiveBuffer();
       setLoading(false);
@@ -225,6 +249,7 @@ export default function AgentPage() {
               content: done.reply,
               toolCalls: done.toolCalls || [],
               thoughts: done.thoughts || [],
+              knowledgeUsed: done.knowledgeUsed || [],
               rounds: done.rounds,
               truncated: done.truncated,
               streaming: false,
@@ -303,12 +328,9 @@ export default function AgentPage() {
 
   const clearChat = () => {
     clearLiveBuffer();
-    messages.forEach((m) => {
-      (m.images || []).forEach((url) => URL.revokeObjectURL(url));
-    });
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
-    setMessages([]);
+    clearMessages();
     setError('');
   };
 
@@ -317,18 +339,37 @@ export default function AgentPage() {
 
   return (
     <div className="agent-page">
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">🤖 问田 · 助农手</h2>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-            内容由AI生成，仅供参考
+      <div className="page-header agent-page-head">
+        <div className="agent-page-heading">
+          <h2 className="page-title">🤖 {selectedAgent ? selectedAgent.name : '问田 · 助农手'}</h2>
+          <p className="agent-page-sub">
+            {selectedAgent
+              ? `${selectedAgent.farmlandName || ''}${selectedAgent.cropName ? ` · ${selectedAgent.cropName}` : ''} · 内容由 AI 生成，仅供参考`
+              : '内容由 AI 生成，仅供参考'}
           </p>
         </div>
-        {messages.length > 0 && (
-          <button className="btn-cancel" onClick={clearChat} style={{ padding: '8px 16px', fontSize: 13 }}>
-            🗑 清空对话
-          </button>
-        )}
+        <div className="agent-page-actions">
+          {agents.length > 0 && (
+            <select
+              className="agent-switcher"
+              value={selectedId ?? ''}
+              onChange={(e) => setSelectedId(Number(e.target.value))}
+              disabled={loading}
+              aria-label="切换助农手"
+            >
+              {agents.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}{item.cropName ? ` · ${item.cropName}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          {messages.length > 0 && (
+            <button className="btn-cancel" onClick={clearChat} style={{ padding: '8px 16px', fontSize: 13 }}>
+              🗑 清空对话
+            </button>
+          )}
+        </div>
       </div>
 
       {notConfigured && (
@@ -346,11 +387,11 @@ export default function AgentPage() {
         <div className="agent-messages" ref={listRef}>
           {messages.length === 0 && (
             <div className="agent-welcome">
-              <div className="agent-welcome-icon">🌾</div>
-              <h3>你好，我是助农手，问田的农事顾问</h3>
+              <div className="agent-welcome-icon">{selectedAgent?.avatar || '🌾'}</div>
+              <h3>你好，我是{selectedAgent?.name || '助农手'}</h3>
               <p>
-                可以问地块、天气和农事安排，也可以直接上传作物照片，
-                我帮你看植物种类、生长阶段和病害。
+                {selectedAgent?.welcome
+                  || '可以问地块、天气和农事安排，也可以直接上传作物照片，我帮你看植物种类、生长阶段和病害。'}
               </p>
 
               <div className="agent-suggestions">
@@ -420,6 +461,12 @@ export default function AgentPage() {
                 )}
 
                 {m.vision && <VisionCard vision={m.vision} />}
+
+                {!m.streaming && m.knowledgeUsed?.length > 0 && (
+                  <div className="agent-knowledge-refs">
+                    📚 参考知识：{m.knowledgeUsed.map((ref) => ref.title).join('、')}
+                  </div>
+                )}
 
                 {m.truncated && (
                   <div className="agent-note">

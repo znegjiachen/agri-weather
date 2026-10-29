@@ -43,8 +43,8 @@ public class GetCropStageTool implements Tool {
     @Override
     public Object execute(AgentContext<?> context, Map<String, Object> args) {
         Long farmlandId = ToolArgs.argLong(args, "farmlandId");
-        Long userId = context.payload(AgriContext.class).userId();
-        Farmland f = guard.requireOwned(farmlandId, userId);
+        AgriContext ctx = context.payload(AgriContext.class);
+        Farmland f = guard.requireOwned(farmlandId, ctx);
 
         if (f.getCropId() == null || f.getPlantDate() == null) {
             return Map.of("error", "该地块尚未设置作物或种植日期，无法判断生长阶段");

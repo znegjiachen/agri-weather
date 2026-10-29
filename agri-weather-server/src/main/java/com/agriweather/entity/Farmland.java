@@ -49,4 +49,8 @@ public class Farmland {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** 对应的专属助农手 ID，仅用于接口返回，不落库 */
+    @Transient
+    private Long agentId;
 }

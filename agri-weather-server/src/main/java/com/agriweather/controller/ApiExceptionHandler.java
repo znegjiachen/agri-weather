@@ -64,7 +64,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleUploadTooLarge(MaxUploadSizeExceededException e) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "FILE_TOO_LARGE");
-        body.put("message", "图片不能超过 5MB");
+        body.put("message", "文件不能超过 5MB");
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
     }
 
@@ -72,7 +72,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleMissingPart(MissingServletRequestPartException e) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("error", "BAD_REQUEST");
-        body.put("message", "请选择图片");
+        body.put("message", "请选择文件");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 

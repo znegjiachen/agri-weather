@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -39,10 +40,20 @@ public class ListFarmlandsTool implements Tool {
 
     @Override
     public Object execute(AgentContext<?> context, Map<String, Object> args) {
-        Long userId = context.payload(AgriContext.class).userId();
+        AgriContext ctx = context.payload(AgriContext.class);
+        List<Farmland> fields;
+        if (ctx.farmlandId() != null) {
+            // 地块专属助农手：只暴露自己负责的那块地
+            Farmland scoped = farmlandRepo.findById(ctx.farmlandId())
+                    .filter(f -> Objects.equals(f.getUserId(), ctx.userId()))
+                    .orElse(null);
+            fields = scoped != null ? List.of(scoped) : List.of();
+        } else {
+            fields = farmlandRepo.findByUserId(ctx.userId());
+        }
 
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Farmland f : farmlandRepo.findByUserId(userId)) {
+        for (Farmland f : fields) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("farmlandId", f.getId());
             m.put("name", f.getFieldName());

@@ -20,4 +20,10 @@ public class AgentChatRequest {
     /** 视觉模型对用户照片的识别结果，后端会拼进本轮用户消息 */
     @Size(max = 6000, message = "图片识别结果过长")
     private String visionContext;
+
+    /** 地块专属助农手 ID；与 farmlandId 至少提供一个即可 */
+    private Long agentId;
+
+    /** 当前地块 ID；没有 agentId 时后端会按地块自动定位智能体 */
+    private Long farmlandId;
 }

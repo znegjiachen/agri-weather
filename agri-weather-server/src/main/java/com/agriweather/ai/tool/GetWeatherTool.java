@@ -43,8 +43,8 @@ public class GetWeatherTool implements Tool {
     @SuppressWarnings("unchecked")
     public Object execute(AgentContext<?> context, Map<String, Object> args) throws Exception {
         Long farmlandId = ToolArgs.argLong(args, "farmlandId");
-        Long userId = context.payload(AgriContext.class).userId();
-        guard.requireOwned(farmlandId, userId);
+        AgriContext ctx = context.payload(AgriContext.class);
+        guard.requireOwned(farmlandId, ctx);
 
         Map<String, Object> raw = weatherService.fetchWeather(farmlandId);
 

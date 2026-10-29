@@ -1,5 +1,6 @@
 package com.agriweather.ai.tool;
 
+import com.agriweather.ai.AgriContext;
 import com.agriweather.entity.Farmland;
 import com.agriweather.repository.FarmlandRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,24 @@ public class FarmlandAccessGuard {
                 .orElseThrow(() -> new IllegalArgumentException("地块不存在（ID=" + farmlandId + "）"));
         if (!Objects.equals(f.getUserId(), userId)) {
             throw new IllegalArgumentException("无权访问该地块（ID=" + farmlandId + "）");
+        }
+        return f;
+    }
+
+    /**
+     * 专属助农手只能访问自己负责的地块。
+     *
+     * 全局对话（farmlandId 为空）保持原行为；地块智能体越界时给出可读提示，
+     * 让模型转告用户切换地块，而不是查出别的地块数据。
+     */
+    public Farmland requireOwned(Long farmlandId, AgriContext context) {
+        Farmland f = requireOwned(farmlandId, context.userId());
+        if (context.farmlandId() != null && !Objects.equals(context.farmlandId(), farmlandId)) {
+            String scopedName = farmlandRepo.findById(context.farmlandId())
+                    .map(Farmland::getFieldName)
+                    .orElse("其他地块");
+            throw new IllegalArgumentException(
+                    "该助农手只负责「" + scopedName + "」，不能查询其他地块，请切换到对应地块的助农手");
         }
         return f;
     }

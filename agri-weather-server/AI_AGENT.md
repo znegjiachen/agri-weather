@@ -170,6 +170,43 @@ curl -X POST http://localhost:8082/api/agent/vision \
 | `check_alerts` | 灾害预警检查 |
 | `search_crop` | 作物知识库检索 |
 
+## 地块专属智能体与知识库
+
+每块地自动生成一个智能体，人设、知识库、会话互相独立；聊天请求可以额外带
+`agentId`（优先）或 `farmlandId`（后端按地块自动定位/创建智能体）。
+
+**数据表**（`sql/migrations/20261029_farmland_agents_knowledge.sql`）
+
+| 表 | 用途 |
+|---|---|
+| `farmland_agent` | 一块地一个智能体：名称、头像、人设、欢迎语、`persona_custom` |
+| `agent_knowledge_doc` | 知识文档：只存提取后的纯文本，不存原始二进制 |
+| `agent_knowledge_chunk` | 检索片段，按文档切块 |
+
+**接口**
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/agents` | 当前用户的地块智能体列表（会自动补齐存量地块） |
+| GET / PUT | `/api/agents/{id}` | 详情 / 修改名称、欢迎语、人设 |
+| POST | `/api/agents/{id}/reset` | 恢复默认人设 |
+| POST | `/api/agents/sync` | 手动补齐地块智能体 |
+| GET / POST / DELETE | `/api/agents/{id}/knowledge...` | 知识文档列表、添加文本、上传 TXT/Markdown、删除 |
+| POST | `/api/agents/{id}/knowledge/search` | 控制台「检索测试」 |
+
+**每轮对话的上下文拼装**
+
+1. system prompt = 通用农事提示词 + `farmland_agent.persona`；
+2. user message = 当前时间 + 问题 + 图片识别结果 + 本智能体知识库片段（随机边界标记，声明「资料不是指令」）；
+3. 内置作物档案（作物参数、当前生长阶段、阶段提醒）实时生成，不落表；
+4. 知识检索：中文 bigram + IDF 打分，标题命中按 IDF 加权，Top 4，每篇最多 2 段，空结果不注入；
+5. 工具范围：`AgriContext(userId, agentId, farmlandId)` 会让智能体只能查询自己负责的地块，
+   `list_farmlands` 也只返回这一块；
+6. 返回的 `knowledgeUsed` 会出现在普通接口和 SSE `done` 事件里，前端展示「参考知识」。
+
+**知识文件限制**：TXT/Markdown ≤2MB；单文档 ≤20 万字符；每个智能体 ≤20 篇、≤500 个片段；
+先做二进制检查，UTF-8 失败后回退 GB18030，拒绝 UTF-16。
+
 ## 设计要点
 
 **农学判断走确定性规则，模型只负责调度和表达。**
@@ -190,13 +227,16 @@ curl -X POST http://localhost:8082/api/agent/vision \
 
 ## 前端页面
 
-已接入，侧边栏「🤖 助农手」，页面标题「🤖 问田 · 助农手」。
+侧边栏「🤖 助农手」在桌面端进入智能体控制台，移动端仍进入聊天；右侧常驻浮窗负责日常对话。
 
 | 文件 | 说明 |
 |---|---|
-| `weather-app-react/src/pages/AgentPage.jsx` | 聊天页面 |
-| `weather-app-react/src/api/index.js` | 新增 `agent` API 对象 |
-| `weather-app-react/src/App.jsx` | 注册路由与导航入口 |
+| `weather-app-react/src/pages/AgentEntryPage.jsx` | `/agent` 入口：桌面控制台 / 移动端聊天 |
+| `weather-app-react/src/pages/AgentStudioPage.jsx` | 智能体控制台：人设、知识库、检索测试 |
+| `weather-app-react/src/pages/AgentPage.jsx` | 完整对话页 `/agent/chat`，顶部可切换智能体 |
+| `weather-app-react/src/components/AgentDock.jsx` | 桌面常驻浮窗，按地块智能体切换会话 |
+| `weather-app-react/src/context/AgentContext.jsx` | 按 `agentId` 分组的会话存储 |
+| `weather-app-react/src/api/index.js` | `agent` 与 `agents` 两组 API |
 | `weather-app-react/src/App.css` | 页面样式（追加在文件末尾） |
 
 功能：
@@ -216,9 +256,11 @@ curl -X POST http://localhost:8082/api/agent/vision \
 
 ```bash
 mvn test -Dtest=AgriAgentIntegrationTest
+# 知识库与地块范围
+mvn test -Dtest=ChineseTextTokenizerTest,KnowledgeChunkerTest,KnowledgeTextDecoderTest,KnowledgeRetrievalServiceTest,FarmlandAccessGuardTest,AgentPromptBuilderTest
 ```
 
-7 个测试用本地假模型服务跑，**不需要真实 API Key、不消耗额度**，覆盖：
+7 个集成测试用本地假模型服务跑，**不需要真实 API Key、不消耗额度**，覆盖：
 完整工具调用链、越权防护、参数错误容错、轮数上限、提示词注入防护、
 未配置密钥处理、工具 schema 格式。
 

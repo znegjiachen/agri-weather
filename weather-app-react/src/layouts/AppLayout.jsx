@@ -16,7 +16,7 @@ export default function AppLayout() {
 
   const sub = SUB_NAV.find((item) => item.to === pathname);
   // 完整对话页已经有整页聊天，不再重复挂浮窗
-  const showDock = isWide && pathname !== '/agent';
+  const showDock = isWide && pathname !== '/agent' && pathname !== '/agent/chat';
 
   return (
     <div className="app-layout">

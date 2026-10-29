@@ -39,8 +39,8 @@ public class CheckAlertsTool implements Tool {
     @Override
     public Object execute(AgentContext<?> context, Map<String, Object> args) throws Exception {
         Long farmlandId = ToolArgs.argLong(args, "farmlandId");
-        Long userId = context.payload(AgriContext.class).userId();
-        guard.requireOwned(farmlandId, userId);
+        AgriContext ctx = context.payload(AgriContext.class);
+        guard.requireOwned(farmlandId, ctx);
 
         List<Map<String, Object>> alerts = weatherService.checkAlerts(farmlandId);
         if (alerts.isEmpty()) {

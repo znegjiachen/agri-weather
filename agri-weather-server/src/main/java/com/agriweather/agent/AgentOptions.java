@@ -24,4 +24,10 @@ public class AgentOptions {
 
     /** trace 里工具结果摘要的最大长度，超长截断 */
     private int traceSummaryMaxChars = 300;
+
+    /** 最多带多少条历史消息，防止前端无限堆积 */
+    private int historyMaxMessages = 20;
+
+    /** 历史消息的总字符上限（保留最近的部分） */
+    private int historyMaxChars = 12000;
 }

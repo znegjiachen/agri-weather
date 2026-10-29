@@ -133,13 +133,15 @@ export const community = {
 
 // Agent（助农手 农事智能体）
 export const agent = {
-  chat: (message, history = [], visionContext = '') =>
+  chat: (message, history = [], visionContext = '', context = {}) =>
     request('/api/agent/chat', {
       method: 'POST',
       body: JSON.stringify({
         message,
         history,
         ...(visionContext ? { visionContext } : {}),
+        ...(context.agentId ? { agentId: context.agentId } : {}),
+        ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
       }),
     }),
 
@@ -147,7 +149,7 @@ export const agent = {
    * 流式对话：思考、工具开始/结束实时回调，最后返回 done 事件里的完整结果。
    * SSE 用 fetch + ReadableStream 读，因为 EventSource 不支持 POST/Authorization。
    */
-  chatStream: async (message, history = [], visionContext = '', handlers = {}) => {
+  chatStream: async (message, history = [], visionContext = '', handlers = {}, context = {}) => {
     const token = getToken();
     const res = await fetch(`${BASE_URL}/api/agent/chat/stream`, {
       method: 'POST',
@@ -160,6 +162,8 @@ export const agent = {
         message,
         history,
         ...(visionContext ? { visionContext } : {}),
+        ...(context.agentId ? { agentId: context.agentId } : {}),
+        ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
       }),
     });
 
@@ -249,4 +253,51 @@ export const agent = {
   },
   status: () => request('/api/agent/status'),
   tools: () => request('/api/agent/tools'),
+};
+
+// Agents（每块地一个专属助农手 + 知识库）
+export const agents = {
+  list: () => request('/api/agents'),
+  get: (id) => request(`/api/agents/${id}`),
+  update: (id, body) => request(`/api/agents/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  }),
+  reset: (id) => request(`/api/agents/${id}/reset`, { method: 'POST' }),
+  sync: () => request('/api/agents/sync', { method: 'POST' }),
+
+  knowledge: {
+    list: (agentId) => request(`/api/agents/${agentId}/knowledge`),
+    getDoc: (agentId, docId) => request(`/api/agents/${agentId}/knowledge/${docId}`),
+    addText: (agentId, body) => request(`/api/agents/${agentId}/knowledge/text`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    remove: (agentId, docId) => request(`/api/agents/${agentId}/knowledge/${docId}`, {
+      method: 'DELETE',
+    }),
+    search: (agentId, query) => request(`/api/agents/${agentId}/knowledge/search`, {
+      method: 'POST',
+      body: JSON.stringify({ query }),
+    }),
+
+    /** multipart 不能手动设 Content-Type，浏览器要自己生成 boundary */
+    uploadFile: async (agentId, file, title = '') => {
+      const token = getToken();
+      const form = new FormData();
+      form.append('file', file);
+      if (title) form.append('title', title);
+
+      const res = await fetch(`${BASE_URL}/api/agents/${agentId}/knowledge/file`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 401) handleUnauthorized(data);
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      return data;
+    },
+  },
 };

@@ -29,6 +29,9 @@ public class AgentChatResponse {
     /** 使用的模型 */
     private String model;
 
+    /** 本轮回答参考了哪些知识库文档（内置作物档案不在此列） */
+    private List<KnowledgeRef> knowledgeUsed;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

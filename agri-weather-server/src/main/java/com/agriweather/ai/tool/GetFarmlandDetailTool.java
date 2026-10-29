@@ -40,8 +40,8 @@ public class GetFarmlandDetailTool implements Tool {
     @Override
     public Object execute(AgentContext<?> context, Map<String, Object> args) {
         Long farmlandId = ToolArgs.argLong(args, "farmlandId");
-        Long userId = context.payload(AgriContext.class).userId();
-        Farmland f = guard.requireOwned(farmlandId, userId);
+        AgriContext ctx = context.payload(AgriContext.class);
+        Farmland f = guard.requireOwned(farmlandId, ctx);
 
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("farmlandId", f.getId());

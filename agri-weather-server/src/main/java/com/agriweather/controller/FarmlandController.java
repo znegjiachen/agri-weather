@@ -1,7 +1,9 @@
 package com.agriweather.controller;
 
 import com.agriweather.entity.Farmland;
+import com.agriweather.entity.FarmlandAgent;
 import com.agriweather.repository.FarmlandRepository;
+import com.agriweather.service.AgentService;
 import com.agriweather.service.FarmlandWeatherService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,12 +28,15 @@ public class FarmlandController {
 
     private final FarmlandRepository farmlandRepository;
     private final FarmlandWeatherService farmlandWeatherService;
+    private final AgentService agentService;
     private final ObjectMapper objectMapper;
 
     @GetMapping
     public List<Farmland> listMine(HttpServletRequest request) {
         Long userId = getUserIdOrAuthError(request);
-        return farmlandRepository.findByUserId(userId);
+        List<Farmland> fields = farmlandRepository.findByUserId(userId);
+        agentService.attachAgentIds(userId, fields);
+        return fields;
     }
 
     @PostMapping
@@ -54,7 +59,10 @@ public class FarmlandController {
         String pd = str(body, "plantDate");
         if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
 
-        return farmlandRepository.save(f);
+        Farmland saved = farmlandRepository.save(f);
+        FarmlandAgent agent = agentService.ensureForFarmland(saved);
+        saved.setAgentId(agent.getId());
+        return saved;
     }
 
     @PutMapping("/{id}")
@@ -78,7 +86,11 @@ public class FarmlandController {
             if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
         }
 
-        return farmlandRepository.save(f);
+        Farmland saved = farmlandRepository.save(f);
+        agentService.refreshDefaultAfterFarmlandUpdate(saved);
+        FarmlandAgent agent = agentService.ensureForFarmland(saved);
+        saved.setAgentId(agent.getId());
+        return saved;
     }
 
     @GetMapping("/{id}/weather")
@@ -109,7 +121,7 @@ public class FarmlandController {
     public void delete(@PathVariable Long id, HttpServletRequest request) {
         Long userId = getUserIdOrAuthError(request);
         requireOwned(id, userId);
-        farmlandRepository.deleteById(id);
+        agentService.deleteFarmlandAndAgent(id, userId);
     }
 
     /** 地块必须存在且属于当前用户，否则 404 / 403 */

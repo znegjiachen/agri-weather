@@ -34,7 +34,6 @@ function clampDockWidth(value) {
  */
 export default function AgentDock() {
   const navigate = useNavigate();
-  const { messages, setMessages } = useAgent();
 
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(() => {
@@ -51,6 +50,12 @@ export default function AgentDock() {
   const [attachments, setAttachments] = useState([]);
   // 首页可能先于浮窗挂载，初始化时补读一次共享上下文
   const [field, setField] = useState(() => getFieldContext());
+
+  // 一块地一个智能体 → 一个独立会话；没有 agentId 时用地块 ID 兜底
+  const agentKey = field?.agentId
+    ? String(field.agentId)
+    : field?.id ? `field-${field.id}` : 'default';
+  const { messages, setMessages, clearMessages } = useAgent(agentKey);
 
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -187,11 +192,6 @@ export default function AgentDock() {
           : m.content,
       }));
 
-    // 只把地块上下文拼进发给模型的文本，气泡里保持用户原话
-    const outbound = field
-      ? `【当前地块：${field.name}（ID ${field.id}）${field.cropName ? `，作物：${field.cropName}` : ''}】\n${question}`
-      : question;
-
     setError('');
     setInput('');
     setAttachments([]);
@@ -221,7 +221,7 @@ export default function AgentDock() {
         streaming: true,
       }]);
 
-      const done = await agentApi.chatStream(outbound, history, visionContext, {
+      const done = await agentApi.chatStream(question, history, visionContext, {
         onContentDelta: ({ delta }) => {
           liveRef.current.content += delta;
           scheduleFlush();
@@ -258,7 +258,7 @@ export default function AgentDock() {
             return { ...m, toolCalls: calls };
           });
         },
-      });
+      }, { agentId: field?.agentId, farmlandId: field?.id });
 
       clearLive();
       setMessages((prev) => {
@@ -270,6 +270,7 @@ export default function AgentDock() {
               content: done.reply,
               toolCalls: done.toolCalls || [],
               thoughts: done.thoughts || [],
+              knowledgeUsed: done.knowledgeUsed || [],
               truncated: done.truncated,
               streaming: false,
             };
@@ -335,10 +336,9 @@ export default function AgentDock() {
   };
 
   const clearChat = () => {
-    messages.forEach((m) => (m.images || []).forEach((url) => URL.revokeObjectURL(url)));
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
-    setMessages([]);
+    clearMessages();
     setError('');
   };
 
@@ -397,7 +397,7 @@ export default function AgentDock() {
         <button
           type="button"
           className="agent-dock-icon"
-          onClick={() => navigate('/agent')}
+          onClick={() => navigate(field?.agentId ? `/agent/chat?agentId=${field.agentId}` : '/agent/chat')}
           title="打开完整对话"
         >
           ⤢
@@ -502,6 +502,12 @@ export default function AgentDock() {
                 {!m.streaming && m.content && (
                   <div className="agent-dock-bubble bot">
                     <Markdown>{m.content}</Markdown>
+                  </div>
+                )}
+
+                {!m.streaming && m.knowledgeUsed?.length > 0 && (
+                  <div className="agent-dock-refs">
+                    📚 参考知识：{m.knowledgeUsed.map((ref) => ref.title).join('、')}
                   </div>
                 )}
 

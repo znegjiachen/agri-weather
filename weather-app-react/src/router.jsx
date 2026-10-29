@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import CommunityPage from './pages/CommunityPage';
 import CommunityPostPage from './pages/CommunityPostPage';
 import AgentPage from './pages/AgentPage';
+import AgentEntryPage from './pages/AgentEntryPage';
 import ProfilePage from './pages/ProfilePage';
 import CropPage from './pages/CropPage';
 import PestPage from './pages/PestPage';
@@ -23,7 +24,9 @@ export default function AppRoutes() {
         <Route index element={<HomePage />} />
         <Route path="community" element={<CommunityPage />} />
         <Route path="community/:id" element={<CommunityPostPage />} />
-        <Route path="agent" element={<AgentPage />} />
+        {/* 桌面端是智能体控制台，手机端仍进入聊天 */}
+        <Route path="agent" element={<AgentEntryPage />} />
+        <Route path="agent/chat" element={<AgentPage />} />
         <Route path="profile" element={<ProfilePage />} />
 
         {/* 二级：首页九宫格进入的功能页 */}

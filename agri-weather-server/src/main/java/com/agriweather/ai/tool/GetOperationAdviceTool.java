@@ -45,8 +45,8 @@ public class GetOperationAdviceTool implements Tool {
     @SuppressWarnings("unchecked")
     public Object execute(AgentContext<?> context, Map<String, Object> args) throws Exception {
         Long farmlandId = ToolArgs.argLong(args, "farmlandId");
-        Long userId = context.payload(AgriContext.class).userId();
-        guard.requireOwned(farmlandId, userId);
+        AgriContext ctx = context.payload(AgriContext.class);
+        guard.requireOwned(farmlandId, ctx);
 
         // 取天气，转成 OperationAdvisor 需要的格式
         Map<String, Object> weather = weatherService.fetchWeather(farmlandId);

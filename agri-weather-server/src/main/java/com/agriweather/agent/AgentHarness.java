@@ -3,6 +3,7 @@ package com.agriweather.agent;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,19 +51,28 @@ public class AgentHarness {
                            List<Map<String, String>> history,
                            AgentContext<?> context,
                            AgentObserver observer) {
+        return run(userMessage, history, context, observer, options.getSystemPrompt());
+    }
+
+    /**
+     * 按请求覆盖 system prompt 的版本。
+     *
+     * 用于「每块地一个助农手」：AgentOptions 仍是单例，不能把某次请求的人设
+     * 写进共享字段，必须通过参数传进来。
+     */
+    public AgentResult run(String userMessage,
+                           List<Map<String, String>> history,
+                           AgentContext<?> context,
+                           AgentObserver observer,
+                           String systemPrompt) {
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(msg("system", options.getSystemPrompt()));
+        String prompt = systemPrompt != null && !systemPrompt.isBlank()
+                ? systemPrompt : options.getSystemPrompt();
+        messages.add(msg("system", prompt));
 
-        if (history != null) {
-            for (Map<String, String> h : history) {
-                String role = h.get("role");
-                String content = h.get("content");
-                // 只接受 user/assistant，防止前端注入 system 提示词
-                if (content == null || content.isBlank()) continue;
-                if (!"user".equals(role) && !"assistant".equals(role)) continue;
-                messages.add(msg(role, content));
-            }
+        for (Map<String, String> h : recentHistory(history)) {
+            messages.add(msg(h.get("role"), h.get("content")));
         }
         messages.add(msg("user", userMessage));
 
@@ -134,6 +144,34 @@ public class AgentHarness {
                 observer.onContentDelta(round, delta);
             }
         });
+    }
+
+    /** 只保留最近的历史，并限制总字符数；role 只接受 user/assistant，防止前端注入 system */
+    private List<Map<String, String>> recentHistory(List<Map<String, String>> history) {
+        if (history == null || history.isEmpty()) return List.of();
+
+        List<Map<String, String>> filtered = new ArrayList<>();
+        for (Map<String, String> h : history) {
+            String role = h.get("role");
+            String content = h.get("content");
+            if (content == null || content.isBlank()) continue;
+            if (!"user".equals(role) && !"assistant".equals(role)) continue;
+            filtered.add(h);
+        }
+
+        int maxMessages = Math.max(1, options.getHistoryMaxMessages());
+        int maxChars = Math.max(500, options.getHistoryMaxChars());
+        List<Map<String, String>> recent = new ArrayList<>();
+        int chars = 0;
+        for (int i = filtered.size() - 1; i >= 0 && recent.size() < maxMessages; i--) {
+            Map<String, String> item = filtered.get(i);
+            int length = item.get("content").length();
+            if (chars + length > maxChars && !recent.isEmpty()) break;
+            recent.add(item);
+            chars += length;
+        }
+        Collections.reverse(recent);
+        return recent;
     }
 
     private void addThought(List<AgentThought> thoughts, int round,

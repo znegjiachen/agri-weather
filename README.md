@@ -13,6 +13,8 @@
 | 模块 | 说明 |
 |---|---|
 | 📊 桌面驾驶舱 | 大屏三栏布局：今日天气、地块卡片、7 日趋势、预警与今日农事一屏呈现；宽屏下助农手常驻右侧 |
+| 🧑‍🌾 智能体控制台 | 每块地自动生成一个专属助农手，可改人设、恢复默认、查看内置作物档案；桌面端侧栏「助农手」进入 |
+| 📚 知识库 | 每个助农手独立知识库：粘贴文本或上传 TXT/Markdown，中文关键词检索后注入对话，回答标注引用了哪几篇 |
 | 🤖 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并实时展示每轮思考与工具调用轨迹 |
 | 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
@@ -38,6 +40,15 @@
 **多模态识图**：在对话里直接上传作物照片（最多 3 张），视觉模型会先识别植物名称、生长阶段、健康状态和可见的病害/虫害/缺素，再由助农手结合地块天气和农事工具给出建议。识别结果以卡片展示，低置信度或无法判断时会明确提示补拍。
 
 可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
+
+### 一块地一个助农手
+
+每块地会自动生成一个专属智能体，桌面端从侧栏「助农手」进入**智能体控制台**：
+
+- **人设独立**：名称、欢迎语、专属人设可编辑；作物或面积变化时会同步默认人设，用户改过的人设不会被覆盖。
+- **知识库独立**：支持粘贴文本或上传 TXT/Markdown（UTF-8/GB18030），按中文关键词与字词重合度检索，最多注入 4 段资料；回答下方会标注「参考知识」。
+- **范围独立**：智能体的工具只能查询它负责的那块地，跨地块查询会被拒绝；前端浮窗和对话页按智能体分别保存会话。
+- **内置知识**：每轮自动附带该地块的作物档案和当前生长阶段，无需手工维护。
 
 详见 [agri-weather-server/AI_AGENT.md](agri-weather-server/AI_AGENT.md)。
 
@@ -88,10 +99,11 @@ docker-compose down       # 停止
 mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
 mysql -u root -p agri_weather < agri-weather-server/sql/schema.sql
 
-# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界 + 作物库扩充
+# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界 + 作物库扩充 + 地块智能体/知识库
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_community_rich_text.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farmland_boundary.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261026_more_crops.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261029_farmland_agents_knowledge.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥

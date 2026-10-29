@@ -58,7 +58,8 @@ export default defineConfig({
               request.method === 'GET' &&
               // 登录态与智能体对话不缓存
               !url.pathname.startsWith('/api/auth/') &&
-              !url.pathname.startsWith('/api/agent/'),
+              !url.pathname.startsWith('/api/agent/') &&
+              !url.pathname.startsWith('/api/agents'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-get',

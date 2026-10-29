@@ -15,7 +15,14 @@ import com.agriweather.ai.VisionProperties;
 import com.agriweather.dto.AgentChatRequest;
 import com.agriweather.dto.AgentChatResponse;
 import com.agriweather.dto.AgentVisionResponse;
+import com.agriweather.dto.KnowledgeRef;
+import com.agriweather.entity.Farmland;
+import com.agriweather.entity.FarmlandAgent;
+import com.agriweather.service.AgentPromptBuilder;
+import com.agriweather.service.AgentService;
+import com.agriweather.service.BuiltInKnowledgeService;
 import com.agriweather.service.CommunityImageProcessor;
+import com.agriweather.service.KnowledgeRetrievalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -56,6 +63,10 @@ public class AgentController {
     private final CommunityImageProcessor imageProcessor;
     private final ObjectMapper objectMapper;
     private final ExecutorService agentStreamExecutor;
+    private final AgentService agentService;
+    private final AgentPromptBuilder agentPromptBuilder;
+    private final BuiltInKnowledgeService builtInKnowledgeService;
+    private final KnowledgeRetrievalService knowledgeRetrievalService;
 
     /**
      * 与农事智能体对话
@@ -71,15 +82,19 @@ public class AgentController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
         }
 
+        ChatPreparation prep = prepare(body, userId);
+
         try {
             AgentResult result = agentHarness.run(
-                    buildUserMessage(body),
+                    prep.message(),
                     body.getHistory(),
-                    AgentContext.of(new AgriContext(userId)));
+                    AgentContext.of(prep.context()),
+                    AgentObserver.NOOP,
+                    prep.systemPrompt());
 
             return new AgentChatResponse(
                     result.reply(), toDto(result.trace()), toThoughts(result.thoughts()),
-                    result.rounds(), result.truncated(), props.getModel());
+                    result.rounds(), result.truncated(), props.getModel(), prep.knowledgeUsed());
         } catch (DeepSeekClient.DeepSeekException e) {
             // 上游模型的问题：密钥、余额、限流、超时
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, e.getMessage());
@@ -104,7 +119,8 @@ public class AgentController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
         }
 
-        String message = buildUserMessage(body);
+        ChatPreparation prep = prepare(body, userId);
+        String message = prep.message();
         SseEmitter emitter = new SseEmitter(180_000L);
         AtomicBoolean cancelled = new AtomicBoolean(false);
 
@@ -121,7 +137,7 @@ public class AgentController {
                     AgentResult result = agentHarness.run(
                             message,
                             body.getHistory(),
-                            AgentContext.of(new AgriContext(userId)),
+                            AgentContext.of(prep.context()),
                             new AgentObserver() {
                                 @Override
                                 public void onRoundStarted(int round) {
@@ -188,7 +204,8 @@ public class AgentController {
                                 public boolean isCancelled() {
                                     return cancelled.get();
                                 }
-                            });
+                            },
+                            prep.systemPrompt());
 
                     Map<String, Object> done = new LinkedHashMap<>();
                     done.put("reply", result.reply());
@@ -197,6 +214,7 @@ public class AgentController {
                     done.put("rounds", result.rounds());
                     done.put("truncated", result.truncated());
                     done.put("model", props.getModel());
+                    done.put("knowledgeUsed", prep.knowledgeUsed());
                     sendEvent(emitter, "done", done);
                     emitter.complete();
                 } catch (AgentCancelledException e) {
@@ -230,8 +248,49 @@ public class AgentController {
         }
     }
 
-    /** 当前时间 + 用户问题 + 可选图片识别结果 */
-    private String buildUserMessage(AgentChatRequest body) {
+    /**
+     * 解析本次请求的智能体、拼接人设和知识库，构造发给模型的消息。
+     *
+     * 这里是 Chat 与 SSE 共用的唯一入口；知识库异常只降级不阻断对话。
+     */
+    private ChatPreparation prepare(AgentChatRequest body, Long userId) {
+        FarmlandAgent agent = agentService.resolveForChat(userId, body.getAgentId(), body.getFarmlandId());
+        String systemPrompt = agentPromptBuilder.build(agent);
+
+        String knowledgeBlock = "";
+        List<KnowledgeRef> knowledgeUsed = List.of();
+        if (agent != null) {
+            try {
+                Farmland field = agentService.requireOwnedFarmland(agent.getFarmlandId(), userId);
+                String builtin = builtInKnowledgeService.build(field);
+                KnowledgeRetrievalService.KnowledgePackage kb =
+                        knowledgeRetrievalService.buildBlock(agent.getId(), body.getMessage());
+
+                StringBuilder block = new StringBuilder();
+                if (kb.block() != null && !kb.block().isBlank()) {
+                    block.append(kb.block());
+                }
+                if (builtin != null && !builtin.isBlank()) {
+                    if (block.length() > 0) block.append("\n\n");
+                    block.append("【内置作物档案（由地块作物设置实时生成）】\n").append(builtin);
+                }
+                knowledgeBlock = block.toString();
+                knowledgeUsed = kb.refs();
+            } catch (Exception e) {
+                log.warn("加载智能体知识库失败 agentId={}: {}", agent.getId(), e.getMessage());
+            }
+        }
+
+        String message = buildUserMessage(body, knowledgeBlock);
+        AgriContext context = new AgriContext(
+                userId,
+                agent != null ? agent.getId() : null,
+                agent != null ? agent.getFarmlandId() : body.getFarmlandId());
+        return new ChatPreparation(message, context, systemPrompt, knowledgeUsed);
+    }
+
+    /** 当前时间 + 用户问题 + 可选图片识别结果 + 本智能体知识库 */
+    private String buildUserMessage(AgentChatRequest body, String knowledgeBlock) {
         String message = "【当前时间】"
                 + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
                 + "\n\n" + body.getMessage();
@@ -240,7 +299,18 @@ public class AgentController {
             message = message + "\n\n【图片识别结果（视觉模型提供，供参考）】\n"
                     + body.getVisionContext().trim();
         }
+        if (knowledgeBlock != null && !knowledgeBlock.isBlank()) {
+            message = message + "\n\n" + knowledgeBlock.trim();
+        }
         return message;
+    }
+
+    private record ChatPreparation(
+            String message,
+            AgriContext context,
+            String systemPrompt,
+            List<KnowledgeRef> knowledgeUsed
+    ) {
     }
 
     /**
