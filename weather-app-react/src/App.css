@@ -6419,3 +6419,36 @@ main {
 }
 
 .studio-embedding .btn-cancel { padding: 5px 9px; font-size: 10px; }
+
+/* 控制台人设表单：名称/头像两列，输入框不能溢出卡片 */
+.studio-form-row {
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+
+.studio-form-row label {
+  display: block;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.studio-form-row label input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 5px;
+  padding: 9px 11px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  box-sizing: border-box;
+}
+
+.studio-form-row label input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.14);
+}
