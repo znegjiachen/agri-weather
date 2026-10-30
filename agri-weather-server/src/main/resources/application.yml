@@ -67,6 +67,15 @@ app:
     max-images: 3
     max-image-bytes: 5242880
 
+  # 知识库向量检索（OpenAI 兼容 /embeddings）
+  # 不配置时使用本地字词哈希向量；配置后可接 BGE / M3E / OpenAI 等兼容服务
+  embedding:
+    base-url: ${EMBEDDING_BASE_URL:}
+    api-key: ${EMBEDDING_API_KEY:}
+    model: ${EMBEDDING_MODEL:}
+    timeout-seconds: ${EMBEDDING_TIMEOUT_SECONDS:30}
+    batch-size: ${EMBEDDING_BATCH_SIZE:16}
+
   # 天气外呼与缓存
   weather:
     base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}

@@ -6364,3 +6364,58 @@ main {
   .agent-switcher { width: 100%; max-width: 100%; }
   .agent-page .page-title { font-size: 20px; }
 }
+/* 智能体控制台：工具开关 / 向量索引 */
+.studio-tools {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.studio-tools h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+.studio-tools > p { margin: 0 0 8px; color: var(--text-muted); font-size: 9.5px; }
+
+.studio-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.studio-tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.studio-tool.on {
+  border-color: rgba(102, 126, 234, 0.3);
+  background: rgba(102, 126, 234, 0.07);
+  color: #4c5bd4;
+}
+
+.studio-tool input { accent-color: #667eea; }
+.studio-tool-icon { font-size: 13px; }
+.studio-tools-warn { color: #b45309 !important; font-size: 10px !important; }
+
+.studio-embedding {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(102, 126, 234, 0.12);
+  border-radius: 8px;
+  background: rgba(102, 126, 234, 0.05);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+}
+
+.studio-embedding .btn-cancel { padding: 5px 9px; font-size: 10px; }

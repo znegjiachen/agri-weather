@@ -1,8 +1,10 @@
 package com.agriweather.controller;
 
 import com.agriweather.dto.AgentDetail;
+import com.agriweather.dto.AgentMessageView;
 import com.agriweather.dto.AgentSummary;
 import com.agriweather.dto.AgentUpdateRequest;
+import com.agriweather.service.AgentChatHistoryService;
 import com.agriweather.service.AgentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -22,6 +24,7 @@ import java.util.List;
 public class AgentStudioController {
 
     private final AgentService agentService;
+    private final AgentChatHistoryService historyService;
 
     @GetMapping
     public List<AgentSummary> list(HttpServletRequest request) {
@@ -48,6 +51,18 @@ public class AgentStudioController {
     @PostMapping("/sync")
     public List<AgentSummary> sync(HttpServletRequest request) {
         return agentService.listSummaries(userId(request));
+    }
+
+    @GetMapping("/{id}/messages")
+    public List<AgentMessageView> messages(@PathVariable Long id,
+                                           @RequestParam(defaultValue = "50") int limit,
+                                           HttpServletRequest request) {
+        return historyService.list(id, userId(request), limit);
+    }
+
+    @DeleteMapping("/{id}/messages")
+    public void clearMessages(@PathVariable Long id, HttpServletRequest request) {
+        historyService.clear(id, userId(request));
     }
 
     private Long userId(HttpServletRequest request) {

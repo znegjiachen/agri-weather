@@ -14,7 +14,7 @@
 |---|---|
 | 📊 桌面驾驶舱 | 大屏三栏布局：今日天气、地块卡片、7 日趋势、预警与今日农事一屏呈现；宽屏下助农手常驻右侧 |
 | 🧑‍🌾 智能体控制台 | 每块地自动生成一个专属助农手，可改人设、恢复默认、查看内置作物档案；桌面端侧栏「助农手」进入 |
-| 📚 知识库 | 每个助农手独立知识库：粘贴文本或上传 TXT/Markdown，中文关键词检索后注入对话，回答标注引用了哪几篇 |
+| 📚 知识库 | 每个助农手独立知识库：粘贴文本或上传 TXT / Markdown / PDF / Word（≤5MB），向量 + 关键词混合检索后注入对话，回答标注引用了哪几篇 |
 | 🤖 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并实时展示每轮思考与工具调用轨迹 |
 | 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
@@ -46,8 +46,10 @@
 每块地会自动生成一个专属智能体，桌面端从侧栏「助农手」进入**智能体控制台**：
 
 - **人设独立**：名称、欢迎语、专属人设可编辑；作物或面积变化时会同步默认人设，用户改过的人设不会被覆盖。
-- **知识库独立**：支持粘贴文本或上传 TXT/Markdown（UTF-8/GB18030），按中文关键词与字词重合度检索，最多注入 4 段资料；回答下方会标注「参考知识」。
-- **范围独立**：智能体的工具只能查询它负责的那块地，跨地块查询会被拒绝；前端浮窗和对话页按智能体分别保存会话。
+- **知识库独立**：支持粘贴文本或上传 TXT / Markdown / PDF / Word（UTF-8/GB18030，≤5MB），中文关键词 + 向量混合检索，最多注入 4 段资料；回答下方会标注「参考知识」。
+- **工具可调配**：每个助农手可启用/停用 7 个农事工具；关闭后模型看不到该工具。
+- **历史持久化**：对话记录存后端，刷新页面或换设备后仍可恢复；每个智能体独立会话。
+- **范围独立**：智能体的工具只能查询它负责的那块地，跨地块查询会被拒绝；前端浮窗和对话页按智能体分别切换会话。
 - **内置知识**：每轮自动附带该地块的作物档案和当前生长阶段，无需手工维护。
 
 详见 [agri-weather-server/AI_AGENT.md](agri-weather-server/AI_AGENT.md)。
@@ -60,7 +62,7 @@
 
 **前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）
 
-**外部服务** — [Open-Meteo](https://open-meteo.com/)（天气，免费无密钥）· [DeepSeek](https://platform.deepseek.com/)（农事智能体）
+**外部服务** — [Open-Meteo](https://open-meteo.com/)（天气，免费无密钥）· [DeepSeek](https://platform.deepseek.com/)（农事智能体）· 可选 OpenAI 兼容 Embedding（不配置时使用本地向量）
 
 **部署** — Docker Compose（MySQL + 后端 + Nginx）
 
@@ -104,6 +106,7 @@ mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_comm
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farmland_boundary.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261026_more_crops.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261029_farmland_agents_knowledge.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -166,6 +169,7 @@ cd weather-app-react && npm install && npm run dev
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
 | 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `GET /tools` · `GET /status` |
+| 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · 知识库 `/knowledge`（文本/文件/检索/重建向量） |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
 
@@ -173,7 +177,7 @@ cd weather-app-react && npm install && npm run dev
 
 ### 数据库表
 
-`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide` · `community_post` · `community_comment` · `community_like` · `community_image`
+`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide` · `community_post` · `community_comment` · `community_like` · `community_image` · `farmland_agent` · `agent_knowledge_doc` · `agent_knowledge_chunk` · `agent_chat_message`
 
 ---
 
@@ -188,6 +192,7 @@ cd weather-app-react && npm install && npm run dev
 | `JWT_SECRET` | JWT 签名密钥，至少 256 位随机串 |
 | `CORS_ORIGINS` | 允许的前端域名，逗号分隔 |
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥（[申请地址](https://platform.deepseek.com/api_keys)） |
+| `EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY` / `EMBEDDING_MODEL` | 可选，OpenAI 兼容的 Embedding 服务；不配置时使用本地字词向量 |
 | `VISION_API_KEY` | 可选，视觉模型密钥；不填默认复用 `DEEPSEEK_API_KEY` |
 | `VISION_MODEL` | 可选，默认 `deepseek-v4-flash-vision-exp` |
 | `SERVER_PORT` | 后端端口，默认 8082 |

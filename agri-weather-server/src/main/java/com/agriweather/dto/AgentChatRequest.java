@@ -21,6 +21,10 @@ public class AgentChatRequest {
     @Size(max = 6000, message = "图片识别结果过长")
     private String visionContext;
 
+    /** 结构化图片识别结果，用于持久化历史（可选） */
+    @Size(max = 20000, message = "图片识别结果过长")
+    private String visionJson;
+
     /** 地块专属助农手 ID；与 farmlandId 至少提供一个即可 */
     private Long agentId;
 

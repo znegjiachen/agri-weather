@@ -9,6 +9,7 @@ import com.agriweather.entity.AgentKnowledgeDoc;
 import com.agriweather.repository.AgentKnowledgeChunkRepository;
 import com.agriweather.repository.AgentKnowledgeDocRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,7 +20,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -27,19 +27,24 @@ import java.util.Map;
  *
  * 文档只存提取后的文本；片段用于检索。所有入口都先校验智能体归属。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentKnowledgeService {
 
+    private static final int MAX_EMBED_CHUNKS = 200;
+
     public static final int MAX_DOCS = 20;
     public static final int MAX_DOC_CHARS = 200_000;
     public static final int MAX_TOTAL_CHUNKS = 500;
-    public static final long MAX_FILE_BYTES = 2 * 1024 * 1024;
+    public static final long MAX_FILE_BYTES = 5 * 1024 * 1024;
 
     private final AgentService agentService;
     private final AgentKnowledgeDocRepository docRepository;
     private final AgentKnowledgeChunkRepository chunkRepository;
     private final KnowledgeRetrievalService retrievalService;
+    private final KnowledgeDocumentExtractor documentExtractor;
+    private final EmbeddingService embeddingService;
 
     public List<KnowledgeDocView> listDocs(Long agentId, Long userId) {
         agentService.requireOwned(agentId, userId);
@@ -83,18 +88,14 @@ public class AgentKnowledgeService {
             throw new IllegalArgumentException("请选择要上传的文件");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new IllegalArgumentException("知识文件不能超过 2MB");
+            throw new IllegalArgumentException("知识文件不能超过 5MB");
         }
         String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "knowledge.txt";
-        String lower = filename.toLowerCase(Locale.ROOT);
-        if (!lower.endsWith(".txt") && !lower.endsWith(".md") && !lower.endsWith(".markdown")) {
-            throw new IllegalArgumentException("目前只支持 TXT / Markdown 文本文件");
-        }
         byte[] bytes = file.getBytes();
-        String text = KnowledgeTextDecoder.decode(bytes);
+        KnowledgeDocumentExtractor.Extracted extracted = documentExtractor.extract(filename, bytes);
         String docTitle = title != null && !title.isBlank() ? title : stripExtension(filename);
-        return save(agentId, userId, docTitle, text, "FILE", filename,
-                file.getContentType() != null ? file.getContentType() : "text/plain", bytes.length);
+        return save(agentId, userId, docTitle, extracted.text(), "FILE", filename,
+                extracted.mimeType(), bytes.length);
     }
 
     @Transactional
@@ -158,15 +159,66 @@ public class AgentKnowledgeService {
         doc.setUpdatedAt(LocalDateTime.now());
         docRepository.save(doc);
 
+        List<AgentKnowledgeChunk> entities = new ArrayList<>();
         int index = 0;
         for (String chunk : chunks) {
-            chunkRepository.save(new AgentKnowledgeChunk(
+            entities.add(new AgentKnowledgeChunk(
                     null, doc.getId(), agentId, index++, chunk, LocalDateTime.now()));
         }
+        applyEmbeddings(entities);
+        chunkRepository.saveAll(entities);
 
         return new KnowledgeDocView(doc.getId(), doc.getTitle(), doc.getSourceType(),
                 doc.getOriginalFilename(), doc.getByteSize(), doc.getCharCount(),
                 chunks.size(), doc.getCreatedAt());
+    }
+
+    /** 重建该智能体已有片段的向量；返回成功写入的片段数 */
+    @Transactional
+    public int reindex(Long agentId, Long userId) {
+        agentService.requireOwned(agentId, userId);
+        List<AgentKnowledgeChunk> chunks = chunkRepository
+                .findByAgentIdOrderByDocIdAscChunkIndexAsc(agentId);
+        if (chunks.isEmpty()) return 0;
+        if (chunks.size() > MAX_EMBED_CHUNKS) {
+            chunks = chunks.subList(0, MAX_EMBED_CHUNKS);
+        }
+        try {
+            List<float[]> vectors = embeddingService.embed(
+                    chunks.stream().map(AgentKnowledgeChunk::getContent).toList());
+            String model = embeddingService.modelName();
+            for (int i = 0; i < chunks.size() && i < vectors.size(); i++) {
+                float[] vector = vectors.get(i);
+                if (vector == null || vector.length == 0) continue;
+                chunks.get(i).setEmbedding(EmbeddingService.toBytes(vector));
+                chunks.get(i).setEmbeddingDim(vector.length);
+                chunks.get(i).setEmbeddingModel(model);
+            }
+            chunkRepository.saveAll(chunks);
+            return chunks.size();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("重建向量失败：" + e.getMessage());
+        }
+    }
+
+    private void applyEmbeddings(List<AgentKnowledgeChunk> chunks) {
+        if (chunks.isEmpty()) return;
+        List<AgentKnowledgeChunk> target = chunks.size() > MAX_EMBED_CHUNKS
+                ? chunks.subList(0, MAX_EMBED_CHUNKS) : chunks;
+        try {
+            List<float[]> vectors = embeddingService.embed(
+                    target.stream().map(AgentKnowledgeChunk::getContent).toList());
+            String model = embeddingService.modelName();
+            for (int i = 0; i < target.size() && i < vectors.size(); i++) {
+                float[] vector = vectors.get(i);
+                if (vector == null || vector.length == 0) continue;
+                target.get(i).setEmbedding(EmbeddingService.toBytes(vector));
+                target.get(i).setEmbeddingDim(vector.length);
+                target.get(i).setEmbeddingModel(model);
+            }
+        } catch (Exception e) {
+            log.warn("生成知识库向量失败，本次仅使用关键词检索: {}", e.getMessage());
+        }
     }
 
     private AgentKnowledgeDoc requireDoc(Long agentId, Long docId) {

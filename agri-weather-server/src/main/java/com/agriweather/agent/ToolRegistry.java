@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 工具注册表：把 {@link Tool} 实现汇总起来，对外提供「描述给模型」和「执行」两个能力。
@@ -32,10 +33,26 @@ public class ToolRegistry {
         }
     }
 
-    /** 返回 OpenAI 协议格式的工具描述列表 */
+    /** 全部工具名，用于默认启用和配置校验 */
+    public Set<String> allToolNames() {
+        return Set.copyOf(byName.keySet());
+    }
+
+    public boolean contains(String name) {
+        return byName.containsKey(name);
+    }
+
+    /** 返回 OpenAI 协议格式的工具描述列表；enabled 为空表示全部 */
     public List<Map<String, Object>> toolSchemas() {
+        return toolSchemas(null);
+    }
+
+    public List<Map<String, Object>> toolSchemas(Set<String> enabled) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (Tool t : byName.values()) out.add(schema(t));
+        for (Tool t : byName.values()) {
+            if (enabled != null && !enabled.isEmpty() && !enabled.contains(t.name())) continue;
+            out.add(schema(t));
+        }
         return out;
     }
 

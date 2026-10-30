@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { agent as agentApi, agents as agentsApi } from '../api';
-import { useAgent } from '../context/AgentContext';
+import { useAgentHistory } from '../hooks/useAgentHistory';
 import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
@@ -36,8 +36,13 @@ export default function AgentPage() {
     [agents, selectedId],
   );
 
-  // 一个智能体一个会话；没选到智能体时使用全局 default 会话
-  const { messages, setMessages, clearMessages } = useAgent(selectedId || 'default');
+  // 一个智能体一个会话；切换时从后端恢复历史（刷新页面也不丢）
+  const {
+    messages,
+    setMessages,
+    clearHistory,
+    loading: historyLoading,
+  } = useAgentHistory(selectedId);
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -131,7 +136,7 @@ export default function AgentPage() {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
-    if ((!content && files.length === 0) || loading) return;
+    if ((!content && files.length === 0) || loading || historyLoading || notConfigured) return;
 
     const question = content || '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。';
     setError('');
@@ -236,7 +241,7 @@ export default function AgentPage() {
             return { ...m, toolCalls: calls };
           });
         },
-      }, { agentId: selectedId, farmlandId: selectedAgent?.farmlandId });
+      }, { agentId: selectedId, farmlandId: selectedAgent?.farmlandId, visionJson: vision ? JSON.stringify(vision) : null });
 
       clearLiveBuffer();
       setLoading(false);
@@ -330,12 +335,12 @@ export default function AgentPage() {
     clearLiveBuffer();
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
-    clearMessages();
+    clearHistory();
     setError('');
   };
 
   const notConfigured = status && status.configured === false;
-  const canSend = !loading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
+  const canSend = !loading && !historyLoading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
 
   return (
     <div className="agent-page">
@@ -385,7 +390,11 @@ export default function AgentPage() {
 
       <div className="agent-window glass">
         <div className="agent-messages" ref={listRef}>
-          {messages.length === 0 && (
+          {messages.length === 0 && historyLoading && (
+            <p className="empty-text">正在加载对话历史…</p>
+          )}
+
+          {messages.length === 0 && !historyLoading && (
             <div className="agent-welcome">
               <div className="agent-welcome-icon">{selectedAgent?.avatar || '🌾'}</div>
               <h3>你好，我是{selectedAgent?.name || '助农手'}</h3>
@@ -400,7 +409,7 @@ export default function AgentPage() {
                     key={s}
                     className="agent-suggestion"
                     onClick={() => send(s)}
-                    disabled={loading || notConfigured}
+                    disabled={loading || historyLoading || notConfigured}
                   >
                     {s}
                   </button>
@@ -525,7 +534,7 @@ export default function AgentPage() {
             type="button"
             className="agent-attach-btn"
             onClick={() => fileInputRef.current?.click()}
-            disabled={loading || notConfigured}
+            disabled={loading || historyLoading || notConfigured}
             aria-label="上传作物照片"
             title="上传作物照片"
           >
@@ -546,7 +555,7 @@ export default function AgentPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={loading || notConfigured}
+            disabled={loading || historyLoading || notConfigured}
           />
           <button
             className="btn-primary agent-send"

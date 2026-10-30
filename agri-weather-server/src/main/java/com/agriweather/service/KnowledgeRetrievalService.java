@@ -6,7 +6,7 @@ import com.agriweather.entity.AgentKnowledgeChunk;
 import com.agriweather.entity.AgentKnowledgeDoc;
 import com.agriweather.repository.AgentKnowledgeChunkRepository;
 import com.agriweather.repository.AgentKnowledgeDocRepository;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,8 +24,8 @@ import java.util.UUID;
  * 单地块知识库通常只有几十到几百个片段，直接全量打分足够快；
  * 宁可不注入，也不把低相关内容塞进模型上下文。
  */
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class KnowledgeRetrievalService {
 
     private static final int MAX_CHUNKS = 500;
@@ -35,6 +35,15 @@ public class KnowledgeRetrievalService {
 
     private final AgentKnowledgeChunkRepository chunkRepository;
     private final AgentKnowledgeDocRepository docRepository;
+    private final EmbeddingService embeddingService;
+
+    public KnowledgeRetrievalService(AgentKnowledgeChunkRepository chunkRepository,
+                                     AgentKnowledgeDocRepository docRepository,
+                                     EmbeddingService embeddingService) {
+        this.chunkRepository = chunkRepository;
+        this.docRepository = docRepository;
+        this.embeddingService = embeddingService;
+    }
 
     /** 控制台「检索测试」用：只返回摘要片段 */
     public List<KnowledgeSearchHit> search(Long agentId, String query, int topK) {
@@ -105,6 +114,17 @@ public class KnowledgeRetrievalService {
             idfByTerm.put(term, Math.log((total + 1.0) / (df.getOrDefault(term, 0) + 1.0)) + 1.0);
         }
 
+        float[] queryVector = null;
+        String vectorModel = null;
+        if (embeddingService != null) {
+            try {
+                queryVector = embeddingService.embed(query);
+                vectorModel = embeddingService.modelName();
+            } catch (Exception e) {
+                log.warn("查询向量生成失败，降级为关键词检索: {}", e.getMessage());
+            }
+        }
+
         String normalizedQuery = query.toLowerCase().replaceAll("\\s+", "");
         List<ScoredChunk> result = new ArrayList<>();
         for (AgentKnowledgeChunk chunk : chunks) {
@@ -118,8 +138,16 @@ public class KnowledgeRetrievalService {
                 score += (1.0 + Math.log(tf)) * idfByTerm.get(term);
             }
 
+            double vectorScore = 0;
+            if (queryVector != null && vectorModel != null
+                    && vectorModel.equals(chunk.getEmbeddingModel())) {
+                float[] chunkVector = EmbeddingService.fromBytes(chunk.getEmbedding());
+                vectorScore = Math.max(0, EmbeddingService.cosine(queryVector, chunkVector));
+            }
+            boolean vectorMatch = vectorScore >= 0.45;
+
             double coverage = (double) matched / queryTerms.size();
-            if (matched < Math.min(2, queryTerms.size()) && coverage < 0.34) continue;
+            if (matched < Math.min(2, queryTerms.size()) && coverage < 0.34 && !vectorMatch) continue;
 
             String title = titles.getOrDefault(chunk.getDocId(), "知识资料");
             // 标题命中更可信：按命中词的 IDF 加权，而不是只要命中一次就给固定分
@@ -131,6 +159,7 @@ public class KnowledgeRetrievalService {
                 }
             }
             score += titleBonus;
+            score += vectorScore * 4.0;
             if (normalizedQuery.length() >= 3 && chunk.getContent().toLowerCase().contains(normalizedQuery)) {
                 score += 3.0;
             }

@@ -40,6 +40,10 @@ public class FarmlandAgent {
     @Column(name = "persona_custom", nullable = false)
     private Boolean personaCustom = false;
 
+    /** 逗号分隔的工具名；空表示全部启用 */
+    @Column(name = "enabled_tools", length = 500)
+    private String enabledTools;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 

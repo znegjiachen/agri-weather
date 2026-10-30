@@ -142,6 +142,7 @@ export const agent = {
         ...(visionContext ? { visionContext } : {}),
         ...(context.agentId ? { agentId: context.agentId } : {}),
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
+        ...(context.visionJson ? { visionJson: context.visionJson } : {}),
       }),
     }),
 
@@ -164,6 +165,7 @@ export const agent = {
         ...(visionContext ? { visionContext } : {}),
         ...(context.agentId ? { agentId: context.agentId } : {}),
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
+        ...(context.visionJson ? { visionJson: context.visionJson } : {}),
       }),
     });
 
@@ -265,6 +267,8 @@ export const agents = {
   }),
   reset: (id) => request(`/api/agents/${id}/reset`, { method: 'POST' }),
   sync: () => request('/api/agents/sync', { method: 'POST' }),
+  messages: (id, limit = 50) => request(`/api/agents/${id}/messages?limit=${limit}`),
+  clearMessages: (id) => request(`/api/agents/${id}/messages`, { method: 'DELETE' }),
 
   knowledge: {
     list: (agentId) => request(`/api/agents/${agentId}/knowledge`),
@@ -279,6 +283,9 @@ export const agents = {
     search: (agentId, query) => request(`/api/agents/${agentId}/knowledge/search`, {
       method: 'POST',
       body: JSON.stringify({ query }),
+    }),
+    reindex: (agentId) => request(`/api/agents/${agentId}/knowledge/reindex`, {
+      method: 'POST',
     }),
 
     /** multipart 不能手动设 Content-Type，浏览器要自己生成 boundary */

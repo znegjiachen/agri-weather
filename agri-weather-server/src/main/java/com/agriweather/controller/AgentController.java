@@ -18,10 +18,12 @@ import com.agriweather.dto.AgentVisionResponse;
 import com.agriweather.dto.KnowledgeRef;
 import com.agriweather.entity.Farmland;
 import com.agriweather.entity.FarmlandAgent;
+import com.agriweather.service.AgentChatHistoryService;
 import com.agriweather.service.AgentPromptBuilder;
 import com.agriweather.service.AgentService;
 import com.agriweather.service.BuiltInKnowledgeService;
 import com.agriweather.service.CommunityImageProcessor;
+import com.agriweather.service.EmbeddingService;
 import com.agriweather.service.KnowledgeRetrievalService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +44,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -67,6 +70,8 @@ public class AgentController {
     private final AgentPromptBuilder agentPromptBuilder;
     private final BuiltInKnowledgeService builtInKnowledgeService;
     private final KnowledgeRetrievalService knowledgeRetrievalService;
+    private final AgentChatHistoryService historyService;
+    private final EmbeddingService embeddingService;
 
     /**
      * 与农事智能体对话
@@ -90,7 +95,9 @@ public class AgentController {
                     body.getHistory(),
                     AgentContext.of(prep.context()),
                     AgentObserver.NOOP,
-                    prep.systemPrompt());
+                    prep.systemPrompt(), prep.enabledTools());
+
+            saveHistory(prep, userId, body, result);
 
             return new AgentChatResponse(
                     result.reply(), toDto(result.trace()), toThoughts(result.thoughts()),
@@ -205,7 +212,9 @@ public class AgentController {
                                     return cancelled.get();
                                 }
                             },
-                            prep.systemPrompt());
+                            prep.systemPrompt(), prep.enabledTools());
+
+                    saveHistory(prep, userId, body, result);
 
                     Map<String, Object> done = new LinkedHashMap<>();
                     done.put("reply", result.reply());
@@ -255,13 +264,21 @@ public class AgentController {
      */
     private ChatPreparation prepare(AgentChatRequest body, Long userId) {
         FarmlandAgent agent = agentService.resolveForChat(userId, body.getAgentId(), body.getFarmlandId());
-        String systemPrompt = agentPromptBuilder.build(agent);
+
+        Farmland field = null;
+        if (agent != null) {
+            try {
+                field = agentService.requireOwnedFarmland(agent.getFarmlandId(), userId);
+            } catch (Exception e) {
+                log.warn("加载智能体地块失败 agentId={}: {}", agent.getId(), e.getMessage());
+            }
+        }
+        String systemPrompt = agentPromptBuilder.build(agent, field);
 
         String knowledgeBlock = "";
         List<KnowledgeRef> knowledgeUsed = List.of();
-        if (agent != null) {
+        if (agent != null && field != null) {
             try {
-                Farmland field = agentService.requireOwnedFarmland(agent.getFarmlandId(), userId);
                 String builtin = builtInKnowledgeService.build(field);
                 KnowledgeRetrievalService.KnowledgePackage kb =
                         knowledgeRetrievalService.buildBlock(agent.getId(), body.getMessage());
@@ -286,7 +303,10 @@ public class AgentController {
                 userId,
                 agent != null ? agent.getId() : null,
                 agent != null ? agent.getFarmlandId() : body.getFarmlandId());
-        return new ChatPreparation(message, context, systemPrompt, knowledgeUsed);
+        Set<String> enabledTools = agent != null
+                ? agentService.enabledToolSet(agent)
+                : toolRegistry.allToolNames();
+        return new ChatPreparation(message, context, systemPrompt, knowledgeUsed, enabledTools);
     }
 
     /** 当前时间 + 用户问题 + 可选图片识别结果 + 本智能体知识库 */
@@ -305,11 +325,23 @@ public class AgentController {
         return message;
     }
 
+    /** 历史写入失败不能影响本次回答 */
+    private void saveHistory(ChatPreparation prep, Long userId,
+                             AgentChatRequest body, AgentResult result) {
+        try {
+            historyService.saveTurn(prep.context().agentId(), userId, body.getMessage(),
+                    body.getVisionJson(), result, prep.knowledgeUsed());
+        } catch (Exception e) {
+            log.warn("保存智能体对话历史失败: {}", e.getMessage());
+        }
+    }
+
     private record ChatPreparation(
             String message,
             AgriContext context,
             String systemPrompt,
-            List<KnowledgeRef> knowledgeUsed
+            List<KnowledgeRef> knowledgeUsed,
+            Set<String> enabledTools
     ) {
     }
 
@@ -391,7 +423,10 @@ public class AgentController {
                 "baseUrl", props.getBaseUrl(),
                 "maxIterations", props.getMaxIterations(),
                 "visionConfigured", visionProps.isConfigured(),
-                "visionModel", visionProps.getModel()
+                "visionModel", visionProps.getModel(),
+                "embeddingConfigured", embeddingService.isExternalConfigured(),
+                "embeddingMode", embeddingService.modeLabel(),
+                "embeddingModel", embeddingService.modelName()
         );
     }
 

@@ -69,6 +69,11 @@ public class AgentKnowledgeController {
         return knowledgeService.search(agentId, userId(request), body.getQuery());
     }
 
+    @PostMapping("/reindex")
+    public void reindex(@PathVariable Long agentId, HttpServletRequest request) {
+        knowledgeService.reindex(agentId, userId(request));
+    }
+
     private Long userId(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {

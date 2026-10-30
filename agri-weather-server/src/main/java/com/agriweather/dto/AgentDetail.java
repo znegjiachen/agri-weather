@@ -1,6 +1,7 @@
 package com.agriweather.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** 智能体控制台详情：人设、欢迎语、只读的内置作物知识、知识库规模 */
 public record AgentDetail(
@@ -17,6 +18,7 @@ public record AgentDetail(
         long docCount,
         long chunkCount,
         String builtinKnowledge,
+        List<String> enabledTools,
         LocalDateTime updatedAt
 ) {
 }

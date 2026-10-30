@@ -22,6 +22,7 @@ export function AgentProvider({ children }) {
 
 function AgentSessionStore({ children }) {
   const [sessions, setSessions] = useState({});
+  const [loaded, setLoaded] = useState({});
 
   const setSession = useCallback((key, updater) => {
     setSessions((prev) => {
@@ -29,6 +30,10 @@ function AgentSessionStore({ children }) {
       const next = typeof updater === 'function' ? updater(current) : updater;
       return { ...prev, [key]: Array.isArray(next) ? next : EMPTY };
     });
+  }, []);
+
+  const markLoaded = useCallback((key) => {
+    setLoaded((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
   }, []);
 
   const clearSession = useCallback((key) => {
@@ -40,11 +45,15 @@ function AgentSessionStore({ children }) {
       delete next[key];
       return next;
     });
+    // 清空后视为已加载，避免又去后端拉一遍旧历史
+    setLoaded((prev) => ({ ...prev, [key]: true }));
   }, []);
 
+  const isLoaded = useCallback((key) => !!loaded[key], [loaded]);
+
   const value = useMemo(
-    () => ({ sessions, setSession, clearSession }),
-    [sessions, setSession, clearSession],
+    () => ({ sessions, setSession, clearSession, markLoaded, isLoaded }),
+    [sessions, setSession, clearSession, markLoaded, isLoaded],
   );
 
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
@@ -64,5 +73,7 @@ export function useAgent(agentKey = 'default') {
     messages: ctx.sessions[key] || EMPTY,
     setMessages: (updater) => ctx.setSession(key, updater),
     clearMessages: () => ctx.clearSession(key),
+    markLoaded: () => ctx.markLoaded(key),
+    isLoaded: ctx.isLoaded(key),
   };
 }

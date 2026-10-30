@@ -21,7 +21,7 @@ import java.util.concurrent.Executors;
  * 环境里直接 new（单元测试就是这么用的）。装配的职责集中在这里。
  */
 @Configuration
-@EnableConfigurationProperties({DeepSeekProperties.class, VisionProperties.class})
+@EnableConfigurationProperties({DeepSeekProperties.class, VisionProperties.class, EmbeddingProperties.class})
 public class AgentAutoConfiguration {
 
     @Bean

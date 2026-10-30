@@ -431,6 +431,7 @@ CREATE TABLE IF NOT EXISTS farmland_agent (
     persona MEDIUMTEXT COMMENT '专属人设，拼接到通用农事提示词之后',
     welcome VARCHAR(500) COMMENT '对话页欢迎语',
     persona_custom BOOLEAN NOT NULL DEFAULT FALSE COMMENT '用户改过人设后不再被作物变更覆盖',
+    enabled_tools VARCHAR(500) COMMENT '逗号分隔的工具名，空表示全部启用',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_agent_farmland (farmland_id),
@@ -463,8 +464,32 @@ CREATE TABLE IF NOT EXISTS agent_knowledge_chunk (
     agent_id BIGINT NOT NULL,
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
+    embedding MEDIUMBLOB COMMENT 'float32 向量，小端序',
+    embedding_dim INT,
+    embedding_model VARCHAR(100),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     KEY idx_chunk_agent (agent_id),
     KEY idx_chunk_doc (doc_id),
     CONSTRAINT fk_chunk_doc FOREIGN KEY (doc_id) REFERENCES agent_knowledge_doc(id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='知识库检索片段';
+
+
+-- =============================================
+-- 17. 智能体对话历史（2026-10-30）
+-- =============================================
+CREATE TABLE IF NOT EXISTS agent_chat_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    agent_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    content MEDIUMTEXT,
+    vision MEDIUMTEXT COMMENT '图片识别结果 JSON',
+    tool_calls MEDIUMTEXT COMMENT '工具调用轨迹 JSON',
+    thoughts MEDIUMTEXT COMMENT '模型思考 JSON',
+    knowledge_used MEDIUMTEXT COMMENT '引用知识 JSON',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_msg_agent (agent_id, id),
+    KEY idx_msg_user (user_id),
+    CONSTRAINT fk_msg_agent FOREIGN KEY (agent_id) REFERENCES farmland_agent(id) ON DELETE CASCADE,
+    CONSTRAINT fk_msg_user FOREIGN KEY (user_id) REFERENCES sys_user(id)
+) ENGINE=InnoDB COMMENT='智能体对话历史';

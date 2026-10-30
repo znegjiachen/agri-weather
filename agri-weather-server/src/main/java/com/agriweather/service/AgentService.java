@@ -1,5 +1,6 @@
 package com.agriweather.service;
 
+import com.agriweather.agent.ToolRegistry;
 import com.agriweather.controller.ResourceNotFoundException;
 import com.agriweather.dto.AgentDetail;
 import com.agriweather.dto.AgentSummary;
@@ -7,6 +8,7 @@ import com.agriweather.dto.AgentUpdateRequest;
 import com.agriweather.entity.CropInfo;
 import com.agriweather.entity.Farmland;
 import com.agriweather.entity.FarmlandAgent;
+import com.agriweather.repository.AgentChatMessageRepository;
 import com.agriweather.repository.AgentKnowledgeChunkRepository;
 import com.agriweather.repository.AgentKnowledgeDocRepository;
 import com.agriweather.repository.CropInfoRepository;
@@ -20,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 地块智能体的生命周期与所有权。
@@ -37,10 +41,12 @@ public class AgentService {
     private final FarmlandAgentRepository agentRepository;
     private final AgentKnowledgeDocRepository docRepository;
     private final AgentKnowledgeChunkRepository chunkRepository;
+    private final AgentChatMessageRepository chatMessageRepository;
     private final FarmlandRepository farmlandRepository;
     private final CropInfoRepository cropInfoRepository;
     private final AgentDefaults defaults;
     private final BuiltInKnowledgeService builtInKnowledgeService;
+    private final ToolRegistry toolRegistry;
 
     @Transactional
     public FarmlandAgent ensureForFarmland(Farmland field) {
@@ -139,6 +145,7 @@ public class AgentService {
                 docRepository.countByAgentId(agent.getId()),
                 chunkRepository.countByAgentId(agent.getId()),
                 builtInKnowledgeService.build(field),
+                enabledTools(agent),
                 agent.getUpdatedAt()
         );
     }
@@ -155,6 +162,22 @@ public class AgentService {
         agent.setWelcome(request.getWelcome() != null ? request.getWelcome().trim() : agent.getWelcome());
         if (request.getAvatar() != null && !request.getAvatar().isBlank()) {
             agent.setAvatar(request.getAvatar().trim());
+        }
+        if (request.getEnabledTools() != null) {
+            List<String> tools = request.getEnabledTools().stream()
+                    .filter(t -> t != null && !t.isBlank())
+                    .map(String::trim)
+                    .distinct()
+                    .toList();
+            if (tools.isEmpty()) {
+                throw new IllegalArgumentException("至少启用一个工具");
+            }
+            for (String tool : tools) {
+                if (!toolRegistry.contains(tool)) {
+                    throw new IllegalArgumentException("未知工具：" + tool);
+                }
+            }
+            agent.setEnabledTools(String.join(",", tools));
         }
         agent.setUpdatedAt(LocalDateTime.now());
         agentRepository.save(agent);
@@ -196,6 +219,7 @@ public class AgentService {
         }
         chunkRepository.deleteByAgentId(agent.getId());
         docRepository.deleteByAgentId(agent.getId());
+        chatMessageRepository.deleteByAgentId(agent.getId());
         agentRepository.delete(agent);
     }
 
@@ -255,6 +279,28 @@ public class AgentService {
             throw new SecurityException("无权访问该地块");
         }
         return field;
+    }
+
+    /** 智能体启用的工具；空配置表示全部工具 */
+    public List<String> enabledTools(FarmlandAgent agent) {
+        String raw = agent.getEnabledTools();
+        if (raw != null && !raw.isBlank()) {
+            List<String> tools = new ArrayList<>();
+            for (String item : raw.split(",")) {
+                String name = item.trim();
+                if (!name.isEmpty() && toolRegistry.contains(name) && !tools.contains(name)) {
+                    tools.add(name);
+                }
+            }
+            if (!tools.isEmpty()) return tools;
+        }
+        List<String> all = new ArrayList<>(toolRegistry.allToolNames());
+        all.sort(String::compareTo);
+        return all;
+    }
+
+    public Set<String> enabledToolSet(FarmlandAgent agent) {
+        return new LinkedHashSet<>(enabledTools(agent));
     }
 
     private Map<Long, Long> toCountMap(List<?> rows) {

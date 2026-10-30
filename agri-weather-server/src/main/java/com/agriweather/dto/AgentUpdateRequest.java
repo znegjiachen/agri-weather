@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class AgentUpdateRequest {
 
@@ -20,4 +22,7 @@ public class AgentUpdateRequest {
 
     @Size(max = 16, message = "头像不能超过 16 个字符")
     private String avatar;
+
+    /** 启用的工具名；null 表示保持原配置，空数组会被拒绝 */
+    private List<String> enabledTools;
 }

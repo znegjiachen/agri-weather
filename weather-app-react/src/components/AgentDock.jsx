@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
-import { useAgent } from '../context/AgentContext';
+import { useAgentHistory } from '../hooks/useAgentHistory';
 import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
@@ -51,11 +51,13 @@ export default function AgentDock() {
   // 首页可能先于浮窗挂载，初始化时补读一次共享上下文
   const [field, setField] = useState(() => getFieldContext());
 
-  // 一块地一个智能体 → 一个独立会话；没有 agentId 时用地块 ID 兜底
-  const agentKey = field?.agentId
-    ? String(field.agentId)
-    : field?.id ? `field-${field.id}` : 'default';
-  const { messages, setMessages, clearMessages } = useAgent(agentKey);
+  // 一块地一个智能体 → 一个独立会话，并从后端恢复历史
+  const {
+    messages,
+    setMessages,
+    clearHistory,
+    loading: historyLoading,
+  } = useAgentHistory(field?.agentId);
 
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -179,7 +181,7 @@ export default function AgentDock() {
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
     const notConfigured = status && status.configured === false;
-    if ((!content && files.length === 0) || loading || notConfigured) return;
+    if ((!content && files.length === 0) || loading || historyLoading || notConfigured) return;
 
     const question = content || '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。';
     // 和完整对话页保持一致：图片识别结果随历史带上，后续追问仍能参考
@@ -258,7 +260,7 @@ export default function AgentDock() {
             return { ...m, toolCalls: calls };
           });
         },
-      }, { agentId: field?.agentId, farmlandId: field?.id });
+      }, { agentId: field?.agentId, farmlandId: field?.id, visionJson: vision ? JSON.stringify(vision) : null });
 
       clearLive();
       setMessages((prev) => {
@@ -338,12 +340,12 @@ export default function AgentDock() {
   const clearChat = () => {
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
-    clearMessages();
+    clearHistory();
     setError('');
   };
 
   const notConfigured = status && status.configured === false;
-  const canSend = !loading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
+  const canSend = !loading && !historyLoading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
 
   if (collapsed) {
     return (
@@ -420,7 +422,11 @@ export default function AgentDock() {
           </div>
         )}
 
-        {messages.length === 0 && (
+        {messages.length === 0 && historyLoading && (
+          <p className="empty-text">正在加载对话历史…</p>
+        )}
+
+        {messages.length === 0 && !historyLoading && (
           <div className="agent-dock-welcome">
             <div className="agent-dock-welcome-icon">🌾</div>
             <h3>你好，我是助农手</h3>
@@ -431,7 +437,7 @@ export default function AgentDock() {
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  disabled={loading || notConfigured}
+                  disabled={loading || historyLoading || notConfigured}
                 >
                   {s}
                 </button>
@@ -524,7 +530,7 @@ export default function AgentDock() {
                         key={s}
                         type="button"
                         onClick={() => send(s)}
-                        disabled={loading || notConfigured}
+                        disabled={loading || historyLoading || notConfigured}
                       >
                         {s}
                       </button>
@@ -570,14 +576,14 @@ export default function AgentDock() {
                 send();
               }
             }}
-            disabled={loading || notConfigured}
+            disabled={loading || historyLoading || notConfigured}
           />
           <div className="agent-dock-tools-row">
             <button
               type="button"
               className="agent-dock-tool-btn"
               onClick={() => fileInputRef.current?.click()}
-              disabled={loading || notConfigured}
+              disabled={loading || historyLoading || notConfigured}
               title="上传作物照片"
             >
               📎

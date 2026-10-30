@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { agents as agentsApi } from '../api';
+import { agent as agentApi, agents as agentsApi } from '../api';
+import { TOOL_LABELS } from '../utils/agentTools';
+
+const ALL_TOOLS = Object.entries(TOOL_LABELS).map(([name, meta]) => ({ name, ...meta }));
 
 /**
  * 智能体控制台（桌面端 /agent）。
@@ -20,9 +23,19 @@ export default function AgentStudioPage() {
   const [detailError, setDetailError] = useState('');
   const [tab, setTab] = useState('persona');
 
-  const [form, setForm] = useState({ name: '', welcome: '', persona: '', avatar: '' });
+  const [form, setForm] = useState({
+    name: '',
+    welcome: '',
+    persona: '',
+    avatar: '',
+    enabledTools: [],
+  });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+
+  const [runtimeStatus, setRuntimeStatus] = useState(null);
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexMsg, setReindexMsg] = useState('');
 
   const [docs, setDocs] = useState(null);
   const [docsVersion, setDocsVersion] = useState(0);
@@ -58,6 +71,14 @@ export default function AgentStudioPage() {
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    agentApi.status()
+      .then((data) => { if (alive) setRuntimeStatus(data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // 选中智能体后加载详情；错误只影响右侧面板
   useEffect(() => {
     if (!selectedId) return undefined;
@@ -71,6 +92,9 @@ export default function AgentStudioPage() {
           welcome: data.welcome || '',
           persona: data.persona || '',
           avatar: data.avatar || '',
+          enabledTools: Array.isArray(data.enabledTools)
+            ? data.enabledTools
+            : ALL_TOOLS.map((tool) => tool.name),
         });
       })
       .catch((e) => { if (alive) setDetailError(e.message || '加载智能体失败'); });
@@ -127,7 +151,7 @@ export default function AgentStudioPage() {
   };
 
   const handleSave = async () => {
-    if (!selectedId || !form.name.trim() || !form.persona.trim()) return;
+    if (!selectedId || !form.name.trim() || !form.persona.trim() || form.enabledTools.length === 0) return;
     setSaving(true);
     setSaveMsg('');
     try {
@@ -138,6 +162,9 @@ export default function AgentStudioPage() {
         welcome: updated.welcome || '',
         persona: updated.persona || '',
         avatar: updated.avatar || '',
+        enabledTools: Array.isArray(updated.enabledTools)
+          ? updated.enabledTools
+          : form.enabledTools,
       });
       setSaveMsg('已保存');
       await reloadList();
@@ -161,6 +188,9 @@ export default function AgentStudioPage() {
         welcome: updated.welcome || '',
         persona: updated.persona || '',
         avatar: updated.avatar || '',
+        enabledTools: Array.isArray(updated.enabledTools)
+          ? updated.enabledTools
+          : form.enabledTools,
       });
       setSaveMsg('已恢复默认');
       await reloadList();
@@ -201,12 +231,12 @@ export default function AgentStudioPage() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || !selectedId) return;
-    if (!/\.(txt|md|markdown)$/i.test(file.name)) {
-      setKbError('目前只支持 TXT / Markdown 文本文件');
+    if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
+      setKbError('目前支持 TXT、Markdown、PDF、Word（doc/docx）');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setKbError('知识文件不能超过 2MB');
+    if (file.size > 5 * 1024 * 1024) {
+      setKbError('知识文件不能超过 5MB');
       return;
     }
     setUploading(true);
@@ -218,6 +248,21 @@ export default function AgentStudioPage() {
       setKbError(e.message || '上传失败');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleReindex = async () => {
+    if (!selectedId) return;
+    setReindexing(true);
+    setReindexMsg('');
+    setKbError('');
+    try {
+      await agentsApi.knowledge.reindex(selectedId);
+      setReindexMsg('向量索引已重建');
+    } catch (e) {
+      setKbError(e.message || '重建向量失败');
+    } finally {
+      setReindexing(false);
     }
   };
 
@@ -379,7 +424,7 @@ export default function AgentStudioPage() {
                       type="button"
                       className="btn-primary"
                       onClick={handleSave}
-                      disabled={saving || !form.name.trim() || !form.persona.trim()}
+                      disabled={saving || !form.name.trim() || !form.persona.trim() || form.enabledTools.length === 0}
                     >
                       {saving ? '保存中…' : '保存'}
                     </button>
@@ -387,6 +432,35 @@ export default function AgentStudioPage() {
                       恢复默认
                     </button>
                     {saveMsg && <span className="studio-save-msg">{saveMsg}</span>}
+                  </div>
+
+                  <div className="studio-tools">
+                    <h3>启用的工具</h3>
+                    <p>关闭后模型看不到该工具；至少保留一个。</p>
+                    <div className="studio-tool-grid">
+                      {ALL_TOOLS.map((tool) => {
+                        const checked = form.enabledTools.includes(tool.name);
+                        return (
+                          <label key={tool.name} className={`studio-tool ${checked ? 'on' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => setForm({
+                                ...form,
+                                enabledTools: checked
+                                  ? form.enabledTools.filter((name) => name !== tool.name)
+                                  : [...form.enabledTools, tool.name],
+                              })}
+                            />
+                            <span className="studio-tool-icon">{tool.icon}</span>
+                            <span>{tool.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {form.enabledTools.length === 0 && (
+                      <p className="studio-tools-warn">至少启用一个工具才能保存</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -406,16 +480,34 @@ export default function AgentStudioPage() {
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading}
                     >
-                      {uploading ? '上传中…' : '上传 TXT / Markdown'}
+                      {uploading ? '上传中…' : '上传文档'}
                     </button>
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".txt,.md,.markdown,text/plain,text/markdown"
+                      accept=".txt,.md,.markdown,.pdf,.doc,.docx,text/plain,text/markdown,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       hidden
                       onChange={handleFile}
                     />
-                    <span className="studio-kb-hint">最多 20 篇，单篇 ≤20 万字符，文件 ≤2MB</span>
+                    <span className="studio-kb-hint">支持 TXT / Markdown / PDF / Word，单篇 ≤20 万字符，文件 ≤5MB</span>
+                  </div>
+
+                  <div className="studio-embedding">
+                    <span>
+                      向量检索：
+                      {runtimeStatus?.embeddingMode === 'external'
+                        ? `已启用 · ${runtimeStatus.embeddingModel}`
+                        : '本地字词向量（配置 EMBEDDING_* 可接入语义模型）'}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      onClick={handleReindex}
+                      disabled={reindexing || !docs?.length}
+                    >
+                      {reindexing ? '重建中…' : '重建向量索引'}
+                    </button>
+                    {reindexMsg && <span className="studio-save-msg">{reindexMsg}</span>}
                   </div>
 
                   {kbError && <div className="agent-error">{kbError}</div>}

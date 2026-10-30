@@ -65,6 +65,18 @@ public class AgentHarness {
                            AgentContext<?> context,
                            AgentObserver observer,
                            String systemPrompt) {
+        return run(userMessage, history, context, observer, systemPrompt, tools.allToolNames());
+    }
+
+    /**
+     * 按智能体配置启用工具子集。空集合视为全部启用，保持旧调用兼容。
+     */
+    public AgentResult run(String userMessage,
+                           List<Map<String, String>> history,
+                           AgentContext<?> context,
+                           AgentObserver observer,
+                           String systemPrompt,
+                           java.util.Set<String> enabledTools) {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         String prompt = systemPrompt != null && !systemPrompt.isBlank()
@@ -78,7 +90,7 @@ public class AgentHarness {
 
         List<ToolCallTrace> trace = new ArrayList<>();
         List<AgentThought> thoughts = new ArrayList<>();
-        List<Map<String, Object>> schemas = tools.toolSchemas();
+        List<Map<String, Object>> schemas = tools.toolSchemas(enabledTools);
 
         for (int round = 1; round <= options.getMaxIterations(); round++) {
             if (observer.isCancelled()) throw new AgentCancelledException();
@@ -103,7 +115,10 @@ public class AgentHarness {
                 observer.onToolStarted(round, call);
 
                 long start = System.currentTimeMillis();
-                String result = tools.execute(call.name(), call.arguments(), context);
+                String result = enabledTools != null && !enabledTools.isEmpty()
+                        && !enabledTools.contains(call.name())
+                        ? "{\"error\":\"该工具未启用，请改用已启用的工具\"}"
+                        : tools.execute(call.name(), call.arguments(), context);
                 long elapsed = System.currentTimeMillis() - start;
                 String summary = summarize(result);
 

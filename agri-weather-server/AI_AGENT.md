@@ -252,12 +252,21 @@ curl -X POST http://localhost:8082/api/agent/vision \
 
 前端请求地址由 `VITE_API_BASE` 决定（见 `api/index.js`），默认 `http://localhost:8082`。
 
+## 地块专属智能体能力
+
+- **一方地一个助农手**：`farmland_agent` 与地块一对一；新建地块自动生成，存量地块启动时补齐。
+- **独立知识库**：`agent_knowledge_doc / agent_knowledge_chunk`，支持粘贴文本和 TXT / Markdown / PDF / Word（PDFBox + POI，≤5MB）；中文 bigram + 向量混合检索，单轮最多注入 4 段资料。
+- **向量检索**：默认使用本地字词哈希向量；配置 `EMBEDDING_BASE_URL / EMBEDDING_API_KEY / EMBEDDING_MODEL` 后使用 OpenAI 兼容的 `/embeddings` 服务，控制台提供「重建向量索引」。
+- **工具开关**：每个智能体可启停 7 个工具，`AgentHarness` 只把启用的工具 schema 暴露给模型，禁用工具即使被提及也不会执行。
+- **对话历史**：`agent_chat_message` 持久化每个智能体的对话、工具轨迹、引用知识和图片识别结果；前端按 `agentId` 恢复，清空对话会同步删后端记录。
+- **地块范围**：工具的 `farmlandId` 被 `AgriContext` 限定在本智能体负责的地块，跨地块调用直接拒绝。
+
 ## 测试
 
 ```bash
 mvn test -Dtest=AgriAgentIntegrationTest
 # 知识库与地块范围
-mvn test -Dtest=ChineseTextTokenizerTest,KnowledgeChunkerTest,KnowledgeTextDecoderTest,KnowledgeRetrievalServiceTest,FarmlandAccessGuardTest,AgentPromptBuilderTest
+mvn test -Dtest=ChineseTextTokenizerTest,KnowledgeChunkerTest,KnowledgeTextDecoderTest,KnowledgeRetrievalServiceTest,KnowledgeDocumentExtractorTest,EmbeddingServiceTest,ToolRegistryTest,FarmlandAccessGuardTest,AgentPromptBuilderTest
 ```
 
 7 个集成测试用本地假模型服务跑，**不需要真实 API Key、不消耗额度**，覆盖：

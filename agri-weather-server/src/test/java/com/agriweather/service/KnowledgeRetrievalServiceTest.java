@@ -42,7 +42,7 @@ class KnowledgeRetrievalServiceTest {
                 new AgentKnowledgeChunk(2L, 2L, 1L, 0,
                         "玉米螟幼虫危害心叶，可在三龄前使用苏云金杆菌。", LocalDateTime.now())
         ));
-        service = new KnowledgeRetrievalService(chunkRepo, docRepo);
+        service = new KnowledgeRetrievalService(chunkRepo, docRepo, null);
     }
 
     @Test
