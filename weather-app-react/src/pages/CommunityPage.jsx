@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
+import { formatCommunityTime } from '../utils/date';
 
 const CATEGORY_LABEL = { TECH: '农技', CHAT: '闲聊', ALERT: '预警' };
 const TABS = [
@@ -326,8 +327,13 @@ export default function CommunityPage() {
                 </Link>
 
                 <div className="community-note-foot">
-                  <span className="community-avatar small">👨‍🌾</span>
-                  <span className="community-note-author-name">{p.author}</span>
+                  <div className="community-note-who">
+                    <span className="community-avatar small">👨‍🌾</span>
+                    <span className="community-note-who-text">
+                      <span className="community-note-author-name">{p.author}</span>
+                      <span className="community-note-time">{formatCommunityTime(p.createdAt)}</span>
+                    </span>
+                  </div>
 
                   <span className="community-note-actions">
                     <button

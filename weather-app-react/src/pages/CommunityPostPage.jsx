@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { community } from '../api';
+import { formatCommunityTime } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 import PostContent from '../components/PostContent';
 
@@ -104,7 +105,7 @@ export default function CommunityPostPage() {
             <span className="community-avatar">👨‍🌾</span>
             <div>
               <div className="community-author-name">{post.author}</div>
-              <div className="community-time">{post.createdAt}</div>
+              <div className="community-time">{formatCommunityTime(post.createdAt)}</div>
             </div>
           </div>
           <span className={`community-tag tag-${post.category?.toLowerCase()}`}>
@@ -140,7 +141,7 @@ export default function CommunityPostPage() {
             <div className="community-comment-head">
               <span className="community-avatar small">👨‍🌾</span>
               <span className="community-author-name">{c.author}</span>
-              <span className="community-time">{c.createdAt}</span>
+              <span className="community-time">{formatCommunityTime(c.createdAt)}</span>
             </div>
             <p className="community-comment-text">{c.content}</p>
           </div>
