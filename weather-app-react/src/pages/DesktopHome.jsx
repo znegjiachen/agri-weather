@@ -1,26 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { farmlands, alerts as alertsApi, crops } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getWeatherInfo, getDayName } from '../utils/weatherCodes';
 import { publishFieldContext, clearFieldContext } from '../utils/fieldContext';
 import ForecastTrend from '../components/ForecastTrend';
-
-const ALERT_LEVEL = {
-  RED: { cls: 'red', text: '红色' },
-  ORANGE: { cls: 'orange', text: '橙色' },
-  YELLOW: { cls: 'yellow', text: '黄色' },
-  BLUE: { cls: 'blue', text: '蓝色' },
-};
-
-const ALERT_TYPE = {
-  FROST: '冻害',
-  HEAT: '热害',
-  RAINSTORM: '涝害',
-  WIND: '大风',
-  PEST: '病虫害',
-  INFO: '提示',
-};
+import { alertLevelMeta, alertTypeMeta } from '../utils/alertMeta';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -169,6 +154,27 @@ export default function DesktopHome() {
       agentId: selectedField.agentId || null,
     });
   }, [selectedField, selectedCrop]);
+
+  // 首页打开时后台刷新一次预警，避免必须进预警中心才更新
+  const alertsRefreshed = useRef(false);
+  useEffect(() => {
+    if (fields.length === 0 || alertsRefreshed.current) return undefined;
+    alertsRefreshed.current = true;
+    let alive = true;
+    (async () => {
+      try {
+        await alertsApi.refresh();
+        const [data, count] = await Promise.all([alertsApi.list(), alertsApi.unreadCount()]);
+        if (alive) {
+          setAlertList(Array.isArray(data) ? data : []);
+          setUnread(count);
+        }
+      } catch {
+        // 后台刷新失败不影响首屏，已有列表继续显示
+      }
+    })();
+    return () => { alive = false; };
+  }, [fields.length]);
 
   const alertCounts = useMemo(() => {
     const map = {};
@@ -448,15 +454,14 @@ export default function DesktopHome() {
                 ) : (
                   <div className="dh-alerts">
                     {recentAlerts.map((a) => {
-                      const level = ALERT_LEVEL[a.alertLevel] || ALERT_LEVEL.BLUE;
+                      const level = alertLevelMeta(a.alertLevel);
+                      const type = alertTypeMeta(a.alertType);
                       return (
                         <div key={a.id} className={`dh-alert ${level.cls}`}>
-                          <span className="dh-alert-icon">
-                            {a.alertType === 'WIND' ? '💨' : a.alertType === 'FROST' ? '❄️' : '⚠️'}
-                          </span>
+                          <span className="dh-alert-icon">{type.icon}</span>
                           <div className="dh-alert-body">
                             <div className="dh-alert-title">
-                              <span className="dh-alert-type">{ALERT_TYPE[a.alertType] || '预警'}</span>
+                              <span className="dh-alert-type">{type.label}</span>
                               {a.alertContent}
                             </div>
                             <div className="dh-alert-meta">

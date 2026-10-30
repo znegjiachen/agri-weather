@@ -9,7 +9,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -185,16 +187,25 @@ public class AlertService {
 
     public List<WeatherAlert> getUserAlerts(Long userId) {
         List<WeatherAlert> alerts = alertRepository.findByUserIdOrderByAlertTimeDesc(userId);
-        // 填充地块名和作物名
+        if (alerts.isEmpty()) return alerts;
+
+        // 批量补地块/作物名，避免每条预警都查一次库
+        List<Long> farmlandIds = alerts.stream()
+                .map(WeatherAlert::getFarmlandId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Farmland> farmlandMap = farmlandRepository.findAllById(farmlandIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Farmland::getId, f -> f));
+        Map<Long, String> cropNames = new java.util.HashMap<>();
+        for (CropInfo crop : cropService.listAll()) {
+            cropNames.put(crop.getId(), crop.getCropName());
+        }
         for (WeatherAlert a : alerts) {
-            if (a.getFarmlandId() != null) {
-                farmlandRepository.findById(a.getFarmlandId()).ifPresent(f -> {
-                    a.setFarmlandName(f.getFieldName());
-                    if (f.getCropId() != null) {
-                        cropService.getById(f.getCropId());
-                        a.setCropName(cropService.getById(f.getCropId()).getCropName());
-                    }
-                });
+            Farmland f = farmlandMap.get(a.getFarmlandId());
+            if (f != null) {
+                a.setFarmlandName(f.getFieldName());
+                if (f.getCropId() != null) a.setCropName(cropNames.get(f.getCropId()));
             }
         }
         return alerts;
@@ -202,6 +213,18 @@ public class AlertService {
 
     public long getUnreadCount(Long userId) {
         return alertRepository.countByUserIdAndIsReadFalse(userId);
+    }
+
+    /** 标记已处理：同时视为已读，便于前端区分「看过」和「处理完」 */
+    public void markHandled(Long id, Long userId) {
+        WeatherAlert alert = alertRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("预警不存在"));
+        if (!Objects.equals(alert.getUserId(), userId)) {
+            throw new SecurityException("无权操作该预警");
+        }
+        alert.setIsHandled(true);
+        alert.setIsRead(true);
+        alertRepository.save(alert);
     }
 
     /** 只能标记自己的预警，否则抛 SecurityException（由全局处理器转 403） */

@@ -81,79 +81,117 @@ public class FarmlandWeatherService {
             long daysSincePlant = ChronoUnit.DAYS.between(f.getPlantDate(), LocalDate.now());
             int acc = 0;
             for (CropGrowthStage s : stages) {
-                acc += s.getStageDays();
+                acc += s.getStageDays() != null ? s.getStageDays() : 0;
                 if (daysSincePlant <= acc) { currentStage = s; break; }
             }
             if (currentStage == null) currentStage = stages.get(stages.size() - 1);
         }
 
-        // 获取实时天气
+        // 获取未来 24 小时预报：预警应基于预报极值，而不是只看此刻的瞬时温度
         Map<String, Object> weather = fetchWeather(farmlandId);
         Map<String, Object> current = (Map<String, Object>) weather.get("current");
-        double temp = ((Number) current.get("temperature_2m")).doubleValue();
-        double humidity = ((Number) current.get("relative_humidity_2m")).doubleValue();
-        double windSpeed = ((Number) current.get("wind_speed_10m")).doubleValue();
+        Map<String, Object> daily = (Map<String, Object>) weather.get("daily");
+        double currentTemp = current != null ? num(current.get("temperature_2m"), 0) : 0;
+        double currentWind = current != null ? num(current.get("wind_speed_10m"), 0) : 0;
+
+        double nextMin = Math.min(
+                numAt((List<Number>) daily.get("temperature_2m_min"), 0, currentTemp),
+                numAt((List<Number>) daily.get("temperature_2m_min"), 1, currentTemp));
+        double nextMax = Math.max(
+                numAt((List<Number>) daily.get("temperature_2m_max"), 0, currentTemp),
+                numAt((List<Number>) daily.get("temperature_2m_max"), 1, currentTemp));
+        double rain24 = numAt((List<Number>) daily.get("precipitation_sum"), 0, 0)
+                + numAt((List<Number>) daily.get("precipitation_sum"), 1, 0);
+        double windMax = Math.max(
+                numAt((List<Number>) daily.get("wind_speed_10m_max"), 0, currentWind),
+                numAt((List<Number>) daily.get("wind_speed_10m_max"), 1, currentWind));
 
         List<Map<String, Object>> alerts = new ArrayList<>();
 
-        Map<String, Object> daily = (Map<String, Object>) weather.get("daily");
-        List<Number> precipList = (List<Number>) daily.get("precipitation_sum");
-        double todayRain = precipList.get(0).doubleValue();
+        // 作物本身的温度/涝害敏感
+        if (Boolean.TRUE.equals(crop.getFrostSensitive()) && nextMin < 5) {
+            String level = nextMin < 0 ? "RED" : "ORANGE";
+            alerts.add(alert("FROST", level,
+                    String.format("%s未来24小时最低气温%.1f°C，低于5°C，存在冻害风险。", f.getFieldName(), nextMin),
+                    "覆盖薄膜、熏烟增温；已受冻地块喷施叶面肥恢复。"));
+        }
+        if (Boolean.TRUE.equals(crop.getHeatSensitive()) && nextMax > 35) {
+            String level = nextMax > 40 ? "RED" : "ORANGE";
+            alerts.add(alert("HEAT", level,
+                    String.format("%s未来24小时最高气温%.1f°C，超过35°C，%s怕热。", f.getFieldName(), nextMax, crop.getCropName()),
+                    "遮阳降温、增加灌溉；11:00-15:00 避免田间作业。"));
+        }
+        if (Boolean.TRUE.equals(crop.getWaterlogSensitive()) && rain24 > 50) {
+            String level = rain24 > 80 ? "RED" : "YELLOW";
+            alerts.add(alert("RAINSTORM", level,
+                    String.format("%s未来24小时降水%.0fmm，%s怕涝。", f.getFieldName(), rain24, crop.getCropName()),
+                    "疏通沟渠、及时排水；暴雨期间停止田间作业。"));
+        }
 
-        // 温度预警
-        if (crop.getFrostSensitive() && temp < 5) {
-            alerts.add(alert("FROST", "RED", "低温冻害预警",
-                String.format("%s当前温度%.1f°C，低于5°C，存在冻害风险！建议覆盖薄膜、熏烟增温。", f.getFieldName(), temp)));
-        }
-        if (crop.getHeatSensitive() && temp > 35) {
-            alerts.add(alert("HEAT", "ORANGE", "高温热害预警",
-                String.format("%s当前温度%.1f°C，超过35°C，%s怕热！建议遮阳降温、增加灌溉。", f.getFieldName(), temp, crop.getCropName())));
-        }
-        if (crop.getWaterlogSensitive() && todayRain > 50) {
-            alerts.add(alert("RAINSTORM", "YELLOW", "暴雨涝害预警",
-                String.format("%s今日降水%.0fmm，%s怕涝！建议疏通沟渠、及时排水。", f.getFieldName(), todayRain, crop.getCropName())));
-        }
-
-        // 生长阶段专项预警
+        // 当前生长阶段的适宜温度
         if (currentStage != null) {
-            if (temp > currentStage.getTempMax()) {
-                alerts.add(alert("HEAT", "ORANGE", "阶段高温预警",
-                    String.format("%s处于%s，适宜温度≤%.0f°C，当前%.1f°C超标！", crop.getCropName(), currentStage.getStageName(), currentStage.getTempMax(), temp)));
+            if (currentStage.getTempMax() != null && nextMax > currentStage.getTempMax()) {
+                double diff = nextMax - currentStage.getTempMax();
+                alerts.add(alert("TEMP_HIGH", diff > 5 ? "RED" : "ORANGE",
+                        String.format("%s处于%s，适宜温度≤%.0f°C，未来24小时最高%.1f°C偏高。",
+                                crop.getCropName(), currentStage.getStageName(), currentStage.getTempMax(), nextMax),
+                        "加强通风、遮阳降温；避开午间高温时段作业。"));
             }
-            if (temp < currentStage.getTempMin()) {
-                alerts.add(alert("FROST", "RED", "阶段低温预警",
-                    String.format("%s处于%s，适宜温度≥%.0f°C，当前%.1f°C偏低！", crop.getCropName(), currentStage.getStageName(), currentStage.getTempMin(), temp)));
+            if (currentStage.getTempMin() != null && nextMin < currentStage.getTempMin()) {
+                double diff = currentStage.getTempMin() - nextMin;
+                alerts.add(alert("TEMP_LOW", diff > 5 ? "RED" : "ORANGE",
+                        String.format("%s处于%s，适宜温度≥%.0f°C，未来24小时最低%.1f°C偏低。",
+                                crop.getCropName(), currentStage.getStageName(), currentStage.getTempMin(), nextMin),
+                        "覆膜保温、夜间熏烟防霜；低温过后检查受冻情况。"));
             }
         }
 
-        if (windSpeed > 8) {
-            alerts.add(alert("WIND", "YELLOW", "大风作业预警",
-                String.format("当前风速%.1f km/h，不建议打药施肥。", windSpeed)));
+        if (windMax > 8) {
+            String level = windMax > 12 ? "ORANGE" : "YELLOW";
+            alerts.add(alert("WIND", level,
+                    String.format("未来24小时最大风速%.1f km/h，超过8 km/h 安全阈值。", windMax),
+                    "暂停打药施肥和高空作业；检查大棚、支架加固。"));
         }
 
-        // 去重保存：今天同类型同地块不重复插入
+        // 去重并更新：同一天、同一地块、同一类型只保留一条；条件变化时刷新级别并重新标记未读
         LocalDate today = LocalDate.now();
-        // 只查一次库，避免在循环里反复查询
         List<WeatherAlert> existingBefore = alertRepo.findByFarmlandIdOrderByAlertTimeDesc(f.getId());
-
-        Set<String> savedTodayTypes = existingBefore.stream()
-                .filter(e -> e.getAlertTime() != null && today.equals(e.getAlertTime().toLocalDate()))
-                .map(WeatherAlert::getAlertType)
-                .collect(Collectors.toSet());
+        Map<String, WeatherAlert> todayByType = new LinkedHashMap<>();
+        for (WeatherAlert e : existingBefore) {
+            if (e.getAlertTime() != null && today.equals(e.getAlertTime().toLocalDate())) {
+                todayByType.putIfAbsent(e.getAlertType(), e);
+            }
+        }
 
         for (Map<String, Object> a : alerts) {
-            String alertType = (String) a.get("type");
-            if (savedTodayTypes.contains(alertType)) continue;
-
-            alertRepo.save(WeatherAlert.builder()
-                    .userId(f.getUserId()).farmlandId(f.getId())
-                    .alertType(alertType)
-                    .alertLevel((String) a.get("level"))
-                    .alertContent((String) a.get("content"))
-                    .suggestion((String) a.get("suggestion"))
-                    .alertTime(LocalDateTime.now())
-                    .build());
-            savedTodayTypes.add(alertType);
+            String type = (String) a.get("type");
+            String level = (String) a.get("level");
+            String content = (String) a.get("content");
+            String suggestion = (String) a.get("suggestion");
+            WeatherAlert existing = todayByType.get(type);
+            if (existing != null) {
+                boolean changed = !Objects.equals(existing.getAlertLevel(), level)
+                        || !Objects.equals(existing.getAlertContent(), content)
+                        || !Objects.equals(existing.getSuggestion(), suggestion);
+                existing.setAlertLevel(level);
+                existing.setAlertContent(content);
+                existing.setSuggestion(suggestion);
+                existing.setAlertTime(LocalDateTime.now());
+                if (changed) {
+                    existing.setIsRead(false);
+                    existing.setIsHandled(false);
+                }
+                alertRepo.save(existing);
+            } else {
+                alertRepo.save(WeatherAlert.builder()
+                        .userId(f.getUserId()).farmlandId(f.getId())
+                        .alertType(type)
+                        .alertLevel(level)
+                        .alertContent(content)
+                        .suggestion(suggestion)
+                        .alertTime(LocalDateTime.now())
+                        .build());
+            }
         }
 
         // 追加历史预警。本次已经算出来的类型不再从库里补一遍 ——
@@ -226,6 +264,15 @@ public class FarmlandWeatherService {
             advice.add(day);
         }
         return advice;
+    }
+
+    private double num(Object value, double fallback) {
+        return value instanceof Number n ? n.doubleValue() : fallback;
+    }
+
+    private double numAt(List<Number> values, int index, double fallback) {
+        if (values == null || index < 0 || index >= values.size()) return fallback;
+        return values.get(index) != null ? values.get(index).doubleValue() : fallback;
     }
 
     private Map<String, Object> alert(String type, String level, String title, String suggestion) {
