@@ -6701,3 +6701,27 @@ main {
 
 /* 预警页自带标题，隐藏 AppLayout 的重复返回栏 */
 body:has(.alerts-page) .subpage-bar { display: none; }
+
+/* 驾驶舱预警卡：按地块聚合后的类型标签 */
+.dh-alert-group-name { font-size: 11.5px; font-weight: 600; }
+.dh-alert-group-count {
+  margin-left: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(31, 36, 55, 0.05);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 400;
+}
+.dh-alert-types { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.dh-alert-type-chip {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(31, 36, 55, 0.05);
+  color: var(--text-muted);
+  font-size: 9px;
+}
+.dh-alert-type-chip.red { background: rgba(239, 68, 68, 0.08); color: #b91c1c; }
+.dh-alert-type-chip.orange { background: rgba(249, 115, 22, 0.08); color: #c2410c; }
+.dh-alert-type-chip.yellow { background: rgba(234, 179, 8, 0.1); color: #a16207; }
+.dh-alert-type-chip.blue { background: rgba(59, 130, 246, 0.08); color: #2563eb; }

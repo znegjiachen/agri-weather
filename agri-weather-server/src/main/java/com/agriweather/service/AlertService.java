@@ -4,6 +4,7 @@ import com.agriweather.dto.AlertResult;
 import com.agriweather.entity.*;
 import com.agriweather.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -186,8 +187,25 @@ public class AlertService {
     }
 
     public List<WeatherAlert> getUserAlerts(Long userId) {
-        List<WeatherAlert> alerts = alertRepository.findByUserIdOrderByAlertTimeDesc(userId);
-        if (alerts.isEmpty()) return alerts;
+        return getUserAlerts(userId, "all", 200);
+    }
+
+    /**
+     * @param status active=仅未处理；all=全部（含已处理历史）
+     * @param limit  最多返回条数，默认 200，上限 500
+     */
+    public List<WeatherAlert> getUserAlerts(Long userId, String status, int limit) {
+        int size = Math.max(1, Math.min(limit <= 0 ? 200 : limit, 500));
+        boolean active = "active".equalsIgnoreCase(status) || "unhandled".equalsIgnoreCase(status);
+        List<WeatherAlert> alerts = active
+                ? alertRepository.findActiveForUser(userId, PageRequest.of(0, size))
+                : alertRepository.findByUserIdOrderByAlertTimeDesc(userId, PageRequest.of(0, size));
+        fillNames(alerts);
+        return alerts;
+    }
+
+    private void fillNames(List<WeatherAlert> alerts) {
+        if (alerts.isEmpty()) return;
 
         // 批量补地块/作物名，避免每条预警都查一次库
         List<Long> farmlandIds = alerts.stream()
@@ -197,7 +215,7 @@ public class AlertService {
                 .toList();
         Map<Long, Farmland> farmlandMap = farmlandRepository.findAllById(farmlandIds).stream()
                 .collect(java.util.stream.Collectors.toMap(Farmland::getId, f -> f));
-        Map<Long, String> cropNames = new java.util.HashMap<>();
+        Map<Long, String> cropNames = new HashMap<>();
         for (CropInfo crop : cropService.listAll()) {
             cropNames.put(crop.getId(), crop.getCropName());
         }
@@ -208,7 +226,6 @@ public class AlertService {
                 if (f.getCropId() != null) a.setCropName(cropNames.get(f.getCropId()));
             }
         }
-        return alerts;
     }
 
     public long getUnreadCount(Long userId) {

@@ -40,6 +40,13 @@ function alertTimeLabel(value) {
     : date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 }
 
+function isToday(value) {
+  if (!value) return false;
+  const date = new Date(String(value).replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return false;
+  return date.toDateString() === new Date().toDateString();
+}
+
 function num(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -55,6 +62,7 @@ export default function DesktopHome() {
   const [fields, setFields] = useState([]);
   const [alertList, setAlertList] = useState([]);
   const [unread, setUnread] = useState(0);
+  const [alertsCheckedAt, setAlertsCheckedAt] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [weatherMap, setWeatherMap] = useState({});
   const [stageMap, setStageMap] = useState({});
@@ -75,7 +83,7 @@ export default function DesktopHome() {
       try {
         const [fieldList, alertData, unreadCount] = await Promise.all([
           farmlands.list(),
-          alertsApi.list(),
+          alertsApi.list({ status: 'active' }),
           alertsApi.unreadCount().catch(() => 0),
         ]);
         if (!alive) return;
@@ -164,10 +172,14 @@ export default function DesktopHome() {
     (async () => {
       try {
         await alertsApi.refresh();
-        const [data, count] = await Promise.all([alertsApi.list(), alertsApi.unreadCount()]);
+        const [data, count] = await Promise.all([
+          alertsApi.list({ status: 'active' }),
+          alertsApi.unreadCount(),
+        ]);
         if (alive) {
           setAlertList(Array.isArray(data) ? data : []);
           setUnread(count);
+          setAlertsCheckedAt(new Date());
         }
       } catch {
         // 后台刷新失败不影响首屏，已有列表继续显示
@@ -176,17 +188,33 @@ export default function DesktopHome() {
     return () => { alive = false; };
   }, [fields.length]);
 
+  // 驾驶舱只看「今天且未处理」的预警；历史记录留在预警中心
+  const todayAlerts = useMemo(
+    () => alertList.filter((a) => !a.isHandled && isToday(a.alertTime)),
+    [alertList],
+  );
+
   const alertCounts = useMemo(() => {
     const map = {};
-    alertList.forEach((a) => {
-      if (a.farmlandId != null) map[a.farmlandId] = (map[a.farmlandId] || 0) + 1;
+    todayAlerts.forEach((a) => {
+      if (!a.isHandled && a.farmlandId != null) {
+        map[a.farmlandId] = (map[a.farmlandId] || 0) + 1;
+      }
     });
     return map;
-  }, [alertList]);
+  }, [todayAlerts]);
 
   const todayAdvice = advice[0];
   const adviceBan = todayAdvice?.bans?.[0];
   const adviceTask = todayAdvice?.tasks?.join(' · ');
+
+  const selectedAlerts = useMemo(
+    () => todayAlerts.filter((a) => a.farmlandId === selectedField?.id && !a.isHandled),
+    [todayAlerts, selectedField?.id],
+  );
+  const topSelectedAlert = useMemo(() => (
+    [...selectedAlerts].sort((a, b) => alertLevelMeta(b.alertLevel).rank - alertLevelMeta(a.alertLevel).rank)[0]
+  ), [selectedAlerts]);
 
   const trendNotes = useMemo(() => {
     if (!daily?.time?.length) return [];
@@ -224,14 +252,42 @@ export default function DesktopHome() {
     return notes.slice(0, 3);
   }, [daily]);
 
-  const recentAlerts = alertList.slice(0, 3);
+  // 按地块聚合：一块地的多条预警只占一张卡，避免同一时间刷屏
+  const alertGroups = useMemo(() => {
+    const groups = new Map();
+    todayAlerts.forEach((a) => {
+      const key = a.farmlandId ?? a.farmlandName ?? a.id;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          key,
+          farmlandName: a.farmlandName || '未知地块',
+          alerts: [],
+          top: a,
+          latest: a.alertTime,
+        };
+        groups.set(key, group);
+      }
+      group.alerts.push(a);
+      if (alertLevelMeta(a.alertLevel).rank > alertLevelMeta(group.top.alertLevel).rank) {
+        group.top = a;
+      }
+      if (new Date(a.alertTime || 0) > new Date(group.latest || 0)) group.latest = a.alertTime;
+    });
+    return [...groups.values()]
+      .sort((a, b) => (
+        alertLevelMeta(b.top.alertLevel).rank - alertLevelMeta(a.top.alertLevel).rank
+        || new Date(b.latest || 0) - new Date(a.latest || 0)
+      ))
+      .slice(0, 3);
+  }, [todayAlerts]);
 
   return (
     <div className="desktop-home">
       <header className="dh-topbar">
         <div className="dh-greeting">
           <h1>{greeting()}，{user?.username || '农友'}</h1>
-          <p>{todayLabel()} · {selectedWeather ? `${clockLabel(current?.time) || clockLabel(new Date())} 更新` : '正在同步天气'}</p>
+          <p>{todayLabel()} · {selectedWeather ? `天气 ${clockLabel(current?.time) || clockLabel(new Date())}` : '正在同步天气'}{alertsCheckedAt ? ` · 预警 ${clockLabel(alertsCheckedAt)}` : ''}</p>
         </div>
         <div className="dh-actions">
           <button
@@ -333,11 +389,20 @@ export default function DesktopHome() {
                 </div>
               </div>
 
-              <div className={`dh-advice ${adviceBan ? 'warn' : 'ok'}`}>
-                <span className="dh-advice-icon">{adviceBan ? '⚠️' : '🌿'}</span>
+              <div className={`dh-advice ${selectedAlerts.length > 0 || adviceBan ? 'warn' : 'ok'}`}>
+                <span className="dh-advice-icon">{selectedAlerts.length > 0 || adviceBan ? '⚠️' : '🌿'}</span>
                 <div>
-                  <b>{adviceBan || (adviceTask ? `适宜：${adviceTask}` : '今日暂无特别限制')}</b>
-                  <span>{adviceBan ? '建议调整今天的田间作业' : '按计划作业即可'}</span>
+                  {selectedAlerts.length > 0 ? (
+                    <>
+                      <b>{selectedAlerts.length} 条预警待处理</b>
+                      <span>{alertTypeMeta(topSelectedAlert?.alertType).label} · 建议先查看预警</span>
+                    </>
+                  ) : (
+                    <>
+                      <b>{adviceBan || (adviceTask ? `适宜：${adviceTask}` : '今日暂无特别限制')}</b>
+                      <span>{adviceBan ? '建议调整今天的田间作业' : '按计划作业即可'}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -391,7 +456,7 @@ export default function DesktopHome() {
                   </div>
                   <div className="dh-field-foot">
                     {count > 0 ? (
-                      <span className="dh-status warn">⚠️ {count} 条预警</span>
+                      <span className="dh-status warn">⚠️ 今日 {count} 条预警</span>
                     ) : (
                       <span className="dh-status ok">适宜作业</span>
                     )}
@@ -442,34 +507,47 @@ export default function DesktopHome() {
                 <div className="dh-card-head">
                   <h3>
                     ⚠️ 预警中心
-                    {unread > 0 && <span className="dh-count-pill">{unread}</span>}
+                    {todayAlerts.length > 0 && <span className="dh-count-pill">{todayAlerts.length}</span>}
                   </h3>
                   <button type="button" className="dh-link" onClick={() => navigate('/home/alerts')}>
                     全部 ›
                   </button>
                 </div>
 
-                {recentAlerts.length === 0 ? (
-                  <p className="dh-empty">暂无预警，一切正常</p>
+                {alertGroups.length === 0 ? (
+                  <p className="dh-empty">暂无待处理预警，一切正常</p>
                 ) : (
                   <div className="dh-alerts">
-                    {recentAlerts.map((a) => {
-                      const level = alertLevelMeta(a.alertLevel);
-                      const type = alertTypeMeta(a.alertType);
+                    {alertGroups.map((group) => {
+                      const level = alertLevelMeta(group.top.alertLevel);
+                      const type = alertTypeMeta(group.top.alertType);
+                      const seen = new Set();
+                      const types = group.alerts.filter((a) => {
+                        if (seen.has(a.alertType)) return false;
+                        seen.add(a.alertType);
+                        return true;
+                      }).slice(0, 3);
                       return (
-                        <div key={a.id} className={`dh-alert ${level.cls}`}>
+                        <div key={group.key} className={`dh-alert ${level.cls}`}>
                           <span className="dh-alert-icon">{type.icon}</span>
                           <div className="dh-alert-body">
                             <div className="dh-alert-title">
-                              <span className="dh-alert-type">{type.label}</span>
-                              {a.alertContent}
+                              <span className="dh-alert-group-name">{group.farmlandName}</span>
+                              <span className="dh-alert-group-count">{group.alerts.length} 条</span>
                             </div>
-                            <div className="dh-alert-meta">
-                              {a.farmlandName || ''}
-                              {a.suggestion ? ` · ${a.suggestion}` : ''}
+                            <div className="dh-alert-types">
+                              {types.map((a) => {
+                                const t = alertTypeMeta(a.alertType);
+                                return (
+                                  <span key={a.id} className={`dh-alert-type-chip ${alertLevelMeta(a.alertLevel).cls}`}>
+                                    {t.label}
+                                  </span>
+                                );
+                              })}
                             </div>
+                            <div className="dh-alert-meta">{group.top.alertContent}</div>
                           </div>
-                          <span className="dh-alert-time">{alertTimeLabel(a.alertTime)}</span>
+                          <span className="dh-alert-time">{alertTimeLabel(group.latest)}</span>
                         </div>
                       );
                     })}
@@ -502,9 +580,9 @@ export default function DesktopHome() {
                       <p className="dh-empty">今日无特殊限制</p>
                     )}
                     <div className="dh-advice-foot">
-                      风速 {todayAdvice.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
+                      今日最大风速 {todayAdvice.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
                       {' · '}
-                      降水 {todayAdvice.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
+                      今日降水 {todayAdvice.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
                     </div>
                   </div>
                 )}

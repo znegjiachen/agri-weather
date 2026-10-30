@@ -70,7 +70,8 @@ export const pests = {
 
 // Alerts
 export const alerts = {
-  list: () => request('/api/alerts'),
+  list: ({ status = 'all', limit = 200 } = {}) =>
+    request(`/api/alerts?status=${encodeURIComponent(status)}&limit=${limit}`),
   unreadCount: () => request('/api/alerts/unread-count'),
   refresh: () => request('/api/alerts/refresh', { method: 'POST' }),
   markRead: (id) => request(`/api/alerts/${id}/read`, { method: 'PUT' }),

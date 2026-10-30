@@ -43,9 +43,11 @@ public class AlertController {
     }
 
     @GetMapping
-    public List<WeatherAlert> listMine(HttpServletRequest request) {
+    public List<WeatherAlert> listMine(@RequestParam(defaultValue = "all") String status,
+                                        @RequestParam(defaultValue = "200") int limit,
+                                        HttpServletRequest request) {
         Long userId = getUserIdOrAuthError(request);
-        return alertService.getUserAlerts(userId);
+        return alertService.getUserAlerts(userId, status, limit);
     }
 
     @GetMapping("/unread-count")
