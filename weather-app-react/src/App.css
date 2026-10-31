@@ -4136,6 +4136,70 @@ main {
 .agent-attach-btn:hover { background: var(--glass-bg-hover); }
 .agent-attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* 录音中：红色呼吸提示 */
+.agent-attach-btn.recording {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.55);
+  animation: agentVoicePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes agentVoicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.28); }
+  50%      { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+/* 对话文档：待发送附件条 + 历史消息里的文件标记 */
+.agent-doc-attachment {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px;
+  padding: 8px 12px;
+  border: 1px solid rgba(102, 126, 234, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(102, 126, 234, 0.08);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.agent-doc-attachment span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-doc-attachment small { color: var(--text-muted); white-space: nowrap; }
+
+.agent-doc-attachment button {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-doc-attachment.loading { color: var(--text-muted); font-style: italic; }
+
+.agent-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-attachments {
   display: flex;
   align-items: center;

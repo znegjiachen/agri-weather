@@ -146,6 +146,8 @@ export const agent = {
         ...(context.agentId ? { agentId: context.agentId } : {}),
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
         ...(context.visionJson ? { visionJson: context.visionJson } : {}),
+        ...(context.documentName ? { documentName: context.documentName } : {}),
+        ...(context.documentContext ? { documentContext: context.documentContext } : {}),
       }),
     }),
 
@@ -169,6 +171,8 @@ export const agent = {
         ...(context.agentId ? { agentId: context.agentId } : {}),
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
         ...(context.visionJson ? { visionJson: context.visionJson } : {}),
+        ...(context.documentName ? { documentName: context.documentName } : {}),
+        ...(context.documentContext ? { documentContext: context.documentContext } : {}),
       }),
     });
 
@@ -256,6 +260,40 @@ export const agent = {
     if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
     return data;
   },
+  /** 录音转文字：multipart 上传音频，未配置 ASR 时后端返回 503 */
+  transcribe: async (blob) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', new File([blob], 'recording.webm', { type: blob.type || 'audio/webm' }));
+
+    const res = await fetch(`${BASE_URL}/api/agent/transcribe`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) handleUnauthorized(data);
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    return data;
+  },
+
+  /** 对话内文档解析：返回提取后的正文，不落库 */
+  document: async (file) => {
+    const token = getToken();
+    const form = new FormData();
+    form.append('file', file);
+
+    const res = await fetch(`${BASE_URL}/api/agent/document`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    const data = await res.json().catch(() => null);
+    if (res.status === 401) handleUnauthorized(data);
+    if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    return data;
+  },
+
   status: () => request('/api/agent/status'),
   tools: () => request('/api/agent/tools'),
 };

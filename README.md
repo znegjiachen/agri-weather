@@ -39,6 +39,10 @@
 
 **多模态识图**：在对话里直接上传作物照片（最多 3 张），视觉模型会先识别植物名称、生长阶段、健康状态和可见的病害/虫害/缺素，再由助农手结合地块天气和农事工具给出建议。识别结果以卡片展示，低置信度或无法判断时会明确提示补拍。
 
+**语音提问**：输入框右侧的 🎤 按钮支持录音转文字，田间不方便打字时直接说话即可。配置 `ASR_*` 后由后端调用 Whisper / 兼容的 `/audio/transcriptions`；未配置时自动回退到浏览器语音识别（Chrome / Edge），两种方式都不可用时会给出明确提示。
+
+**对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB），复用知识库的文档解析器提取正文，作为本轮对话资料注入（不落库、不进知识库），适合「帮我看一下这份种植方案」这类需求。文档内容按资料处理，提示词里明确要求模型不执行文档中的指令。
+
 可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
 
 ### 一块地一个助农手
@@ -168,7 +172,7 @@ cd weather-app-react && npm install && npm run dev
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
-| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `GET /tools` · `GET /status` |
+| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析）· `GET /tools` · `GET /status` |
 | 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · 知识库 `/knowledge`（文本/文件/检索/重建向量） |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
@@ -195,6 +199,8 @@ cd weather-app-react && npm install && npm run dev
 | `EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY` / `EMBEDDING_MODEL` | 可选，OpenAI 兼容的 Embedding 服务；不配置时使用本地字词向量 |
 | `VISION_API_KEY` | 可选，视觉模型密钥；不填默认复用 `DEEPSEEK_API_KEY` |
 | `VISION_MODEL` | 可选，默认 `deepseek-v4-flash-vision-exp` |
+| `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL` | 可选，OpenAI 兼容的语音识别服务（如 Whisper）；不配置时前端回退浏览器语音识别 |
+| `ASR_LANGUAGE` | 可选，识别语言，默认 `zh` |
 | `SERVER_PORT` | 后端端口，默认 8082 |
 
 **不要把密钥写进 `application.yml` 并提交**——该文件会进 Git。本地开发用环境变量注入。
