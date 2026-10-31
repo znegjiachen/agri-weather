@@ -13,10 +13,13 @@ export default function AppLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isWide = useMediaQuery('(min-width: 1200px)');
+  const isUltraWide = useMediaQuery('(min-width: 1440px)');
 
   const sub = SUB_NAV.find((item) => item.to === pathname);
-  // 完整对话页已经有整页聊天，不再重复挂浮窗
-  const showDock = isWide && pathname !== '/agent' && pathname !== '/agent/chat';
+  // 完整对话页已经有整页聊天；控制台在超宽屏用浮窗作为实时预览
+  const showDock = isWide
+    && pathname !== '/agent/chat'
+    && (pathname !== '/agent' || isUltraWide);
 
   return (
     <div className="app-layout">

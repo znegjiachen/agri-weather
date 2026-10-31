@@ -381,7 +381,7 @@ export default function AgentDock() {
         <div className="agent-dock-avatar">🤖</div>
         <div className="agent-dock-id">
           <div className="agent-dock-title">
-            助农手
+            {field?.agentName || '助农手'}
             <span className="agent-dock-tag">AI</span>
           </div>
           <div className={`agent-dock-status ${notConfigured ? 'off' : ''}`}>
