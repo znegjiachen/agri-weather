@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { farmlands, crops } from '../api';
-
-const SOIL_TYPES = ['壤土', '沙土', '黏土', '红壤', '黑土', '盐碱土'];
-const IRRIGATION_TYPES = ['漫灌', '滴灌', '喷灌', '渗灌', '雨水'];
+import {
+  SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
+} from '../utils/farmlandDefaults';
 const WEATHER_ICONS = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
   51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
@@ -33,6 +33,9 @@ export default function FarmlandsPage() {
   });
   // 有边界的地块面积由服务端按多边形计算，不允许手工覆盖
   const [editHasBoundary, setEditHasBoundary] = useState(false);
+  // 用户手动改过土壤/灌溉后，不再用推荐值覆盖
+  const [soilTouched, setSoilTouched] = useState(false);
+  const [irrigationTouched, setIrrigationTouched] = useState(false);
 
   const loadList = () => {
     setListLoading(true);
@@ -59,8 +62,35 @@ export default function FarmlandsPage() {
       soilType: '', cropId: '', plantDate: '', irrigationType: '' });
     setEditId(null);
     setEditHasBoundary(false);
+    setSoilTouched(false);
+    setIrrigationTouched(false);
     setShowForm(false);
     setError('');
+  };
+
+  /** 录入经纬度时按位置推荐土壤；用户手动选过就不再覆盖 */
+  const updateCoordinate = (key, value) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      const hasLat = key === 'lat' ? value !== '' : prev.lat !== '';
+      const hasLng = key === 'lng' ? value !== '' : prev.lng !== '';
+      if (!soilTouched && hasLat && hasLng) {
+        next.soilType = suggestSoil(Number(next.lat), Number(next.lng));
+      }
+      return next;
+    });
+  };
+
+  /** 选作物时按作物推荐灌溉方式；用户手动选过就不再覆盖 */
+  const updateCrop = (value) => {
+    setForm((prev) => {
+      const next = { ...prev, cropId: value };
+      if (!irrigationTouched) {
+        const crop = cropList.find((c) => String(c.id) === value);
+        next.irrigationType = suggestIrrigation(crop?.cropName);
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -119,6 +149,9 @@ export default function FarmlandsPage() {
     });
     setEditId(f.id);
     setEditHasBoundary(!!f.boundary);
+    // 已保存的土壤/灌溉保持不变；原先没填的仍允许跟随位置/作物推荐
+    setSoilTouched(!!f.soilType);
+    setIrrigationTouched(!!f.irrigationType);
     setShowForm(true);
   };
 
@@ -172,7 +205,7 @@ export default function FarmlandsPage() {
                   <input type="text" value={form.fieldName} onChange={(e) => setForm({ ...form, fieldName: e.target.value })} required />
                 </label>
                 <label>种植作物
-                  <select value={form.cropId} onChange={(e) => setForm({ ...form, cropId: e.target.value })}>
+                  <select value={form.cropId} onChange={(e) => updateCrop(e.target.value)}>
                     <option value="">-- 选择作物 --</option>
                     {cropList.map((c) => <option key={c.id} value={c.id}>{c.cropName}</option>)}
                   </select>
@@ -182,12 +215,12 @@ export default function FarmlandsPage() {
                 <label>纬度 *（-90 ~ 90）
                   <input type="number" step="0.01" min="-90" max="90" inputMode="decimal"
                     placeholder="如 30.27" value={form.lat}
-                    onChange={(e) => setForm({ ...form, lat: e.target.value })} required />
+                    onChange={(e) => updateCoordinate('lat', e.target.value)} required />
                 </label>
                 <label>经度 *（-180 ~ 180）
                   <input type="number" step="0.01" min="-180" max="180" inputMode="decimal"
                     placeholder="如 120.15" value={form.lng}
-                    onChange={(e) => setForm({ ...form, lng: e.target.value })} required />
+                    onChange={(e) => updateCoordinate('lng', e.target.value)} required />
                 </label>
               </div>
               <div className="form-row">
@@ -206,14 +239,28 @@ export default function FarmlandsPage() {
                 </label>
               </div>
               <div className="form-row">
-                <label>土壤类型
-                  <select value={form.soilType} onChange={(e) => setForm({ ...form, soilType: e.target.value })}>
+                <label>
+                  土壤类型 <span className="form-label-hint">（按位置估算）</span>
+                  <select
+                    value={form.soilType}
+                    onChange={(e) => {
+                      setSoilTouched(true);
+                      setForm({ ...form, soilType: e.target.value });
+                    }}
+                  >
                     <option value="">未填写</option>
                     {SOIL_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
-                <label>灌溉方式
-                  <select value={form.irrigationType} onChange={(e) => setForm({ ...form, irrigationType: e.target.value })}>
+                <label>
+                  灌溉方式 <span className="form-label-hint">（按作物推荐）</span>
+                  <select
+                    value={form.irrigationType}
+                    onChange={(e) => {
+                      setIrrigationTouched(true);
+                      setForm({ ...form, irrigationType: e.target.value });
+                    }}
+                  >
                     <option value="">未填写</option>
                     {IRRIGATION_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>

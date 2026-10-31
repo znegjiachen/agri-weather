@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { farmlands as farmlandApi, crops } from '../api';
 import FarmlandMap from '../components/FarmlandMap';
 import { polygonAreaMu, polygonCenter, roundCoord } from '../utils/geo';
+import {
+  SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
+} from '../utils/farmlandDefaults';
 
 const WEATHER_ICONS = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
@@ -27,6 +30,10 @@ export default function MapPage() {
   const [finishOpen, setFinishOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCropId, setNewCropId] = useState('');
+  const [newSoilType, setNewSoilType] = useState('');
+  const [newIrrigationType, setNewIrrigationType] = useState('');
+  const [soilTouched, setSoilTouched] = useState(false);
+  const [irrigationTouched, setIrrigationTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const mapRef = useRef(null);
@@ -62,6 +69,8 @@ export default function MapPage() {
     setDraft((prev) => [...prev, point]);
   }, []);
 
+  const cropNameOf = (id) => cropList.find((c) => String(c.id) === String(id))?.cropName;
+
   const startDrawing = () => {
     setDrawing(true);
     setDraft([]);
@@ -69,6 +78,10 @@ export default function MapPage() {
     setSelected(null);
     setNewName('');
     setNewCropId('');
+    setNewSoilType('');
+    setNewIrrigationType('');
+    setSoilTouched(false);
+    setIrrigationTouched(false);
     setError('');
   };
 
@@ -83,6 +96,14 @@ export default function MapPage() {
     if (draft.length < 3) {
       setError('至少需要 3 个边界点才能围成地块');
       return;
+    }
+    // 圈完地先按中心点估算土壤，灌溉按已选作物给默认值
+    const center = polygonCenter(draft);
+    if (center && !soilTouched) {
+      setNewSoilType(suggestSoil(center.lat, center.lng));
+    }
+    if (!irrigationTouched) {
+      setNewIrrigationType(suggestIrrigation(cropNameOf(newCropId)));
     }
     setFinishOpen(true);
     setError('');
@@ -107,8 +128,8 @@ export default function MapPage() {
         lat: roundCoord(center.lat, 2),
         lng: roundCoord(center.lng, 2),
         altitude: null,
-        soilType: null,
-        irrigationType: null,
+        soilType: newSoilType || null,
+        irrigationType: newIrrigationType || null,
         cropId: newCropId ? Number(newCropId) : null,
         boundary: JSON.stringify(draft.map((p) => ({
           lat: roundCoord(p.lat, 6),
@@ -122,6 +143,10 @@ export default function MapPage() {
       setFinishOpen(false);
       setNewName('');
       setNewCropId('');
+      setNewSoilType('');
+      setNewIrrigationType('');
+      setSoilTouched(false);
+      setIrrigationTouched(false);
       setSelected(created);
       handleSelect(created);
     } catch (e) {
@@ -241,14 +266,52 @@ export default function MapPage() {
                 <select
                   className="community-input"
                   value={newCropId}
-                  onChange={(e) => setNewCropId(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNewCropId(value);
+                    // 灌溉方式跟随作物，除非用户已经手动选过
+                    if (!irrigationTouched) {
+                      setNewIrrigationType(suggestIrrigation(cropNameOf(value)));
+                    }
+                  }}
                 >
                   <option value="">选择作物（可选）</option>
                   {cropList.map((c) => (
                     <option key={c.id} value={c.id}>{c.cropName}</option>
                   ))}
                 </select>
+                <select
+                  className="community-input"
+                  value={newSoilType}
+                  onChange={(e) => {
+                    setSoilTouched(true);
+                    setNewSoilType(e.target.value);
+                  }}
+                  aria-label="土壤类型"
+                >
+                  <option value="">土壤类型</option>
+                  {SOIL_TYPES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <select
+                  className="community-input"
+                  value={newIrrigationType}
+                  onChange={(e) => {
+                    setIrrigationTouched(true);
+                    setNewIrrigationType(e.target.value);
+                  }}
+                  aria-label="灌溉方式"
+                >
+                  <option value="">灌溉方式</option>
+                  {IRRIGATION_TYPES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
+              <p className="map-draw-hint">
+                土壤按圈地位置估算、灌溉按作物常用方式推荐，都可以手动修改。
+              </p>
               <div className="map-draw-actions">
                 <button
                   type="button"
