@@ -314,22 +314,12 @@ export default function DesktopHome() {
           <section className="dh-hero glass">
             <div className="dh-hero-head">
               {selectedField ? (
-                <label className="dh-field-select">
-                  <span className="dh-field-dot" />
-                  <select
-                    value={selectedId ?? ''}
-                    onChange={(e) => setSelectedId(Number(e.target.value))}
-                    aria-label="选择地块"
-                  >
-                    {fields.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.fieldName}
-                        {weatherMap[f.id]?.cropName ? ` · ${weatherMap[f.id].cropName}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="dh-select-caret">⌄</span>
-                </label>
+                <FieldSelect
+                  fields={fields}
+                  value={selectedId ?? selectedField.id}
+                  weatherMap={weatherMap}
+                  onChange={setSelectedId}
+                />
               ) : (
                 <span className="dh-field-empty">还没有地块</span>
               )}
@@ -615,6 +605,105 @@ export default function DesktopHome() {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 地块切换下拉：自定义浮层替代原生 select，避免系统默认的蓝色高亮样式。
+ * 支持点击外部 / Esc 关闭，方向键在选项间移动。
+ */
+function FieldSelect({ fields, value, weatherMap, onChange }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const current = fields.find((f) => f.id === value) || fields[0];
+  const labelOf = (field) => {
+    const crop = weatherMap[field.id]?.cropName;
+    return `${field.fieldName}${crop ? ` · ${crop}` : ''}`;
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  const openAndFocus = () => {
+    setOpen(true);
+    requestAnimationFrame(() => menuRef.current?.querySelector('button')?.focus());
+  };
+
+  const moveFocus = (event, step) => {
+    const options = Array.from(menuRef.current?.querySelectorAll('button') || []);
+    if (options.length === 0) return;
+    const index = options.indexOf(document.activeElement);
+    const next = index < 0 ? 0 : (index + step + options.length) % options.length;
+    options[next].focus();
+    event.preventDefault();
+  };
+
+  return (
+    <div className="dh-field-select" ref={rootRef}>
+      <button
+        type="button"
+        className="dh-field-trigger"
+        onClick={() => setOpen((prev) => !prev)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') openAndFocus();
+          if (event.key === 'Escape') setOpen(false);
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="选择地块"
+      >
+        <span className="dh-field-dot" />
+        <span className="dh-field-label">{current ? labelOf(current) : ''}</span>
+        <span className={`dh-select-caret ${open ? 'open' : ''}`}>⌄</span>
+      </button>
+
+      {open && (
+        <div
+          className="dh-field-menu"
+          ref={menuRef}
+          role="listbox"
+          aria-label="选择地块"
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') moveFocus(event, 1);
+            if (event.key === 'ArrowUp') moveFocus(event, -1);
+            if (event.key === 'Escape') {
+              setOpen(false);
+              rootRef.current?.querySelector('.dh-field-trigger')?.focus();
+            }
+          }}
+        >
+          {fields.map((field) => {
+            const crop = weatherMap[field.id]?.cropName;
+            const active = field.id === current?.id;
+            return (
+              <button
+                type="button"
+                key={field.id}
+                role="option"
+                aria-selected={active}
+                className={`dh-field-option ${active ? 'active' : ''}`}
+                onClick={() => {
+                  onChange(field.id);
+                  setOpen(false);
+                }}
+              >
+                <span className="dh-field-option-name">{field.fieldName}</span>
+                {crop && <span className="dh-field-option-crop">{crop}</span>}
+                {active && <span className="dh-field-option-check">✓</span>}
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );
