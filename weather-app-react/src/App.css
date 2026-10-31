@@ -5946,6 +5946,63 @@ main {
 .agent-dock-tool-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); }
 .agent-dock-tool-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* 录音中：红色呼吸提示 */
+.agent-dock-tool-btn.recording {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+  animation: agentVoicePulse 1.2s ease-in-out infinite;
+}
+
+/* 对话文档：待发送附件条 + 历史消息里的文件标记 */
+.agent-dock-doc {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 16px 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(102, 126, 234, 0.28);
+  border-radius: 9px;
+  background: rgba(102, 126, 234, 0.07);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+}
+
+.agent-dock-doc span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-doc small { color: var(--text-muted); white-space: nowrap; }
+
+.agent-dock-doc button {
+  margin-left: auto;
+  width: 17px;
+  height: 17px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-dock-doc.loading { color: var(--text-muted); font-style: italic; }
+
+.agent-dock-doc-chip {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #4c5bd4;
+  font-size: 9.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-dock-send {
   margin-left: auto;
   width: 30px;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
 import { useAgentHistory } from '../hooks/useAgentHistory';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
@@ -48,6 +49,8 @@ export default function AgentDock() {
   const [status, setStatus] = useState(null);
   const [toolCount, setToolCount] = useState(null);
   const [attachments, setAttachments] = useState([]);
+  const [docAttachment, setDocAttachment] = useState(null);
+  const [docLoading, setDocLoading] = useState(false);
   // 首页可能先于浮窗挂载，初始化时补读一次共享上下文
   const [field, setField] = useState(() => getFieldContext());
 
@@ -61,8 +64,15 @@ export default function AgentDock() {
 
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
+  const docInputRef = useRef(null);
   const attachmentsRef = useRef(attachments);
   const liveRef = useRef({ content: '', timer: null });
+
+  const voice = useVoiceInput({
+    asrConfigured: status?.asrConfigured,
+    onText: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
+    onError: setError,
+  });
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -180,25 +190,31 @@ export default function AgentDock() {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
+    const docForTurn = docAttachment;
     const notConfigured = status && status.configured === false;
-    if ((!content && files.length === 0) || loading || historyLoading || notConfigured) return;
+    if ((!content && files.length === 0 && !docForTurn) || loading || historyLoading || notConfigured) return;
 
-    const question = content || '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。';
-    // 和完整对话页保持一致：图片识别结果随历史带上，后续追问仍能参考
+    const question = content || (files.length > 0
+      ? '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。'
+      : '请阅读这份文档，提取与当前地块相关的农事建议。');
+    // 和完整对话页保持一致：图片识别结果 / 文档名称随历史带上，后续追问仍能参考
     const history = messages
       .filter((m) => !m.streaming)
-      .map((m) => ({
-        role: m.role,
-        content: m.role === 'user' && m.vision
-          ? `${m.content}\n\n【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`
-          : m.content,
-      }));
+      .map((m) => {
+        const parts = [];
+        if (m.role === 'user' && m.document) parts.push(`【用户上传了文档：${m.document.filename}】`);
+        if (m.role === 'user' && m.vision) {
+          parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
+        }
+        parts.push(m.content);
+        return { role: m.role, content: parts.filter(Boolean).join('\n\n') };
+      });
 
     setError('');
     setInput('');
     setAttachments([]);
     clearLive();
-    setMessages((prev) => [...prev, { role: 'user', content: question, images: previews }]);
+    setMessages((prev) => [...prev, { role: 'user', content: question, images: previews, document: docForTurn }]);
     setLoading(true);
 
     try {
@@ -260,7 +276,14 @@ export default function AgentDock() {
             return { ...m, toolCalls: calls };
           });
         },
-      }, { agentId: field?.agentId, farmlandId: field?.id, visionJson: vision ? JSON.stringify(vision) : null });
+      }, {
+        agentId: field?.agentId,
+        farmlandId: field?.id,
+        visionJson: vision ? JSON.stringify(vision) : null,
+        documentName: docForTurn?.filename,
+        documentContext: docForTurn?.text,
+      });
+      setDocAttachment(null);
 
       clearLive();
       setMessages((prev) => {
@@ -329,6 +352,35 @@ export default function AgentDock() {
     }
   };
 
+  const handleDocument = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
+      setError('对话文档支持 TXT、Markdown、PDF、Word');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('文档不能超过 5MB');
+      return;
+    }
+    setDocLoading(true);
+    setError('');
+    try {
+      const data = await agentApi.document(file);
+      setDocAttachment({
+        filename: file.name,
+        text: data.text,
+        charCount: data.charCount,
+        truncated: data.truncated,
+      });
+    } catch (e) {
+      setError(e.message || '文档解析失败');
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
   const removeAttachment = (index) => {
     setAttachments((prev) => {
       const target = prev[index];
@@ -340,12 +392,14 @@ export default function AgentDock() {
   const clearChat = () => {
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
+    setDocAttachment(null);
     clearHistory();
     setError('');
   };
 
   const notConfigured = status && status.configured === false;
-  const canSend = !loading && !historyLoading && !notConfigured && (input.trim().length > 0 || attachments.length > 0);
+  const canSend = !loading && !historyLoading && !notConfigured
+    && (input.trim().length > 0 || attachments.length > 0 || !!docAttachment);
 
   if (collapsed) {
     return (
@@ -430,7 +484,7 @@ export default function AgentDock() {
           <div className="agent-dock-welcome">
             <div className="agent-dock-welcome-icon">🌾</div>
             <h3>你好，我是助农手</h3>
-            <p>可以问地块、天气和农事安排，也可以直接上传作物照片。</p>
+            <p>可以问地块、天气和农事安排，也可以上传作物照片或种植方案文档。</p>
             <div className="agent-dock-suggestions">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -458,6 +512,9 @@ export default function AgentDock() {
 
             {m.role === 'user' && (
               <>
+                {m.document && (
+                  <div className="agent-dock-doc-chip">📄 {m.document.filename}</div>
+                )}
                 <div className="agent-dock-bubble user">{m.content}</div>
                 {m.vision && (
                   <div className="agent-dock-vision">
@@ -551,6 +608,18 @@ export default function AgentDock() {
 
       {error && <div className="agent-dock-error">{error}</div>}
 
+      {docAttachment && (
+        <div className="agent-dock-doc">
+          <span>📄 {docAttachment.filename}</span>
+          <small>
+            {docAttachment.charCount} 字{docAttachment.truncated ? ' · 已截断' : ''}
+          </small>
+          <button type="button" onClick={() => setDocAttachment(null)} aria-label="移除文档">×</button>
+        </div>
+      )}
+
+      {docLoading && <div className="agent-dock-doc loading">正在解析文档…</div>}
+
       {attachments.length > 0 && (
         <div className="agent-dock-attachments">
           {attachments.map((item, index) => (
@@ -567,7 +636,7 @@ export default function AgentDock() {
         <div className="agent-dock-input-box">
           <textarea
             rows={1}
-            placeholder="问问地块、天气，或上传作物照片…"
+            placeholder="问问地块、天气，或上传照片/文档…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -595,6 +664,31 @@ export default function AgentDock() {
               multiple
               hidden
               onChange={handleFiles}
+            />
+            <button
+              type="button"
+              className={`agent-dock-tool-btn ${voice.recording ? 'recording' : ''}`}
+              onClick={voice.toggle}
+              disabled={loading || historyLoading || voice.processing || notConfigured}
+              title={voice.recording ? '停止录音' : voice.processing ? '正在识别…' : '语音输入'}
+            >
+              {voice.processing ? '⏳' : voice.recording ? '⏹' : '🎤'}
+            </button>
+            <button
+              type="button"
+              className="agent-dock-tool-btn"
+              onClick={() => docInputRef.current?.click()}
+              disabled={loading || historyLoading || notConfigured || docLoading}
+              title="上传文档（PDF / Word / TXT / Markdown）"
+            >
+              📄
+            </button>
+            <input
+              ref={docInputRef}
+              type="file"
+              accept=".txt,.md,.markdown,.pdf,.doc,.docx"
+              hidden
+              onChange={handleDocument}
             />
             <button
               type="button"
