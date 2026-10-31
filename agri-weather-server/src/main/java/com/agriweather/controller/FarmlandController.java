@@ -1,13 +1,18 @@
 package com.agriweather.controller;
 
+import com.agriweather.dto.FarmlandRequest;
 import com.agriweather.entity.Farmland;
 import com.agriweather.entity.FarmlandAgent;
+import com.agriweather.repository.CropInfoRepository;
 import com.agriweather.repository.FarmlandRepository;
 import com.agriweather.service.AgentService;
+import com.agriweather.service.FarmlandGeometry;
 import com.agriweather.service.FarmlandWeatherService;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,18 +20,26 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/farmlands")
 @RequiredArgsConstructor
 public class FarmlandController {
 
+    private static final Set<String> SOIL_TYPES =
+            Set.of("壤土", "沙土", "黏土", "红壤", "黑土", "盐碱土");
+    private static final Set<String> IRRIGATION_TYPES =
+            Set.of("漫灌", "滴灌", "喷灌", "渗灌", "雨水");
+
     private final FarmlandRepository farmlandRepository;
+    private final CropInfoRepository cropInfoRepository;
     private final FarmlandWeatherService farmlandWeatherService;
     private final AgentService agentService;
     private final ObjectMapper objectMapper;
@@ -40,24 +53,22 @@ public class FarmlandController {
     }
 
     @PostMapping
-    public Farmland create(@RequestBody String rawBody, HttpServletRequest request) throws Exception {
+    public Farmland create(@Valid @RequestBody FarmlandRequest body, HttpServletRequest request) {
         Long userId = getUserIdOrAuthError(request);
-
-        Map<String, Object> body = objectMapper.readValue(rawBody, new TypeReference<Map<String, Object>>() {});
 
         Farmland f = new Farmland();
         f.setUserId(userId);
-        f.setFieldName(str(body, "fieldName"));
-        f.setLat(dbl(body, "lat"));
-        f.setLng(dbl(body, "lng"));
-        f.setAltitude(dbl(body, "altitude"));
-        f.setAreaMu(dbl(body, "areaMu"));
-        f.setSoilType(str(body, "soilType"));
-        if (body.get("cropId") != null) f.setCropId(lng(body, "cropId"));
-        f.setIrrigationType(str(body, "irrigationType"));
-        f.setBoundary(normalizeBoundary(body.get("boundary")));
-        String pd = str(body, "plantDate");
-        if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
+        f.setFieldName(requireName(body.getFieldName()));
+        f.setLat(requireLat(body.getLat()));
+        f.setLng(requireLng(body.getLng()));
+        f.setAltitude(validateAltitude(body.getAltitude()));
+        f.setAreaMu(validateArea(body.getAreaMu()));
+        f.setSoilType(normalizeSoil(body.getSoilType()));
+        f.setIrrigationType(normalizeIrrigation(body.getIrrigationType()));
+        f.setCropId(requireCrop(body.getCropId()));
+        f.setPlantDate(parsePlantDate(body.getPlantDate()));
+        f.setBoundary(normalizeBoundary(body.getBoundary()));
+        applyBoundaryArea(f);
 
         Farmland saved = farmlandRepository.save(f);
         FarmlandAgent agent = agentService.ensureForFarmland(saved);
@@ -72,19 +83,23 @@ public class FarmlandController {
 
         Map<String, Object> body = objectMapper.readValue(rawBody, new TypeReference<Map<String, Object>>() {});
 
-        if (body.containsKey("fieldName")) f.setFieldName(str(body, "fieldName"));
-        if (body.containsKey("lat")) f.setLat(dbl(body, "lat"));
-        if (body.containsKey("lng")) f.setLng(dbl(body, "lng"));
-        if (body.containsKey("altitude")) f.setAltitude(dbl(body, "altitude"));
-        if (body.containsKey("areaMu")) f.setAreaMu(dbl(body, "areaMu"));
-        if (body.containsKey("soilType")) f.setSoilType(str(body, "soilType"));
-        if (body.containsKey("cropId")) f.setCropId(lng(body, "cropId"));
-        if (body.containsKey("irrigationType")) f.setIrrigationType(str(body, "irrigationType"));
-        if (body.containsKey("boundary")) f.setBoundary(normalizeBoundary(body.get("boundary")));
-        if (body.containsKey("plantDate")) {
-            String pd = str(body, "plantDate");
-            if (pd != null && !pd.isEmpty()) f.setPlantDate(LocalDate.parse(pd));
+        if (body.containsKey("fieldName")) f.setFieldName(requireName(str(body, "fieldName")));
+        if (body.containsKey("lat")) f.setLat(requireLat(dbl(body, "lat")));
+        if (body.containsKey("lng")) f.setLng(requireLng(dbl(body, "lng")));
+        if (body.containsKey("altitude")) f.setAltitude(validateAltitude(dbl(body, "altitude")));
+        if (body.containsKey("areaMu")) f.setAreaMu(validateArea(dbl(body, "areaMu")));
+        if (body.containsKey("soilType")) f.setSoilType(normalizeSoil(str(body, "soilType")));
+        if (body.containsKey("irrigationType")) f.setIrrigationType(normalizeIrrigation(str(body, "irrigationType")));
+        if (body.containsKey("cropId")) f.setCropId(requireCrop(lng(body, "cropId")));
+        if (body.containsKey("plantDate")) f.setPlantDate(parsePlantDate(str(body, "plantDate")));
+
+        boolean boundaryCleared = false;
+        if (body.containsKey("boundary")) {
+            f.setBoundary(normalizeBoundary(body.get("boundary")));
+            boundaryCleared = f.getBoundary() == null && !body.containsKey("areaMu");
         }
+        applyBoundaryArea(f);
+        if (boundaryCleared) f.setAreaMu(null);
 
         Farmland saved = farmlandRepository.save(f);
         agentService.refreshDefaultAfterFarmlandUpdate(saved);
@@ -141,32 +156,153 @@ public class FarmlandController {
         return userId;
     }
 
-    private String str(Map<String, Object> m, String k) {
-        Object v = m.get(k);
-        return v != null ? v.toString() : null;
+    // ---------------- 字段校验：统一 400，避免把数据库约束抛成 500 ----------------
+
+    private String requireName(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("请填写地块名称");
+        }
+        String name = raw.trim();
+        if (name.length() > 100) {
+            throw new IllegalArgumentException("地块名称不能超过 100 个字符");
+        }
+        return name;
     }
-    private Double dbl(Map<String, Object> m, String k) {
-        Object v = m.get(k);
-        if (v == null) return null;
-        if (v instanceof Number) return ((Number) v).doubleValue();
-        return Double.parseDouble(v.toString());
+
+    private Double requireLat(Double value) {
+        if (value == null || !Double.isFinite(value)) {
+            throw new IllegalArgumentException("请填写纬度");
+        }
+        if (value < -90 || value > 90) {
+            throw new IllegalArgumentException("纬度需在 -90 ~ 90 之间");
+        }
+        return value;
     }
-    private Long lng(Map<String, Object> m, String k) {
-        Object v = m.get(k);
-        if (v == null) return null;
-        if (v instanceof Number) return ((Number) v).longValue();
-        return Long.parseLong(v.toString());
+
+    private Double requireLng(Double value) {
+        if (value == null || !Double.isFinite(value)) {
+            throw new IllegalArgumentException("请填写经度");
+        }
+        if (value < -180 || value > 180) {
+            throw new IllegalArgumentException("经度需在 -180 ~ 180 之间");
+        }
+        return value;
+    }
+
+    /** 海拔为空表示未填写 */
+    private Double validateAltitude(Double value) {
+        if (value == null) return null;
+        if (!Double.isFinite(value) || value < -500 || value > 9000) {
+            throw new IllegalArgumentException("海拔需在 -500 ~ 9000 米之间");
+        }
+        return value;
+    }
+
+    /** 面积为空表示未知；0 和负数没有意义，直接拒绝 */
+    private Double validateArea(Double value) {
+        if (value == null) return null;
+        if (!Double.isFinite(value) || value <= 0) {
+            throw new IllegalArgumentException("面积需大于 0");
+        }
+        if (value > 1_000_000) {
+            throw new IllegalArgumentException("面积过大，请确认单位是否为亩");
+        }
+        return round2(value);
+    }
+
+    private Long requireCrop(Long cropId) {
+        if (cropId == null) return null;
+        if (!cropInfoRepository.existsById(cropId)) {
+            throw new IllegalArgumentException("作物不存在");
+        }
+        return cropId;
+    }
+
+    private LocalDate parsePlantDate(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return LocalDate.parse(raw.trim());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("种植日期格式应为 YYYY-MM-DD");
+        }
+    }
+
+    private String normalizeSoil(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String value = raw.trim();
+        if (!SOIL_TYPES.contains(value)) {
+            throw new IllegalArgumentException("土壤类型不支持：" + value);
+        }
+        return value;
+    }
+
+    private String normalizeIrrigation(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String value = raw.trim();
+        if (!IRRIGATION_TYPES.contains(value)) {
+            throw new IllegalArgumentException("灌溉方式不支持：" + value);
+        }
+        return value;
+    }
+
+    // ---------------- 边界与面积 ----------------
+
+    /** 有边界时面积以服务端计算结果为准，避免手工面积与图形不一致 */
+    private void applyBoundaryArea(Farmland f) {
+        if (f.getBoundary() == null || f.getBoundary().isBlank()) return;
+        f.setAreaMu(areaFromBoundary(f.getBoundary()));
+    }
+
+    private Double areaFromBoundary(String boundaryJson) {
+        try {
+            List<Map<String, Object>> points = objectMapper.readValue(
+                    boundaryJson, new TypeReference<List<Map<String, Object>>>() {});
+            List<FarmlandGeometry.Point> polygon = new ArrayList<>(points.size());
+            for (Map<String, Object> point : points) {
+                polygon.add(new FarmlandGeometry.Point(
+                        ((Number) point.get("lat")).doubleValue(),
+                        ((Number) point.get("lng")).doubleValue()));
+            }
+            double areaMu = FarmlandGeometry.areaMu(polygon);
+            if (!Double.isFinite(areaMu) || areaMu < 0.01) {
+                throw new IllegalArgumentException("地块边界面积过小，请重新圈选");
+            }
+            return round2(areaMu);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("地块边界格式不正确");
+        }
+    }
+
+    private static double round2(double value) {
+        return Math.round(value * 100d) / 100d;
     }
 
     /**
-     * 边界支持传 JSON 字符串或数组；统一校验并归一为 [{lat,lng}] JSON 字符串。
+     * 边界支持传 JSON 字符串、数组或 JsonNode；统一校验并归一为 [{lat,lng}] JSON 字符串。
      * 只存 WGS84，显示时前端负责转 GCJ-02 叠到高德影像上。
      */
     private String normalizeBoundary(Object raw) {
         if (raw == null) return null;
 
         Object value = raw;
-        if (raw instanceof String s) {
+        if (raw instanceof JsonNode node) {
+            if (node.isNull()) return null;
+            if (node.isTextual()) {
+                String text = node.asText();
+                if (text.isBlank()) return null;
+                try {
+                    value = objectMapper.readValue(text, List.class);
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("地块边界格式不正确");
+                }
+            } else if (node.isArray()) {
+                value = objectMapper.convertValue(node, List.class);
+            } else {
+                throw new IllegalArgumentException("地块边界格式不正确");
+            }
+        } else if (raw instanceof String s) {
             if (s.isBlank()) return null;
             try {
                 value = objectMapper.readValue(s, List.class);
@@ -216,5 +352,30 @@ public class FarmlandController {
             throw new IllegalArgumentException("经度需在 -180 ~ 180 之间");
         }
         return v;
+    }
+
+    private String str(Map<String, Object> m, String k) {
+        Object v = m.get(k);
+        return v != null ? v.toString() : null;
+    }
+    private Double dbl(Map<String, Object> m, String k) {
+        Object v = m.get(k);
+        if (v == null) return null;
+        if (v instanceof Number) return ((Number) v).doubleValue();
+        try {
+            return Double.parseDouble(v.toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(k + " 格式不正确");
+        }
+    }
+    private Long lng(Map<String, Object> m, String k) {
+        Object v = m.get(k);
+        if (v == null) return null;
+        if (v instanceof Number) return ((Number) v).longValue();
+        try {
+            return Long.parseLong(v.toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(k + " 格式不正确");
+        }
     }
 }

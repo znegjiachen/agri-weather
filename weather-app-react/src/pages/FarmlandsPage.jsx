@@ -26,10 +26,13 @@ export default function FarmlandsPage() {
   // Modal state
   const [modal, setModal] = useState(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
 
+  // 未填写就保持空：不要用默认土壤/灌溉或 0 代替用户没填的数据
   const [form, setForm] = useState({
     fieldName: '', lat: '', lng: '', altitude: '', areaMu: '',
-    soilType: '壤土', cropId: '', plantDate: '', irrigationType: '滴灌',
+    soilType: '', cropId: '', plantDate: '', irrigationType: '',
   });
+  // 有边界的地块面积由服务端按多边形计算，不允许手工覆盖
+  const [editHasBoundary, setEditHasBoundary] = useState(false);
 
   const loadList = () => {
     setListLoading(true);
@@ -40,14 +43,22 @@ export default function FarmlandsPage() {
   };
 
   useEffect(() => {
-    loadList();
-    crops.list().then(setCropList).catch(() => {});
+    // 首次加载：初始 state 已是 loading，这里不再同步 setState
+    let alive = true;
+    farmlands.list()
+      .then((data) => { if (alive) { setList(data); setListLoading(false); } })
+      .catch((err) => {
+        if (alive) { setListError(err.message || '加载失败'); setListLoading(false); }
+      });
+    crops.list().then((data) => { if (alive) setCropList(data); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   const resetForm = () => {
     setForm({ fieldName: '', lat: '', lng: '', altitude: '', areaMu: '',
-      soilType: '壤土', cropId: '', plantDate: '', irrigationType: '滴灌' });
+      soilType: '', cropId: '', plantDate: '', irrigationType: '' });
     setEditId(null);
+    setEditHasBoundary(false);
     setShowForm(false);
     setError('');
   };
@@ -68,17 +79,21 @@ export default function FarmlandsPage() {
     }
 
     setLoading(true);
+    const numberOrNull = (value) => (String(value).trim() === '' ? null : Number(value));
     const body = {
-      fieldName: form.fieldName,
+      fieldName: form.fieldName.trim(),
       lat,
       lng,
-      altitude: parseFloat(form.altitude) || 0,
-      areaMu: parseFloat(form.areaMu) || 0,
-      soilType: form.soilType,
+      altitude: numberOrNull(form.altitude),
+      soilType: form.soilType || null,
       cropId: form.cropId ? parseInt(form.cropId) : null,
       plantDate: form.plantDate || null,
-      irrigationType: form.irrigationType,
+      irrigationType: form.irrigationType || null,
     };
+    // 有边界的地块面积由后端按边界计算，手工填的值没有意义
+    if (!editHasBoundary) {
+      body.areaMu = numberOrNull(form.areaMu);
+    }
     try {
       if (editId) await farmlands.update(editId, body);
       else await farmlands.create(body);
@@ -96,11 +111,14 @@ export default function FarmlandsPage() {
       fieldName: f.fieldName || '',
       lat: f.lat != null ? Number(f.lat).toFixed(2) : '',
       lng: f.lng != null ? Number(f.lng).toFixed(2) : '',
-      altitude: f.altitude?.toString() || '', areaMu: f.areaMu?.toString() || '',
-      soilType: f.soilType || '壤土', cropId: f.cropId?.toString() || '',
-      plantDate: f.plantDate || '', irrigationType: f.irrigationType || '滴灌',
+      altitude: f.altitude?.toString() || '',
+      // 历史数据里 0 亩其实是「未知」，编辑时按空值处理
+      areaMu: f.areaMu != null && Number(f.areaMu) > 0 ? String(f.areaMu) : '',
+      soilType: f.soilType || '', cropId: f.cropId?.toString() || '',
+      plantDate: f.plantDate || '', irrigationType: f.irrigationType || '',
     });
     setEditId(f.id);
+    setEditHasBoundary(!!f.boundary);
     setShowForm(true);
   };
 
@@ -174,16 +192,29 @@ export default function FarmlandsPage() {
               </div>
               <div className="form-row">
                 <label>海拔 (m)<input type="number" step="any" value={form.altitude} onChange={(e) => setForm({ ...form, altitude: e.target.value })} /></label>
-                <label>面积 (亩)<input type="number" step="any" value={form.areaMu} onChange={(e) => setForm({ ...form, areaMu: e.target.value })} /></label>
+                <label>
+                  面积 (亩){editHasBoundary ? '（由边界自动计算）' : ''}
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={form.areaMu}
+                    onChange={(e) => setForm({ ...form, areaMu: e.target.value })}
+                    disabled={editHasBoundary}
+                    placeholder={editHasBoundary ? '' : '不填表示未知'}
+                  />
+                </label>
               </div>
               <div className="form-row">
                 <label>土壤类型
                   <select value={form.soilType} onChange={(e) => setForm({ ...form, soilType: e.target.value })}>
+                    <option value="">未填写</option>
                     {SOIL_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label>灌溉方式
                   <select value={form.irrigationType} onChange={(e) => setForm({ ...form, irrigationType: e.target.value })}>
+                    <option value="">未填写</option>
                     {IRRIGATION_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
@@ -320,7 +351,11 @@ export default function FarmlandsPage() {
               </div>
               <div className="farmland-details">
                 <p>📍 {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)} {f.altitude ? `海拔${f.altitude}m` : ''}</p>
-                <p>📐 {f.areaMu} 亩 | 🪨 {f.soilType} | 💧 {f.irrigationType}</p>
+                <p>
+                  📐 {f.areaMu != null ? `${f.areaMu} 亩` : '面积未填'}
+                  {' | '}🪨 {f.soilType || '土壤未填'}
+                  {' | '}💧 {f.irrigationType || '灌溉未填'}
+                </p>
                 {f.plantDate && <p>🌱 播种：{f.plantDate}</p>}
               </div>
               <div className="farmland-actions">

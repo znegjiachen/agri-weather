@@ -106,10 +106,9 @@ export default function MapPage() {
         fieldName: newName.trim(),
         lat: roundCoord(center.lat, 2),
         lng: roundCoord(center.lng, 2),
-        altitude: 0,
-        areaMu: Number(polygonAreaMu(draft).toFixed(2)),
-        soilType: '壤土',
-        irrigationType: '滴灌',
+        altitude: null,
+        soilType: null,
+        irrigationType: null,
         cropId: newCropId ? Number(newCropId) : null,
         boundary: JSON.stringify(draft.map((p) => ({
           lat: roundCoord(p.lat, 6),
