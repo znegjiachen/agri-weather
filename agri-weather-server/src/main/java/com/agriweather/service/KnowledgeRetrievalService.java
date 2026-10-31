@@ -146,9 +146,6 @@ public class KnowledgeRetrievalService {
             }
             boolean vectorMatch = vectorScore >= 0.45;
 
-            double coverage = (double) matched / queryTerms.size();
-            if (matched < Math.min(2, queryTerms.size()) && coverage < 0.34 && !vectorMatch) continue;
-
             String title = titles.getOrDefault(chunk.getDocId(), "知识资料");
             // 标题命中更可信：按命中词的 IDF 加权，而不是只要命中一次就给固定分
             Map<String, Integer> titleCounts = ChineseTextTokenizer.termCounts(title.toLowerCase());
@@ -158,6 +155,14 @@ public class KnowledgeRetrievalService {
                     titleBonus += idfByTerm.get(term) * 1.8;
                 }
             }
+
+            double coverage = (double) matched / queryTerms.size();
+            // 短问句常带「什么时候」等噪声 bigram，覆盖 30% 即可召回；标题加分只影响排序
+            if (matched < Math.min(2, queryTerms.size()) && coverage < 0.30
+                    && !vectorMatch) {
+                continue;
+            }
+
             score += titleBonus;
             score += vectorScore * 4.0;
             if (normalizedQuery.length() >= 3 && chunk.getContent().toLowerCase().contains(normalizedQuery)) {
