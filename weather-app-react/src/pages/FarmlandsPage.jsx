@@ -353,7 +353,7 @@ export default function FarmlandsPage() {
                 <p>📍 {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)} {f.altitude ? `海拔${f.altitude}m` : ''}</p>
                 <p>
                   📐 {f.areaMu != null ? `${f.areaMu} 亩` : '面积未填'}
-                  {' | '}🪨 {f.soilType || '土壤未填'}
+                  {' | '}🧱 {f.soilType || '土壤未填'}
                   {' | '}💧 {f.irrigationType || '灌溉未填'}
                 </p>
                 {f.plantDate && <p>🌱 播种：{f.plantDate}</p>}
@@ -363,7 +363,7 @@ export default function FarmlandsPage() {
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>⚠️ 预警</button>
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>📋 农事</button>
                 <button className="btn-edit" onClick={() => handleEdit(f)}>✏️</button>
-                <button className="btn-del" onClick={() => handleDelete(f.id)}>🗑</button>
+                <button className="btn-del" onClick={() => handleDelete(f.id)} title="删除地块">🗑️</button>
               </div>
             </div>
           ))}

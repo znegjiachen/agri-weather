@@ -1675,6 +1675,8 @@ main {
 }
 
 .farmland-card {
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius-md);
   padding: 24px;
   animation: cardEnter 0.4s var(--ease-out-expo) both;
@@ -1692,17 +1694,23 @@ main {
 }
 
 .farmland-header h3 {
+  min-width: 0;
+  overflow: hidden;
   font-size: 1.1rem;
   color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .crop-badge {
+  flex: none;
   padding: 4px 12px;
   border-radius: 12px;
   background: rgba(102, 126, 234, 0.1);
   color: #667eea;
   font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .farmland-details p {
@@ -1713,18 +1721,28 @@ main {
 
 .farmland-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  /* 卡片高度不一致时，操作区统一贴底 */
+  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .btn-edit, .btn-del {
-  padding: 6px 14px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-sm);
   background: white;
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
