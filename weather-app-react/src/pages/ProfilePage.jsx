@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { auth } from '../api';
 import { useAuth } from '../context/AuthContext';
 
-const ROLE_LABEL = { FARMER: '农户', ADMIN: '管理员' };
-
 function notificationLabel(permission) {
   if (permission === 'granted') return '已开启 · 有新预警时提醒';
   if (permission === 'denied') return '已被浏览器禁用，请在浏览器设置中开启';
@@ -132,10 +130,6 @@ export default function ProfilePage() {
           <div className="profile-avatar">👨‍🌾</div>
           <div className="profile-hero-text">
             <h3 className="profile-name">{user?.username}</h3>
-            <p className="profile-role">
-              {ROLE_LABEL[user?.role] || user?.role || '农户'}
-              {user?.userId != null ? ` · ID ${user.userId}` : ''}
-            </p>
           </div>
         </div>
         <div className="profile-hero-chips">
