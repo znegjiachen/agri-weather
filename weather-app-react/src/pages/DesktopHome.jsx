@@ -325,7 +325,9 @@ export default function DesktopHome() {
               )}
               {selectedStage && <span className="dh-chip green">{selectedStage}</span>}
               <span className="dh-updated">
-                {selectedWeather ? '数据来源 Open-Meteo' : '天气待同步'}
+                {selectedWeather
+                  ? `数据来源 ${selectedWeather._source === 'qweather' ? '和风天气' : 'Open-Meteo'}`
+                  : '天气待同步'}
               </span>
             </div>
 

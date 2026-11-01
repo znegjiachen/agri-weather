@@ -15,6 +15,11 @@ public class WeatherProperties {
     /** 上游预报接口 */
     private String baseUrl = "https://api.open-meteo.com";
 
+    /** 备源：和风天气（国内数据源，需要 QWEATHER_API_KEY） */
+    private String fallbackBaseUrl = "https://devapi.qweather.com";
+
+    private String fallbackApiKey = "";
+
     /** 建连超时（毫秒）—— 不加超时会让请求无限挂起 */
     private int connectTimeoutMs = 3000;
 

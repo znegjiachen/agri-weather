@@ -105,6 +105,9 @@ app:
   # 天气外呼与缓存
   weather:
     base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}
+    # 国内备源：配置和风天气 Key 后，Open-Meteo 失败自动降级
+    fallback-base-url: ${QWEATHER_BASE_URL:https://devapi.qweather.com}
+    fallback-api-key: ${QWEATHER_API_KEY:}
     connect-timeout-ms: 3000
     read-timeout-ms: 8000
     cache-enabled: ${WEATHER_CACHE_ENABLED:true}

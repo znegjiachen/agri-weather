@@ -166,7 +166,9 @@ export default function AlertsPage() {
       <div className="alerts-head">
         <div>
           <h2 className="page-title">🔔 预警中心</h2>
-          <p className="page-subtitle">按未来 24 小时天气、作物阶段和地块作物自动检查</p>
+          <p className="page-subtitle">
+            按未来 24 小时天气、作物阶段和地块作物自动检查；预警由阈值推导，非官方发布，仅供参考
+          </p>
         </div>
         <div className="alerts-head-actions">
           {pushState === 'available' && (

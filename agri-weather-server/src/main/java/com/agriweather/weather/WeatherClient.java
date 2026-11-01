@@ -44,6 +44,7 @@ public class WeatherClient {
     private final ObjectMapper mapper;
     private final ObjectProvider<CacheManager> cacheManagerProvider;
     private final WeatherCacheMetrics metrics;
+    private final QWeatherFallbackClient fallbackClient;
 
     private volatile HttpClient http;
 
@@ -122,6 +123,25 @@ public class WeatherClient {
     }
 
     private Map<String, Object> callUpstream(WeatherCoord c) throws Exception {
+        try {
+            Map<String, Object> data = callOpenMeteo(c);
+            data.put("_source", "open-meteo");
+            return data;
+        } catch (Exception primary) {
+            if (fallbackClient.isConfigured()) {
+                try {
+                    log.warn("Open-Meteo 回源失败，切换和风天气备源 coord={}: {}", c.key(), primary.getMessage());
+                    return fallbackClient.fetch(c);
+                } catch (Exception fallback) {
+                    primary.addSuppressed(fallback);
+                    log.warn("和风天气备源也失败 coord={}: {}", c.key(), fallback.getMessage());
+                }
+            }
+            throw primary;
+        }
+    }
+
+    private Map<String, Object> callOpenMeteo(WeatherCoord c) throws Exception {
         String url = String.format(
                 Locale.ROOT,
                 "%s/v1/forecast?latitude=%s&longitude=%s"
