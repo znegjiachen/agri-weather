@@ -1,6 +1,7 @@
 package com.agriweather.service;
 
 import com.agriweather.entity.*;
+import com.agriweather.push.WebPushService;
 import com.agriweather.repository.*;
 import com.agriweather.weather.WeatherClient;
 import com.agriweather.weather.WeatherFetch;
@@ -24,6 +25,9 @@ public class FarmlandWeatherService {
 
     /** 外呼与缓存都收敛在这一层，本类不再直接碰 HTTP */
     private final WeatherClient weatherClient;
+
+    /** 新预警生成/级别变化时尽力推送，未配置 VAPID 时为空操作 */
+    private final WebPushService webPushService;
 
     /**
      * 取某地块的天气：先按经纬度拿（可跨地块共享的）预报，再叠加地块/作物元信息。
@@ -163,6 +167,7 @@ public class FarmlandWeatherService {
             }
         }
 
+        List<WeatherAlert> toNotify = new ArrayList<>();
         for (Map<String, Object> a : alerts) {
             String type = (String) a.get("type");
             String level = (String) a.get("level");
@@ -180,18 +185,34 @@ public class FarmlandWeatherService {
                 if (changed) {
                     existing.setIsRead(false);
                     existing.setIsHandled(false);
+                    toNotify.add(existing);
                 }
                 alertRepo.save(existing);
             } else {
-                alertRepo.save(WeatherAlert.builder()
+                WeatherAlert created = WeatherAlert.builder()
                         .userId(f.getUserId()).farmlandId(f.getId())
                         .alertType(type)
                         .alertLevel(level)
                         .alertContent(content)
                         .suggestion(suggestion)
                         .alertTime(LocalDateTime.now())
-                        .build());
+                        .build();
+                alertRepo.save(created);
+                toNotify.add(created);
             }
+        }
+
+        if (!toNotify.isEmpty()) {
+            WeatherAlert top = toNotify.stream()
+                    .max(Comparator.comparingInt(a -> alertLevelRank(a.getAlertLevel())))
+                    .orElse(toNotify.get(0));
+            String body = top.getAlertContent() == null ? "请打开预警中心查看" : top.getAlertContent();
+            if (body.length() > 120) body = body.substring(0, 120) + "…";
+            webPushService.notifyUserAsync(
+                    f.getUserId(),
+                    "农事预警 · " + f.getFieldName(),
+                    body,
+                    "/home/alerts");
         }
 
         // 追加历史预警。本次已经算出来的类型不再从库里补一遍 ——
@@ -217,6 +238,16 @@ public class FarmlandWeatherService {
         }
 
         return alerts;
+    }
+
+    private int alertLevelRank(String level) {
+        if (level == null) return 0;
+        return switch (level.toUpperCase(Locale.ROOT)) {
+            case "RED" -> 3;
+            case "ORANGE" -> 2;
+            case "YELLOW" -> 1;
+            default -> 0;
+        };
     }
 
     @SuppressWarnings("unchecked")

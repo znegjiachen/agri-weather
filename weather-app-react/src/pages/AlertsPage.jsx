@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { alerts } from '../api';
 import { formatCommunityTime } from '../utils/date';
 import { alertLevelMeta, alertTypeMeta } from '../utils/alertMeta';
+import { getPushStatus, enablePush } from '../utils/push';
 
 const FILTERS = [
   { key: 'ALL', label: '全部' },
@@ -18,9 +19,7 @@ export default function AlertsPage() {
   // 检查失败与加载失败分开：失败时不能把旧结果说成「状态正常」
   const [refreshError, setRefreshError] = useState('');
   const [markingId, setMarkingId] = useState(null);
-  const [notifyPermission, setNotifyPermission] = useState(() => (
-    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
-  ));
+  const [pushState, setPushState] = useState('loading');
 
   const notifyNewAlerts = (before, after) => {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -40,10 +39,21 @@ export default function AlertsPage() {
     }
   };
 
+  useEffect(() => {
+    let alive = true;
+    getPushStatus()
+      .then((status) => { if (alive) setPushState(status.state); })
+      .catch(() => { if (alive) setPushState('error'); });
+    return () => { alive = false; };
+  }, []);
+
   const enableNotifications = async () => {
-    if (typeof Notification === 'undefined') return;
-    const permission = await Notification.requestPermission();
-    setNotifyPermission(permission);
+    try {
+      await enablePush();
+      setPushState('subscribed');
+    } catch (e) {
+      setError(e.message || '开启推送失败');
+    }
   };
 
   /**
@@ -159,7 +169,7 @@ export default function AlertsPage() {
           <p className="page-subtitle">按未来 24 小时天气、作物阶段和地块作物自动检查</p>
         </div>
         <div className="alerts-head-actions">
-          {notifyPermission === 'default' && (
+          {pushState === 'available' && (
             <button type="button" className="btn-cancel" onClick={enableNotifications}>
               开启通知
             </button>

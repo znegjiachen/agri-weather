@@ -18,7 +18,7 @@
 | 🤖 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并实时展示每轮思考与工具调用轨迹 |
 | 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
-| 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害；后台每 30 分钟自动检查，移动端首页有入口与未读角标，应用打开期间可开启浏览器通知 |
+| 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害；后台每 30 分钟自动检查，支持 Web Push 后台推送（需 HTTPS + VAPID），移动端首页有入口与未读角标 |
 | 📍 地块管理 | 地块增删改查，绑定作物与种植日期 |
 | 🗺️ 地块地图 | 卫星底图圈地：点击边界点围成地块，自动计算亩数并保存，支持定位 |
 | 🌤️ 天气预报 | 逐小时 / 逐日预报、天气详情、单位切换 |
@@ -115,6 +115,8 @@ mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agen
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261101_agent_document_context.sql
 # 对话文档检索：上传切块建索引，提问时按问题注入片段
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261102_agent_document_rag.sql
+# Web Push：浏览器订阅表
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261103_web_push.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
@@ -178,6 +180,7 @@ cd weather-app-react && npm install && npm run dev
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
 | 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析并建索引，返回 `documentId`）· `GET /tools` · `GET /status` |
+| 推送 `/api/push` | `GET /public-key` · `POST /subscribe` · `DELETE /subscribe`（Web Push，需要 HTTPS） |
 | 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · 知识库 `/knowledge`（文本/文件/检索/重建向量） |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
@@ -207,6 +210,7 @@ cd weather-app-react && npm install && npm run dev
 | `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL` | 可选，OpenAI 兼容的语音识别服务（如 Whisper）；不配置时前端回退浏览器语音识别 |
 | `ASR_LANGUAGE` | 可选，识别语言，默认 `zh` |
 | `ALERT_REFRESH_INTERVAL_MS` | 可选，后台预警检查间隔，默认 1800000（30 分钟） |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | 可选，Web Push 后台推送；生成一次后固定使用，多实例共享。生成：`./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.agriweather.push.VapidKeyGenerator` |
 | `DOCUMENT_TTL_DAYS` / `DOCUMENT_MAX_CHUNKS` | 可选，对话文档保留天数（默认 7）与最多索引片段数（默认 120） |
 | `SERVER_PORT` | 后端端口，默认 8082 |
 

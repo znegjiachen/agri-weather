@@ -35,6 +35,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // 自定义 Web Push 事件处理（public/push-sw.js）
+        importScripts: ['push-sw.js'],
         navigateFallback: '/index.html',
         // 否则离线时 API 请求会拿到 index.html，前端 res.json() 直接崩
         navigateFallbackDenylist: [/^\/api\//, /^\/actuator\//],

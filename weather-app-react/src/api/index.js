@@ -86,6 +86,19 @@ export const alerts = {
   },
 };
 
+// Web Push
+export const push = {
+  publicKey: () => request('/api/push/public-key'),
+  subscribe: (body) => request('/api/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
+  unsubscribe: (endpoint) => request('/api/push/subscribe', {
+    method: 'DELETE',
+    body: JSON.stringify({ endpoint }),
+  }),
+};
+
 // Operations
 export const operations = {
   advice: (farmlandId, forecast) =>

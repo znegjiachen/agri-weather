@@ -24,6 +24,7 @@ import java.util.concurrent.Executors;
 @EnableConfigurationProperties({
         DeepSeekProperties.class, VisionProperties.class,
         EmbeddingProperties.class, AsrProperties.class, DocumentProperties.class,
+        com.agriweather.push.PushProperties.class,
 })
 public class AgentAutoConfiguration {
 

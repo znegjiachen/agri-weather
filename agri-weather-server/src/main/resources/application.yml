@@ -91,6 +91,12 @@ app:
     top-k: ${DOCUMENT_TOP_K:4}
     max-block-chars: ${DOCUMENT_MAX_BLOCK_CHARS:2400}
 
+  # Web Push（VAPID；不配置时关闭后台推送，不影响站内通知）
+  push:
+    public-key: ${VAPID_PUBLIC_KEY:}
+    private-key: ${VAPID_PRIVATE_KEY:}
+    subject: ${VAPID_SUBJECT:mailto:admin@example.com}
+
   # 后台定时生成地块预警（多实例用 Redis 锁互斥）
   alerts:
     refresh-initial-delay-ms: ${ALERT_REFRESH_INITIAL_DELAY_MS:120000}

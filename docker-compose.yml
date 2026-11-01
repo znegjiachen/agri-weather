@@ -60,6 +60,9 @@ services:
       dockerfile: Dockerfile
     container_name: agri-backend-1
     restart: always
+    # 把 .env 里的 AI / Embedding / ASR / VAPID 等密钥一起传进容器
+    env_file:
+      - .env
     environment:
       INSTANCE_ID: node-1
       SERVER_PORT: 8082
@@ -89,6 +92,8 @@ services:
       dockerfile: Dockerfile
     container_name: agri-backend-2
     restart: always
+    env_file:
+      - .env
     environment:
       INSTANCE_ID: node-2
       SERVER_PORT: 8082

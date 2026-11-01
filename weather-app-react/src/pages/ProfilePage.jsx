@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { auth } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { getPushStatus, enablePush, disablePush } from '../utils/push';
 
-function notificationLabel(permission) {
-  if (permission === 'granted') return '已开启 · 有新预警时提醒';
-  if (permission === 'denied') return '已被浏览器禁用，请在浏览器设置中开启';
-  if (permission === 'unsupported') return '当前浏览器不支持通知';
-  return '未开启 · 点击允许浏览器通知';
+function pushLabel(state) {
+  if (state === 'subscribed') return '已开启 · 新预警会推送到浏览器';
+  if (state === 'denied') return '已被浏览器禁用，请在浏览器设置中开启';
+  if (state === 'unsupported') return '当前浏览器不支持 Web Push';
+  if (state === 'server-disabled') return '服务端未配置 VAPID 密钥';
+  if (state === 'error') return '状态检查失败，点击重试';
+  if (state === 'loading') return '正在检查推送状态…';
+  return '未开启 · 点击订阅预警推送';
 }
 
 export default function ProfilePage() {
@@ -14,9 +18,7 @@ export default function ProfilePage() {
 
   const [sheet, setSheet] = useState(null); // profile | password
   const [pageNotice, setPageNotice] = useState('');
-  const [permission, setPermission] = useState(() => (
-    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
-  ));
+  const [pushStatus, setPushStatus] = useState({ state: 'loading' });
 
   const [profile, setProfile] = useState({
     phone: user?.phone || '',
@@ -43,6 +45,14 @@ export default function ProfilePage() {
     setPasswordState({ saving: false, message: '', error: '' });
   };
   const closeSheet = () => setSheet(null);
+
+  useEffect(() => {
+    let alive = true;
+    getPushStatus()
+      .then((status) => { if (alive) setPushStatus(status); })
+      .catch(() => { if (alive) setPushStatus({ state: 'error' }); });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     if (!sheet) return undefined;
@@ -97,19 +107,38 @@ export default function ProfilePage() {
     }
   };
 
-  const requestNotification = async () => {
-    if (typeof Notification === 'undefined') return;
-    if (Notification.permission === 'denied') {
+  const togglePush = async () => {
+    const state = pushStatus.state;
+    if (state === 'loading') return;
+
+    if (state === 'denied') {
       showNotice('通知已被浏览器禁用，请在浏览器设置中开启');
       return;
     }
-    if (Notification.permission === 'granted') {
-      showNotice('预警通知已开启');
+    if (state === 'server-disabled') {
+      showNotice('服务端尚未配置 VAPID 密钥，暂不能推送');
       return;
     }
-    const result = await Notification.requestPermission();
-    setPermission(result);
-    showNotice(result === 'granted' ? '预警通知已开启' : '未获得通知权限');
+    if (state === 'unsupported') {
+      showNotice('当前浏览器不支持 Web Push');
+      return;
+    }
+
+    setPushStatus({ state: 'loading' });
+    try {
+      if (state === 'subscribed') {
+        await disablePush();
+        setPushStatus({ state: 'available' });
+        showNotice('已关闭预警推送');
+      } else {
+        await enablePush();
+        setPushStatus({ state: 'subscribed' });
+        showNotice('已开启预警推送');
+      }
+    } catch (e) {
+      setPushStatus({ state: 'error' });
+      showNotice(e.message || '推送设置失败');
+    }
   };
 
   const handleLogout = () => {
@@ -159,13 +188,13 @@ export default function ProfilePage() {
           <span className="settings-row-arrow" aria-hidden>›</span>
         </button>
 
-        <button type="button" className="settings-row" onClick={requestNotification}>
+        <button type="button" className="settings-row" onClick={togglePush}>
           <span className="settings-row-icon" aria-hidden>🔔</span>
           <span className="settings-row-text">
             <b>预警通知</b>
-            <small>{notificationLabel(permission)}</small>
+            <small>{pushLabel(pushStatus.state)}</small>
           </span>
-          <span className={`settings-switch ${permission === 'granted' ? 'on' : ''}`} aria-hidden />
+          <span className={`settings-switch ${pushStatus.state === 'subscribed' ? 'on' : ''}`} aria-hidden />
         </button>
 
         <div className="settings-row static">
