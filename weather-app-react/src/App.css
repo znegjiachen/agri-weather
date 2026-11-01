@@ -5438,14 +5438,29 @@ main {
   min-width: 100%;
   width: max-content;
   max-width: min(320px, 74vw);
-  max-height: 280px;
+  /* 约 7 个地块后列表内滚动，避免下拉盖住整页 */
+  max-height: min(270px, 55vh);
   padding: 6px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.38) transparent;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 16px 36px rgba(31, 41, 80, 0.16);
   animation: dhMenuIn 0.14s ease-out;
+}
+
+.dh-field-menu::-webkit-scrollbar { width: 6px; }
+.dh-field-menu::-webkit-scrollbar-track { background: transparent; }
+.dh-field-menu::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(102, 126, 234, 0.3);
+}
+
+.dh-field-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.48);
 }
 
 @keyframes dhMenuIn {
