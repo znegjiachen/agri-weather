@@ -446,11 +446,13 @@ export default function DesktopHome() {
                   </div>
                   <div className="dh-field-foot">
                     {count > 0 ? (
-                      <span className="dh-status warn">⚠️ 今日 {count} 条预警</span>
+                      <span className="dh-status warn">⚠️ {count} 条预警</span>
                     ) : (
                       <span className="dh-status ok">适宜作业</span>
                     )}
-                    <span>{rain != null ? `24h 降水 ${Number(rain).toFixed(1)} mm` : '—'}</span>
+                    <span className="dh-field-rain">
+                      {rain != null ? `💧 ${Number(rain).toFixed(1)} mm` : '—'}
+                    </span>
                   </div>
                 </button>
               );
