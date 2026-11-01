@@ -668,7 +668,10 @@ export default function AgentStudioPage() {
                         <h3>知识文档</h3>
                         <p>每次提问会检索最相关的片段注入对话，回答下方会标注引用来源。</p>
                       </div>
-                      <span className="studio-doc-count">{docs === null ? '—' : docs.length} 篇</span>
+                      <span className="studio-doc-count">
+                        {docs === null ? '—' : `${docs.length} 篇`}
+                        {docs && docs.length > 7 ? ' · 可滚动' : ''}
+                      </span>
                     </div>
 
                     {docs === null ? (

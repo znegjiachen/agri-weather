@@ -7737,7 +7737,28 @@ body:has(.alerts-page) .subpage-bar { display: none; }
 .studio-dropzone b { font-size: 11px; font-weight: 500; }
 .studio-dropzone > span:last-child { color: var(--text-muted); font-size: 9px; }
 .studio-doc-count { color: var(--text-muted); font-size: 9.5px; white-space: nowrap; }
-.studio-doc-list { display: flex; flex-direction: column; }
+.studio-doc-list {
+  display: flex;
+  flex-direction: column;
+  /* 约 7 行的高度，超出后在列表内滚动，避免把整页撑长 */
+  max-height: 315px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.35) transparent;
+}
+
+.studio-doc-list::-webkit-scrollbar { width: 6px; }
+.studio-doc-list::-webkit-scrollbar-track { background: transparent; }
+.studio-doc-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(102, 126, 234, 0.28);
+}
+
+.studio-doc-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.45);
+}
 .studio-doc-row { display: flex; align-items: center; gap: 9px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
 .studio-doc-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .studio-doc-icon { display: grid; place-items: center; width: 29px; height: 29px; flex: none; border-radius: 7px; background: rgba(102, 126, 234, 0.07); font-size: 14px; }
