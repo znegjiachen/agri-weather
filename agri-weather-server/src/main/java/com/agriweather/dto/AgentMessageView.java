@@ -10,6 +10,8 @@ public record AgentMessageView(
         String role,
         String content,
         Map<String, Object> vision,
+        String documentName,
+        String documentContext,
         List<Map<String, Object>> toolCalls,
         List<Map<String, Object>> thoughts,
         List<Map<String, Object>> knowledgeUsed,

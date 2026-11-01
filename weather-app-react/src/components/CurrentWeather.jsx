@@ -1,9 +1,13 @@
 import { getWeatherInfo, formatTime, displayTemp } from '../utils/weatherCodes';
 
-export default function CurrentWeather({ data, cityName, isCelsius }) {
+export default function CurrentWeather({ data, cityName, isCelsius, updatedAt }) {
   const current = data.current;
   const daily = data.daily;
   const weatherInfo = getWeatherInfo(current.weather_code);
+  const observedAt = current.time ? new Date(current.time) : (updatedAt ? new Date(updatedAt) : null);
+  const updatedLabel = observedAt && !Number.isNaN(observedAt.getTime())
+    ? observedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   return (
     <div className="current-weather glass">
@@ -15,6 +19,7 @@ export default function CurrentWeather({ data, cityName, isCelsius }) {
           day: 'numeric',
           weekday: 'long',
         })}
+        {updatedLabel ? ` · ${updatedLabel} 观测` : ''}
       </p>
       <div className="weather-main">
         <div className="weather-icon">{weatherInfo.icon}</div>

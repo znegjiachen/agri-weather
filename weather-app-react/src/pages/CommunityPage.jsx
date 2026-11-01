@@ -13,6 +13,7 @@ const TABS = [
   { key: 'ALERT', label: '预警' },
 ];
 const MAX_TEXT = 2000;
+const PAGE_SIZE = 20;
 
 function plainText(html) {
   const doc = new DOMParser().parseFromString(html || '', 'text/html');
@@ -79,7 +80,10 @@ export default function CommunityPage() {
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
+  const cursorRef = useRef(null);
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -116,22 +120,46 @@ export default function CommunityPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ reset = true } = {}) => {
+    if (reset) {
+      cursorRef.current = null;
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      setPosts(await community.list(null, 20, {
+      const data = await community.list(reset ? null : cursorRef.current, PAGE_SIZE, {
         q: debouncedQuery,
         category: tab === 'ALL' ? null : tab,
-      }));
+      });
+      const items = Array.isArray(data) ? data : [];
+      setPosts((prev) => {
+        if (reset) return items;
+        const seen = new Set(prev.map((post) => post.id));
+        return [...prev, ...items.filter((post) => !seen.has(post.id))];
+      });
+      const last = items[items.length - 1];
+      cursorRef.current = last?.id ?? null;
+      setHasMore(items.length === PAGE_SIZE);
       setError('');
     } catch (e) {
       setError(e.message);
+      if (!reset) setHasMore(true);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [debouncedQuery, tab]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // 放进异步回调，避免在 effect 内同步 setState
+    let alive = true;
+    (async () => {
+      await Promise.resolve();
+      if (alive) await load({ reset: true });
+    })();
+    return () => { alive = false; };
+  }, [load]);
 
   const editorEmpty = editorState.textLength === 0 && editorState.imageCount === 0;
 
@@ -181,6 +209,7 @@ export default function CommunityPage() {
   };
 
   const removePost = async (post) => {
+    if (!window.confirm('删除后无法恢复，确定删除这条分享吗？')) return;
     try {
       await community.remove(post.id);
       setPosts((prev) => prev.filter((x) => x.id !== post.id));
@@ -289,8 +318,17 @@ export default function CommunityPage() {
       {!loading && posts.length === 0 && (
         <div className="glass section-card">
           <p className="empty-text">
-            {filtersActive ? '没有找到相关帖子' : '还没有帖子，来发第一条吧'}
+            {error
+              ? `加载失败：${error}`
+              : filtersActive
+                ? '没有找到相关帖子'
+                : '还没有帖子，来发第一条吧'}
           </p>
+          {error && (
+            <button type="button" className="btn-cancel" onClick={() => load({ reset: true })}>
+              重新加载
+            </button>
+          )}
         </div>
       )}
 
@@ -362,6 +400,19 @@ export default function CommunityPage() {
           </div>
         ))}
       </div>
+
+      {!loading && posts.length > 0 && hasMore && (
+        <div className="community-more">
+          <button
+            type="button"
+            className="btn-cancel"
+            onClick={() => load({ reset: false })}
+            disabled={loadingMore}
+          >
+            {loadingMore ? '加载中…' : '加载更多'}
+          </button>
+        </div>
+      )}
 
       {!composing && (
         <button

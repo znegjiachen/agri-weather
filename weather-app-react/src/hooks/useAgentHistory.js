@@ -7,6 +7,14 @@ function mapMessage(message) {
     role: message.role,
     content: message.content || '',
     vision: message.vision || null,
+    document: message.documentContext
+      ? {
+        filename: message.documentName || '上传的文档',
+        text: message.documentContext,
+        charCount: message.documentContext.length,
+        truncated: false,
+      }
+      : null,
     toolCalls: Array.isArray(message.toolCalls) ? message.toolCalls : [],
     thoughts: Array.isArray(message.thoughts) ? message.thoughts : [],
     knowledgeUsed: Array.isArray(message.knowledgeUsed) ? message.knowledgeUsed : [],
@@ -25,10 +33,12 @@ export function useAgentHistory(agentId) {
   const { messages, setMessages, clearMessages, markLoaded, isLoaded } = session;
   const requestedFor = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!agentId) return undefined;
-    if (requestedFor.current === agentId || isLoaded) return undefined;
+    if (attempt === 0 && (requestedFor.current === agentId || isLoaded)) return undefined;
     requestedFor.current = agentId;
     let alive = true;
     setLoading(true);
@@ -36,17 +46,26 @@ export function useAgentHistory(agentId) {
       .then((list) => {
         if (!alive) return;
         setMessages(Array.isArray(list) ? list.map(mapMessage) : []);
+        setError('');
       })
-      .catch(() => {})
+      .catch((err) => {
+        // 不要静默当成空会话，否则用户会以为历史记录丢了
+        if (alive) setError(err.message || '对话历史加载失败');
+      })
       .finally(() => {
         if (!alive) return;
         markLoaded();
         setLoading(false);
       });
     return () => { alive = false; };
-    // 只在智能体变化时拉取；setMessages 等来自 context，避免把 effect 变成循环
+    // 只在智能体变化或手动重试时拉取；setMessages 等来自 context，避免把 effect 变成循环
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId]);
+  }, [agentId, attempt]);
+
+  const retry = () => {
+    setError('');
+    setAttempt((value) => value + 1);
+  };
 
   const clearHistory = async () => {
     if (agentId) {
@@ -64,6 +83,8 @@ export function useAgentHistory(agentId) {
     setMessages,
     clearHistory,
     clearMessages,
+    error,
+    retry,
     loading: !!agentId && (loading || !isLoaded),
   };
 }

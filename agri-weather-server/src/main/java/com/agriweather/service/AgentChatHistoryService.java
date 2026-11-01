@@ -36,6 +36,7 @@ public class AgentChatHistoryService {
 
     @Transactional
     public void saveTurn(Long agentId, Long userId, String userContent, String visionJson,
+                         String documentName, String documentContext,
                          AgentResult result, List<KnowledgeRef> knowledgeUsed) {
         if (agentId == null || result == null) return;
         agentService.requireOwned(agentId, userId);
@@ -46,6 +47,8 @@ public class AgentChatHistoryService {
         user.setRole("user");
         user.setContent(userContent);
         user.setVision(normalizeJson(visionJson));
+        user.setDocumentName(documentName);
+        user.setDocumentContext(documentContext);
         user.setCreatedAt(LocalDateTime.now());
         repository.save(user);
 
@@ -75,6 +78,8 @@ public class AgentChatHistoryService {
                     message.getRole(),
                     message.getContent(),
                     parseObject(message.getVision()),
+                    message.getDocumentName(),
+                    message.getDocumentContext(),
                     parseList(message.getToolCalls()),
                     parseList(message.getThoughts()),
                     parseList(message.getKnowledgeUsed()),

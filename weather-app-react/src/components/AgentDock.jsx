@@ -60,6 +60,8 @@ export default function AgentDock() {
     setMessages,
     clearHistory,
     loading: historyLoading,
+    error: historyError,
+    retry: retryHistory,
   } = useAgentHistory(field?.agentId);
 
   const listRef = useRef(null);
@@ -67,6 +69,8 @@ export default function AgentDock() {
   const docInputRef = useRef(null);
   const attachmentsRef = useRef(attachments);
   const liveRef = useRef({ content: '', timer: null });
+  const abortRef = useRef(null);
+  const [statusError, setStatusError] = useState(false);
 
   const voice = useVoiceInput({
     asrConfigured: status?.asrConfigured,
@@ -81,12 +85,26 @@ export default function AgentDock() {
   useEffect(() => () => {
     attachmentsRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
     if (liveRef.current.timer) clearTimeout(liveRef.current.timer);
+    abortRef.current?.abort();
   }, []);
 
   useEffect(() => {
-    agentApi.status().then(setStatus).catch(() => setStatus({ configured: false }));
-    agentApi.tools().then((tools) => setToolCount(tools.length)).catch(() => {});
+    let alive = true;
+    agentApi.status()
+      .then((data) => { if (alive) { setStatus(data); setStatusError(false); } })
+      .catch(() => { if (alive) setStatusError(true); });
+    agentApi.tools().then((tools) => { if (alive) setToolCount(tools.length); }).catch(() => {});
+    return () => { alive = false; };
   }, []);
+
+  const retryStatus = () => {
+    setStatusError(false);
+    agentApi.status()
+      .then((data) => { setStatus(data); setStatusError(false); })
+      .catch(() => setStatusError(true));
+  };
+
+  const stopGeneration = () => abortRef.current?.abort();
 
   // 首页选中的地块作为对话上下文（仅本地，不上报）
   useEffect(() => {
@@ -191,18 +209,26 @@ export default function AgentDock() {
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
     const docForTurn = docAttachment;
-    const notConfigured = status && status.configured === false;
+    const notConfigured = !statusError && status && status.configured === false;
     if ((!content && files.length === 0 && !docForTurn) || loading || historyLoading || notConfigured) return;
 
     const question = content || (files.length > 0
       ? '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。'
       : '请阅读这份文档，提取与当前地块相关的农事建议。');
     // 和完整对话页保持一致：图片识别结果 / 文档名称随历史带上，后续追问仍能参考
+    const latestDoc = [...messages].reverse()
+      .find((m) => m.role === 'user' && m.document?.text);
     const history = messages
       .filter((m) => !m.streaming)
       .map((m) => {
         const parts = [];
-        if (m.role === 'user' && m.document) parts.push(`【用户上传了文档：${m.document.filename}】`);
+        if (m.role === 'user' && m.document) {
+          if (m === latestDoc) {
+            parts.push(`【此前上传的文档《${m.document.filename}》（节选，仅作资料）】\n${String(m.document.text).slice(0, 6000)}`);
+          } else {
+            parts.push(`【用户上传了文档：${m.document.filename}】`);
+          }
+        }
         if (m.role === 'user' && m.vision) {
           parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
         }
@@ -216,6 +242,8 @@ export default function AgentDock() {
     clearLive();
     setMessages((prev) => [...prev, { role: 'user', content: question, images: previews, document: docForTurn }]);
     setLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       let vision = null;
@@ -224,6 +252,9 @@ export default function AgentDock() {
       if (files.length > 0) {
         setAnalyzing(true);
         vision = await agentApi.vision(files, content);
+        if (controller.signal.aborted) {
+          throw new DOMException('用户已停止生成', 'AbortError');
+        }
         visionContext = formatVision(vision);
         setMessages((prev) => prev.map((m, index) => (
           index === prev.length - 1 ? { ...m, vision } : m
@@ -240,6 +271,7 @@ export default function AgentDock() {
       }]);
 
       const done = await agentApi.chatStream(question, history, visionContext, {
+        signal: controller.signal,
         onContentDelta: ({ delta }) => {
           liveRef.current.content += delta;
           scheduleFlush();
@@ -305,24 +337,50 @@ export default function AgentDock() {
         return next;
       });
     } catch (e) {
+      const aborted = e.name === 'AbortError' || controller.signal.aborted;
+      const partial = liveRef.current.content;
       clearLive();
-      setError(e.message || '调用失败');
-      setMessages((prev) => {
-        const next = [...prev];
-        if (next.length > 0 && next[next.length - 1].role === 'assistant'
-          && next[next.length - 1].streaming) {
-          next.pop();
+
+      if (aborted) {
+        setError('已停止生成');
+        setMessages((prev) => {
+          const next = [...prev];
+          if (next.length > 0 && next[next.length - 1].role === 'assistant'
+            && next[next.length - 1].streaming) {
+            if (partial.trim()) {
+              next[next.length - 1] = {
+                role: 'assistant',
+                content: `${partial.trim()}\n\n（已停止生成）`,
+                toolCalls: next[next.length - 1].toolCalls || [],
+                thoughts: next[next.length - 1].thoughts || [],
+                streaming: false,
+              };
+            } else {
+              next.pop();
+            }
+          }
+          return next;
+        });
+      } else {
+        setError(e.message || '调用失败');
+        setMessages((prev) => {
+          const next = [...prev];
+          if (next.length > 0 && next[next.length - 1].role === 'assistant'
+            && next[next.length - 1].streaming) {
+            next.pop();
+          }
+          if (next.length > 0 && next[next.length - 1].role === 'user') {
+            next.pop();
+          }
+          return next;
+        });
+        setInput(content);
+        if (files.length > 0) {
+          setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
         }
-        if (next.length > 0 && next[next.length - 1].role === 'user') {
-          next.pop();
-        }
-        return next;
-      });
-      setInput(content);
-      if (files.length > 0) {
-        setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
       }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       clearLive();
       setAnalyzing(false);
       setLoading(false);
@@ -390,6 +448,7 @@ export default function AgentDock() {
   };
 
   const clearChat = () => {
+    if (!window.confirm('清空后对话记录无法恢复，确定清空吗？')) return;
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
     setDocAttachment(null);
@@ -397,7 +456,7 @@ export default function AgentDock() {
     setError('');
   };
 
-  const notConfigured = status && status.configured === false;
+  const notConfigured = !statusError && status && status.configured === false;
   const canSend = !loading && !historyLoading && !notConfigured
     && (input.trim().length > 0 || attachments.length > 0 || !!docAttachment);
 
@@ -438,16 +497,23 @@ export default function AgentDock() {
             {field?.agentName || '助农手'}
             <span className="agent-dock-tag">AI</span>
           </div>
-          <div className={`agent-dock-status ${notConfigured ? 'off' : ''}`}>
+          <button
+            type="button"
+            className={`agent-dock-status ${notConfigured ? 'off' : ''} ${statusError ? 'error' : ''}`}
+            onClick={statusError ? retryStatus : undefined}
+            title={statusError ? '点击重新检查状态' : undefined}
+          >
             <span className="agent-dock-live" />
-            {notConfigured
-              ? '未启用 · 缺少 API Key'
-              : `在线 · 已接入 ${toolCount ?? 7} 项农事工具`}
-          </div>
+            {statusError
+              ? '状态获取失败 · 点击重试'
+              : notConfigured
+                ? '未启用 · 缺少 API Key'
+                : `在线 · 已接入 ${toolCount ?? 7} 项农事工具`}
+          </button>
         </div>
         {messages.length > 0 && (
-          <button type="button" className="agent-dock-icon" onClick={clearChat} title="清空对话">
-            🗑
+          <button type="button" className="agent-dock-icon" onClick={clearChat} title="清空对话" aria-label="清空对话">
+            🗑️
           </button>
         )}
         <button
@@ -455,6 +521,7 @@ export default function AgentDock() {
           className="agent-dock-icon"
           onClick={() => navigate(field?.agentId ? `/agent/chat?agentId=${field.agentId}` : '/agent/chat')}
           title="打开完整对话"
+          aria-label="打开完整对话"
         >
           ⤢
         </button>
@@ -463,6 +530,7 @@ export default function AgentDock() {
           className="agent-dock-icon"
           onClick={() => setCollapsed(true)}
           title="收起面板"
+          aria-label="收起面板"
         >
           ×
         </button>
@@ -473,6 +541,13 @@ export default function AgentDock() {
           <div className="agent-dock-context">
             📍 当前地块 · {field.name}
             {field.cropName ? ` ${field.cropName}` : ''}
+          </div>
+        )}
+
+        {historyError && (
+          <div className="agent-dock-warning" role="status">
+            对话历史加载失败：{historyError}
+            <button type="button" className="agent-dock-retry" onClick={retryHistory}>重试</button>
           </div>
         )}
 
@@ -599,6 +674,13 @@ export default function AgentDock() {
           </div>
         ))}
 
+        {statusError && (
+          <div className="agent-dock-warning">
+            无法获取助农手状态，可能是网络问题，仍可继续提问。
+            <button type="button" className="agent-dock-retry" onClick={retryStatus}>重试</button>
+          </div>
+        )}
+
         {notConfigured && (
           <div className="agent-dock-warning">
             助农手尚未启用：后端没有配置 <code>DEEPSEEK_API_KEY</code>。
@@ -654,6 +736,7 @@ export default function AgentDock() {
               onClick={() => fileInputRef.current?.click()}
               disabled={loading || historyLoading || notConfigured}
               title="上传作物照片"
+              aria-label="上传作物照片"
             >
               📎
             </button>
@@ -671,6 +754,7 @@ export default function AgentDock() {
               onClick={voice.toggle}
               disabled={loading || historyLoading || voice.processing || notConfigured}
               title={voice.recording ? '停止录音' : voice.processing ? '正在识别…' : '语音输入'}
+              aria-label={voice.recording ? '停止录音' : '语音输入'}
             >
               {voice.processing ? '⏳' : voice.recording ? '⏹' : '🎤'}
             </button>
@@ -680,6 +764,7 @@ export default function AgentDock() {
               onClick={() => docInputRef.current?.click()}
               disabled={loading || historyLoading || notConfigured || docLoading}
               title="上传文档（PDF / Word / TXT / Markdown）"
+              aria-label="上传文档"
             >
               📄
             </button>
@@ -690,12 +775,24 @@ export default function AgentDock() {
               hidden
               onChange={handleDocument}
             />
+            {loading && (
+              <button
+                type="button"
+                className="agent-dock-stop"
+                onClick={stopGeneration}
+                title="停止生成"
+                aria-label="停止生成"
+              >
+                ⏹
+              </button>
+            )}
             <button
               type="button"
               className="agent-dock-send"
               onClick={() => send()}
               disabled={!canSend}
               title="发送"
+              aria-label="发送"
             >
               {analyzing ? '识别中' : loading ? '…' : '↑'}
             </button>

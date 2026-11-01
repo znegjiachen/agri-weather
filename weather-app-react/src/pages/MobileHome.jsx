@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { alerts } from '../api';
 import HomeWeather from '../components/HomeWeather';
 
 const SLIDES = [
@@ -52,14 +53,34 @@ const AGENTS = [
 
 export default function MobileHome() {
   const [index, setIndex] = useState(0);
+  const [unread, setUnread] = useState(0);
+  const [paused, setPaused] = useState(false);
   const touchX = useRef(null);
 
   useEffect(() => {
+    let alive = true;
+    const loadUnread = () => {
+      alerts.unreadCount()
+        .then((count) => { if (alive) setUnread(Number(count) || 0); })
+        .catch(() => {});
+    };
+    loadUnread();
+    window.addEventListener('focus', loadUnread);
+    document.addEventListener('visibilitychange', loadUnread);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', loadUnread);
+      document.removeEventListener('visibilitychange', loadUnread);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (paused) return undefined;
     const timer = setInterval(() => {
       setIndex((i) => (i + 1) % SLIDES.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [paused]);
 
   const onTouchStart = (event) => {
     touchX.current = event.touches[0]?.clientX ?? null;
@@ -77,6 +98,18 @@ export default function MobileHome() {
   return (
     <div className="mobile-home">
       <HomeWeather />
+
+      <Link to="/home/alerts" className="mh-alert-banner">
+        <span className="mh-alert-icon" aria-hidden>🔔</span>
+        <span className="mh-alert-text">
+          <b>预警中心</b>
+          <small>{unread > 0 ? `${unread > 99 ? '99+' : unread} 条未读预警` : '查看地块气象预警'}</small>
+        </span>
+        {unread > 0 && (
+          <span className="mh-alert-badge">{unread > 99 ? '99+' : unread}</span>
+        )}
+        <span className="mh-alert-arrow" aria-hidden>›</span>
+      </Link>
 
       <div
         className="mh-carousel"
@@ -106,6 +139,14 @@ export default function MobileHome() {
             />
           ))}
         </div>
+        <button
+          type="button"
+          className="mh-carousel-pause"
+          onClick={() => setPaused((value) => !value)}
+          aria-label={paused ? '播放轮播' : '暂停轮播'}
+        >
+          {paused ? '▶' : '⏸'}
+        </button>
       </div>
 
       <Link to="/agent" className="mh-hero">

@@ -34,7 +34,14 @@ export default function CommunityPostPage() {
     }
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      await Promise.resolve();
+      if (alive) await load();
+    })();
+    return () => { alive = false; };
+  }, [load]);
 
   useEffect(() => {
     if (!preview) return undefined;

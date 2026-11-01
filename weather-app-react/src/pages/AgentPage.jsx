@@ -43,6 +43,8 @@ export default function AgentPage() {
     setMessages,
     clearHistory,
     loading: historyLoading,
+    error: historyError,
+    retry: retryHistory,
   } = useAgentHistory(selectedId);
 
   const [input, setInput] = useState('');
@@ -50,6 +52,7 @@ export default function AgentPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState(null);
+  const [statusError, setStatusError] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [docAttachment, setDocAttachment] = useState(null);
   const [docLoading, setDocLoading] = useState(false);
@@ -59,6 +62,7 @@ export default function AgentPage() {
   const fileInputRef = useRef(null);
   const docInputRef = useRef(null);
   const attachmentsRef = useRef(attachments);
+  const abortRef = useRef(null);
 
   const voice = useVoiceInput({
     asrConfigured: status?.asrConfigured,
@@ -72,23 +76,33 @@ export default function AgentPage() {
     attachmentsRef.current = attachments;
   }, [attachments]);
 
-  // 离开页面时只清理还没发出去的照片和流式缓冲
+  // 离开页面时清理照片、流式缓冲，并中止仍在进行的对话
   useEffect(() => () => {
     attachmentsRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
     if (liveRef.current.timer) clearTimeout(liveRef.current.timer);
+    abortRef.current?.abort();
   }, []);
 
   useEffect(() => {
-    agentApi.status()
-      .then(setStatus)
-      .catch(() => setStatus({ configured: false }));
-
     let alive = true;
+    agentApi.status()
+      .then((data) => { if (alive) { setStatus(data); setStatusError(false); } })
+      .catch(() => { if (alive) setStatusError(true); });
+
     agentsApi.list()
       .then((data) => { if (alive) setAgents(Array.isArray(data) ? data : []); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  const retryStatus = () => {
+    setStatusError(false);
+    agentApi.status()
+      .then((data) => { setStatus(data); setStatusError(false); })
+      .catch(() => setStatusError(true));
+  };
+
+  const stopGeneration = () => abortRef.current?.abort();
 
   // 首次进入 / 从其它 Tab 切回来 / 新消息到达时，直接定位到最新一条
   useLayoutEffect(() => {
@@ -158,9 +172,18 @@ export default function AgentPage() {
     setAttachments([]);
 
     // 历史里把之前的图片识别结果 / 文档名称带上，后续追问时模型仍能参考
+    // 只带最近一份文档的正文，避免每轮把历史里的所有长文档重复发给模型
+    const latestDoc = [...messages].reverse()
+      .find((m) => m.role === 'user' && m.document?.text);
     const history = messages.map((m) => {
       const parts = [];
-      if (m.role === 'user' && m.document) parts.push(`【用户上传了文档：${m.document.filename}】`);
+      if (m.role === 'user' && m.document) {
+        if (m === latestDoc) {
+          parts.push(`【此前上传的文档《${m.document.filename}》（节选，仅作资料）】\n${String(m.document.text).slice(0, 6000)}`);
+        } else {
+          parts.push(`【用户上传了文档：${m.document.filename}】`);
+        }
+      }
       if (m.role === 'user' && m.vision) {
         parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
       }
@@ -172,6 +195,8 @@ export default function AgentPage() {
     liveRef.current.round = null;
     setMessages((prev) => [...prev, { role: 'user', content: question, images: previews, document: docForTurn }]);
     setLoading(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       let vision = null;
@@ -180,6 +205,9 @@ export default function AgentPage() {
       if (files.length > 0) {
         setAnalyzing(true);
         vision = await agentApi.vision(files, content);
+        if (controller.signal.aborted) {
+          throw new DOMException('用户已停止生成', 'AbortError');
+        }
         visionContext = formatVision(vision);
         // 识别结果先挂到本轮用户消息上，用户能立刻看到
         setMessages((prev) => prev.map((m, index) => (
@@ -198,6 +226,7 @@ export default function AgentPage() {
       }]);
 
       const done = await agentApi.chatStream(question, history, visionContext, {
+        signal: controller.signal,
         onRound: ({ round }) => {
           clearLiveBuffer();
           liveRef.current.round = round;
@@ -289,25 +318,52 @@ export default function AgentPage() {
         return next;
       });
     } catch (e) {
+      const aborted = e.name === 'AbortError' || controller.signal.aborted;
+      const partial = liveRef.current.content;
       clearLiveBuffer();
-      setError(e.message || '调用失败');
-      // 失败时移除占位消息和本轮用户消息，保留输入与照片方便重试
-      setMessages((prev) => {
-        const next = [...prev];
-        if (next.length > 0 && next[next.length - 1].role === 'assistant'
-          && next[next.length - 1].streaming) {
-          next.pop();
+
+      if (aborted) {
+        // 用户主动停止：保留问题和已经生成的内容，不再恢复输入框
+        setError('已停止生成');
+        setMessages((prev) => {
+          const next = [...prev];
+          if (next.length > 0 && next[next.length - 1].role === 'assistant'
+            && next[next.length - 1].streaming) {
+            if (partial.trim()) {
+              next[next.length - 1] = {
+                role: 'assistant',
+                content: `${partial.trim()}\n\n（已停止生成）`,
+                thoughts: next[next.length - 1].thoughts || [],
+                toolCalls: next[next.length - 1].toolCalls || [],
+                streaming: false,
+              };
+            } else {
+              next.pop();
+            }
+          }
+          return next;
+        });
+      } else {
+        setError(e.message || '调用失败');
+        // 失败时移除占位消息和本轮用户消息，保留输入与照片方便重试
+        setMessages((prev) => {
+          const next = [...prev];
+          if (next.length > 0 && next[next.length - 1].role === 'assistant'
+            && next[next.length - 1].streaming) {
+            next.pop();
+          }
+          if (next.length > 0 && next[next.length - 1].role === 'user') {
+            next.pop();
+          }
+          return next;
+        });
+        setInput(content);
+        if (files.length > 0) {
+          setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
         }
-        if (next.length > 0 && next[next.length - 1].role === 'user') {
-          next.pop();
-        }
-        return next;
-      });
-      setInput(content);
-      if (files.length > 0) {
-        setAttachments(files.map((file, index) => ({ file, preview: previews[index] })));
       }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       clearLiveBuffer();
       setAnalyzing(false);
       setLoading(false);
@@ -385,6 +441,7 @@ export default function AgentPage() {
   };
 
   const clearChat = () => {
+    if (!window.confirm('清空后对话记录无法恢复，确定清空吗？')) return;
     clearLiveBuffer();
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
@@ -392,7 +449,7 @@ export default function AgentPage() {
     setError('');
   };
 
-  const notConfigured = status && status.configured === false;
+  const notConfigured = !statusError && status && status.configured === false;
   const canSend = !loading && !historyLoading && !notConfigured && (input.trim().length > 0 || attachments.length > 0 || !!docAttachment);
 
   return (
@@ -430,6 +487,18 @@ export default function AgentPage() {
         </div>
       </div>
 
+      {statusError && (
+        <div className="agent-warning">
+          <strong>⚠️ 无法获取助农手状态</strong>
+          <p>
+            可能是网络或服务暂时不可用，不影响继续提问。
+            <button type="button" className="btn-cancel" style={{ marginLeft: 8 }} onClick={retryStatus}>
+              重试
+            </button>
+          </p>
+        </div>
+      )}
+
       {notConfigured && (
         <div className="agent-warning">
           <strong>⚠️ 助农手尚未启用</strong>
@@ -443,6 +512,15 @@ export default function AgentPage() {
 
       <div className="agent-window glass">
         <div className="agent-messages" ref={listRef}>
+          {historyError && (
+            <div className="auth-notice" role="status" style={{ margin: '0 18px 8px' }}>
+              对话历史加载失败：{historyError}
+              <button type="button" className="btn-cancel" style={{ marginLeft: 8 }} onClick={retryHistory}>
+                重试
+              </button>
+            </div>
+          )}
+
           {messages.length === 0 && historyLoading && (
             <p className="empty-text">正在加载对话历史…</p>
           )}
@@ -654,6 +732,15 @@ export default function AgentPage() {
             onKeyDown={handleKeyDown}
             disabled={loading || historyLoading || notConfigured}
           />
+          {loading && (
+            <button
+              type="button"
+              className="btn-cancel agent-stop"
+              onClick={stopGeneration}
+            >
+              停止
+            </button>
+          )}
           <button
             className="btn-primary agent-send"
             onClick={() => send()}

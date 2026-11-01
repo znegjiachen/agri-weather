@@ -84,6 +84,11 @@ app:
     language: ${ASR_LANGUAGE:zh}
     timeout-seconds: ${ASR_TIMEOUT_SECONDS:60}
 
+  # 后台定时生成地块预警（多实例用 Redis 锁互斥）
+  alerts:
+    refresh-initial-delay-ms: ${ALERT_REFRESH_INITIAL_DELAY_MS:120000}
+    refresh-interval-ms: ${ALERT_REFRESH_INTERVAL_MS:1800000}
+
   # 天气外呼与缓存
   weather:
     base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}

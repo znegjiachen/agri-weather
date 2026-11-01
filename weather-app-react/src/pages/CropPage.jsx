@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { crops } from '../api';
 
 export default function CropPage() {
@@ -11,21 +11,107 @@ export default function CropPage() {
   const [rainfall, setRainfall] = useState(10);
   const [light, setLight] = useState(8);
 
-  useEffect(() => { crops.list().then(setCropList).catch(() => {}); }, []);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [stageError, setStageError] = useState('');
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState('');
+  const requestRef = useRef(0);
+
+  useEffect(() => {
+    let alive = true;
+    crops.list()
+      .then((data) => {
+        if (!alive) return;
+        setCropList(Array.isArray(data) ? data : []);
+        setLoadError('');
+      })
+      .catch((err) => {
+        if (alive) setLoadError(err.message || '作物列表加载失败');
+      })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [reloadKey]);
+
+  const retryLoad = () => {
+    setLoading(true);
+    setLoadError('');
+    setReloadKey((value) => value + 1);
+  };
 
   const selectCrop = async (crop) => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
     setSelected(crop);
-    const s = await crops.stages(crop.id).catch(() => []);
-    setStages(s);
+    setStages([]);
+    setStageError('');
+    try {
+      const data = await crops.stages(crop.id);
+      if (requestRef.current === requestId) setStages(Array.isArray(data) ? data : []);
+    } catch (err) {
+      if (requestRef.current === requestId) {
+        setStageError(err.message || '生长阶段加载失败');
+      }
+    }
   };
 
   const checkMatch = async () => {
     if (!selected) return;
-    const m = await crops.weatherMatch(selected.id, {
-      temp, humidity, rainfall, light,
-    }).catch(() => null);
-    setMatch(m);
+    const values = [temp, humidity, rainfall, light].map(Number);
+    if (values.some((value) => !Number.isFinite(value))) {
+      setMatchError('请填写有效的温度、湿度、降水和光照');
+      return;
+    }
+    if (values[1] < 0 || values[1] > 100) {
+      setMatchError('湿度需在 0 ~ 100% 之间');
+      return;
+    }
+    if (values[0] < -50 || values[0] > 60) {
+      setMatchError('温度需在 -50 ~ 60°C 之间');
+      return;
+    }
+    if (values[2] < 0 || values[3] < 0 || values[3] > 24) {
+      setMatchError('降水不能为负，光照需在 0 ~ 24 小时之间');
+      return;
+    }
+    setMatchLoading(true);
+    setMatchError('');
+    try {
+      const data = await crops.weatherMatch(selected.id, {
+        temp: values[0],
+        humidity: values[1],
+        rainfall: values[2],
+        light: values[3],
+      });
+      setMatch(data);
+    } catch (err) {
+      setMatchError(err.message || '检测失败，请稍后重试');
+    } finally {
+      setMatchLoading(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="crop-page">
+        <h2 className="page-title">🌱 作物气象适配</h2>
+        <p className="empty-text">正在加载作物数据…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="crop-page">
+        <h2 className="page-title">🌱 作物气象适配</h2>
+        <div className="glass section-card">
+          <p className="empty-text">作物数据加载失败：{loadError}</p>
+          <button type="button" className="btn-cancel" onClick={retryLoad}>重试</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="crop-page">
@@ -36,13 +122,14 @@ export default function CropPage() {
           <h3>选择作物</h3>
           <div className="crop-chips">
             {cropList.map((c) => (
-              <span
+              <button
+                type="button"
                 key={c.id}
                 className={`crop-chip ${selected?.id === c.id ? 'active' : ''}`}
                 onClick={() => selectCrop(c)}
               >
                 {c.cropName}
-              </span>
+              </button>
             ))}
           </div>
 
@@ -68,8 +155,12 @@ export default function CropPage() {
             <label>湿度 (%)<input type="number" value={humidity} onChange={(e) => setHumidity(+e.target.value)} /></label>
             <label>降水 (mm)<input type="number" value={rainfall} onChange={(e) => setRainfall(+e.target.value)} /></label>
             <label>光照 (h)<input type="number" value={light} onChange={(e) => setLight(+e.target.value)} /></label>
-            <button onClick={checkMatch} disabled={!selected}>检测适配度</button>
+            <button onClick={checkMatch} disabled={!selected || matchLoading}>
+              {matchLoading ? '检测中…' : '检测适配度'}
+            </button>
           </div>
+
+          {matchError && <div className="auth-error">{matchError}</div>}
 
           {match && (
             <div className={`match-result score-${match.finalScore >= 80 ? 'good' : match.finalScore >= 60 ? 'warn' : 'bad'}`}>
@@ -141,6 +232,12 @@ export default function CropPage() {
           )}
         </div>
       </div>
+
+      {stageError && (
+        <div className="glass section-card" style={{ marginTop: 16 }}>
+          <p className="empty-text">{stageError}</p>
+        </div>
+      )}
 
       {stages.length > 0 && (
         <div className="glass section-card" style={{ marginTop: 16 }}>

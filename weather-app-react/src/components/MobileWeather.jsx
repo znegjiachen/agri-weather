@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useWeather, { getSearchHistory } from '../hooks/useWeather';
+import useWeather, { defaultWeatherCity } from '../hooks/useWeather';
+import { useAuth } from '../context/AuthContext';
 import { getBackgroundClass, getWeatherInfo, getDayName } from '../utils/weatherCodes';
 
 function formatDate(dateStr) {
@@ -27,6 +28,7 @@ function aqiInfo(value) {
 /** 移动端天气页：参照深色天气卡片布局，数据与桌面端一致 */
 export default function MobileWeather() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     cityName,
     regionName,
@@ -35,6 +37,8 @@ export default function MobileWeather() {
     loading,
     error,
     history,
+    updatedAt,
+    locateMessage,
     searchCity,
     locateUser,
   } = useWeather();
@@ -43,8 +47,8 @@ export default function MobileWeather() {
   const [term, setTerm] = useState('');
 
   useEffect(() => {
-    searchCity(getSearchHistory()[0] || '北京');
-  }, [searchCity]);
+    searchCity(defaultWeatherCity(user?.region));
+  }, [searchCity, user?.region]);
 
   const current = weatherData?.current;
   const daily = weatherData?.daily;
@@ -107,6 +111,10 @@ export default function MobileWeather() {
   const info = current ? getWeatherInfo(current.weather_code) : null;
   const aqi = airQuality?.aqi ?? null;
   const air = aqiInfo(aqi);
+  const observedAt = current?.time ? new Date(current.time) : (updatedAt ? new Date(updatedAt) : null);
+  const observedLabel = observedAt && !Number.isNaN(observedAt.getTime())
+    ? observedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   const submitSearch = (value) => {
     const city = (value ?? term).trim();
@@ -169,6 +177,8 @@ export default function MobileWeather() {
           </div>
         )}
 
+        {locateMessage && <p className="wd-locate-msg" role="status">{locateMessage}</p>}
+
         {loading && <div className="wd-loading">正在获取天气…</div>}
 
         {error && !loading && (
@@ -187,6 +197,9 @@ export default function MobileWeather() {
                 <div className="wd-range">
                   最高 {today.high}° / 最低 {today.low}°
                 </div>
+                {observedLabel && (
+                  <div className="wd-updated">{observedLabel} 观测</div>
+                )}
               </div>
               <div className="wd-hero-side">
                 <div className="wd-icon">{info.icon}</div>

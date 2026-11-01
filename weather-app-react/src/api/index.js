@@ -36,6 +36,9 @@ async function request(path, options = {}) {
 export const auth = {
   register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  profile: () => request('/api/auth/profile'),
+  updateProfile: (body) => request('/api/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  changePassword: (body) => request('/api/auth/password', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
 // Crops
@@ -159,6 +162,8 @@ export const agent = {
     const token = getToken();
     const res = await fetch(`${BASE_URL}/api/agent/chat/stream`, {
       method: 'POST',
+      // 用户点击停止时 abort，后端会在 SSE 断开后取消本轮
+      signal: handlers.signal,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',

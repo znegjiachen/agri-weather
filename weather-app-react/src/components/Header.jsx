@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
-export default function Header({ onSearch, onLocate, history, onHistorySelect }) {
+export default function Header({
+  onSearch, onLocate, history, onHistorySelect, locateMessage,
+}) {
   const [inputValue, setInputValue] = useState('');
 
   const handleSearch = () => {
@@ -37,15 +39,17 @@ export default function Header({ onSearch, onLocate, history, onHistorySelect })
           📍 定位
         </button>
       </div>
+      {locateMessage && <p className="weather-locate-msg" role="status">{locateMessage}</p>}
       <div className="search-history">
         {history.map((city) => (
-          <span
+          <button
+            type="button"
             key={city}
             className="history-chip"
             onClick={() => handleHistoryClick(city)}
           >
             {city}
-          </span>
+          </button>
         ))}
       </div>
     </header>

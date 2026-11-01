@@ -6,8 +6,30 @@ const TYPE_NAMES = { INSECT: '🐛 虫害', FUNGUS: '🍄 病害' };
 export default function PestPage() {
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => { pests.list().then(setList).catch(() => {}); }, []);
+  useEffect(() => {
+    let alive = true;
+    pests.list()
+      .then((data) => {
+        if (!alive) return;
+        setList(Array.isArray(data) ? data : []);
+        setError('');
+      })
+      .catch((err) => {
+        if (alive) setError(err.message || '病虫害数据加载失败');
+      })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [reloadKey]);
+
+  const retry = () => {
+    setLoading(true);
+    setError('');
+    setReloadKey((value) => value + 1);
+  };
 
   const filtered = filter ? list.filter((p) => p.pestType === filter) : list;
 
@@ -20,6 +42,19 @@ export default function PestPage() {
         <button className={filter === 'INSECT' ? 'active' : ''} onClick={() => setFilter('INSECT')}>🐛 虫害</button>
         <button className={filter === 'FUNGUS' ? 'active' : ''} onClick={() => setFilter('FUNGUS')}>🍄 病害</button>
       </div>
+
+      {loading && <p className="empty-text">正在加载病虫害数据…</p>}
+
+      {!loading && error && (
+        <div className="glass section-card">
+          <p className="empty-text">{error}</p>
+          <button type="button" className="btn-cancel" onClick={retry}>重试</button>
+        </div>
+      )}
+
+      {!loading && !error && filtered.length === 0 && (
+        <p className="empty-text">{filter ? '当前分类下暂无数据' : '暂无病虫害数据'}</p>
+      )}
 
       <div className="pest-grid">
         {filtered.map((p) => (

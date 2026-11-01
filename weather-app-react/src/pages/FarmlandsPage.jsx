@@ -68,6 +68,26 @@ export default function FarmlandsPage() {
     setError('');
   };
 
+  // 弹窗打开时支持 Esc 关闭，并锁住背景滚动
+  useEffect(() => {
+    if (!showForm) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowForm(false);
+        setEditId(null);
+        setEditHasBoundary(false);
+        setError('');
+      }
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showForm]);
+
   /** 录入经纬度时按位置推荐土壤；用户手动选过就不再覆盖 */
   const updateCoordinate = (key, value) => {
     setForm((prev) => {
@@ -197,8 +217,13 @@ export default function FarmlandsPage() {
       {/* Add/Edit Form Modal */}
       {showForm && (
         <div className="form-overlay" onClick={(e) => { if (e.target === e.currentTarget) resetForm(); }}>
-          <div className="form-card glass-heavy">
-            <h3>{editId ? '编辑地块' : '添加地块'}</h3>
+          <div
+            className="form-card glass-heavy"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="farmland-form-title"
+          >
+            <h3 id="farmland-form-title">{editId ? '编辑地块' : '添加地块'}</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <label>地块名称 *
@@ -409,7 +434,15 @@ export default function FarmlandsPage() {
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>🌤️ 天气</button>
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>⚠️ 预警</button>
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>📋 农事</button>
-                <button className="btn-edit" onClick={() => handleEdit(f)}>✏️</button>
+                <button
+                  type="button"
+                  className="btn-edit"
+                  onClick={() => handleEdit(f)}
+                  title="编辑地块"
+                  aria-label={`编辑地块 ${f.fieldName}`}
+                >
+                  ✏️
+                </button>
                 <button className="btn-del" onClick={() => handleDelete(f.id)} title="删除地块">🗑️</button>
               </div>
             </div>

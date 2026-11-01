@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useWeather, { getSearchHistory } from '../hooks/useWeather';
+import useWeather, { defaultWeatherCity } from '../hooks/useWeather';
+import { useAuth } from '../context/AuthContext';
 import { getWeatherInfo } from '../utils/weatherCodes';
 
 /**
@@ -11,11 +12,12 @@ import { getWeatherInfo } from '../utils/weatherCodes';
  */
 export default function HomeWeather() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { cityName, weatherData, loading, error, searchCity } = useWeather();
 
   useEffect(() => {
-    searchCity(getSearchHistory()[0] || '北京');
-  }, [searchCity]);
+    searchCity(defaultWeatherCity(user?.region));
+  }, [searchCity, user?.region]);
 
   const current = weatherData?.current;
   const info = current ? getWeatherInfo(current.weather_code) : null;

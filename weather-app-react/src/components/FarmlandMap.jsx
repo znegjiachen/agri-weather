@@ -158,11 +158,13 @@ const FarmlandMap = forwardRef(function FarmlandMap({
 
     setTimeout(() => map.invalidateSize(), 200);
 
+    const markers = markersRef.current;
+    const polygons = polygonsRef.current;
     return () => {
       map.remove();
       mapRef.current = null;
-      markersRef.current.clear();
-      polygonsRef.current.clear();
+      markers?.clear();
+      polygons?.clear();
       userMarkerRef.current = null;
       hasFitRef.current = false;
     };

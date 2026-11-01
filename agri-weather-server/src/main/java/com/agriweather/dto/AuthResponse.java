@@ -10,4 +10,6 @@ public class AuthResponse {
     private String username;
     private String role;
     private Long userId;
+    private String phone;
+    private String region;
 }

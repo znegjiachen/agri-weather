@@ -2,6 +2,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import BottomTabBar from '../components/BottomTabBar';
 import AgentDock from '../components/AgentDock';
+import AlertNotifier from '../components/AlertNotifier';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { SUB_NAV } from '../nav';
 
@@ -23,6 +24,7 @@ export default function AppLayout() {
 
   return (
     <div className="app-layout">
+      <AlertNotifier />
       <Sidebar />
 
       <main className="main-content">

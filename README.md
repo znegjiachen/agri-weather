@@ -18,7 +18,7 @@
 | 🤖 助农手 | 多模态对话顾问。能看作物照片识别植物、生长阶段和病虫害，自主调用工具查询真实数据，并实时展示每轮思考与工具调用轨迹 |
 | 🌱 作物适配 | 34 种常见作物的知识库，含生长阶段划分与「当前天气是否适合该作物」的匹配度分析 |
 | 🐛 病虫害库 | 按类型检索病虫害，关联防治建议 |
-| 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害 |
+| 🔔 预警中心 | 对地块执行灾害检查：冻害、热害、涝害、大风、病虫害；后台每 30 分钟自动检查，移动端首页有入口与未读角标，应用打开期间可开启浏览器通知 |
 | 📍 地块管理 | 地块增删改查，绑定作物与种植日期 |
 | 🗺️ 地块地图 | 卫星底图圈地：点击边界点围成地块，自动计算亩数并保存，支持定位 |
 | 🌤️ 天气预报 | 逐小时 / 逐日预报、天气详情、单位切换 |
@@ -111,6 +111,9 @@ mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farm
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261026_more_crops.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261029_farmland_agents_knowledge.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
+# 对话内文档：历史保存文档名与正文，刷新后仍可继续追问
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261101_agent_document_context.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -166,7 +169,7 @@ cd weather-app-react && npm install && npm run dev
 
 | 分组 | 接口 |
 |---|---|
-| 认证 `/api/auth` | `POST /register` · `POST /login` |
+| 认证 `/api/auth` | `POST /register` · `POST /login` · `GET/PUT /profile`（资料）· `PUT /password`（修改密码） |
 | 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice`（创建/更新支持 `boundary` 边界数组） |
 | 作物 `/api/crops` | `GET /` · `GET /{id}` · `GET /search` · `GET /{id}/stages` · `GET /{id}/weather-match` · `GET /{id}/current-stage` |
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
@@ -201,6 +204,7 @@ cd weather-app-react && npm install && npm run dev
 | `VISION_MODEL` | 可选，默认 `deepseek-v4-flash-vision-exp` |
 | `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL` | 可选，OpenAI 兼容的语音识别服务（如 Whisper）；不配置时前端回退浏览器语音识别 |
 | `ASR_LANGUAGE` | 可选，识别语言，默认 `zh` |
+| `ALERT_REFRESH_INTERVAL_MS` | 可选，后台预警检查间隔，默认 1800000（30 分钟） |
 | `SERVER_PORT` | 后端端口，默认 8082 |
 
 **不要把密钥写进 `application.yml` 并提交**——该文件会进 Git。本地开发用环境变量注入。

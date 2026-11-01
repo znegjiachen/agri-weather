@@ -1,19 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /** 监听 CSS 媒体查询，用于同一路由按设备渲染两套布局 */
 export function useMediaQuery(query) {
-  const getMatches = () => (
-    typeof window !== 'undefined' && window.matchMedia(query).matches
-  );
-  const [matches, setMatches] = useState(getMatches);
-
-  useEffect(() => {
+  const subscribe = useCallback((onChange) => {
     const media = window.matchMedia(query);
-    const onChange = (event) => setMatches(event.matches);
-    setMatches(media.matches);
     media.addEventListener('change', onChange);
     return () => media.removeEventListener('change', onChange);
   }, [query]);
 
-  return matches;
+  const getSnapshot = useCallback(
+    () => (typeof window !== 'undefined' && window.matchMedia(query).matches),
+    [query],
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

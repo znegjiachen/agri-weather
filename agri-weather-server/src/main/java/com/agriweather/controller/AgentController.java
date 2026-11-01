@@ -341,7 +341,8 @@ public class AgentController {
                              AgentChatRequest body, AgentResult result) {
         try {
             historyService.saveTurn(prep.context().agentId(), userId, body.getMessage(),
-                    body.getVisionJson(), result, prep.knowledgeUsed());
+                    body.getVisionJson(), body.getDocumentName(), body.getDocumentContext(),
+                    result, prep.knowledgeUsed());
         } catch (Exception e) {
             log.warn("保存智能体对话历史失败: {}", e.getMessage());
         }

@@ -15,20 +15,73 @@ export default function AlertsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const [error, setError] = useState('');
+  // 检查失败与加载失败分开：失败时不能把旧结果说成「状态正常」
+  const [refreshError, setRefreshError] = useState('');
   const [markingId, setMarkingId] = useState(null);
+  const [notifyPermission, setNotifyPermission] = useState(() => (
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+  ));
 
-  const loadAlerts = useCallback(async ({ refresh = false, silent = false } = {}) => {
-    if (refresh) setRefreshing(true);
-    if (!silent) setLoading(true);
-    setError('');
+  const notifyNewAlerts = (before, after) => {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const beforeIds = new Set(before.map((a) => a.id));
+    const fresh = after.filter((a) => !a.isRead && !beforeIds.has(a.id));
+    if (fresh.length === 0) return;
+    const top = fresh.sort(
+      (a, b) => alertLevelMeta(b.alertLevel).rank - alertLevelMeta(a.alertLevel).rank,
+    )[0];
     try {
-      if (refresh) await alerts.refresh();
+      new Notification(`新的农事预警（${fresh.length} 条）`, {
+        body: `${top.farmlandName ? `${top.farmlandName} · ` : ''}${top.alertContent || '请打开预警中心查看'}`,
+        tag: 'agri-alert',
+      });
+    } catch {
+      // 浏览器不支持在页面内创建通知时忽略
+    }
+  };
+
+  const enableNotifications = async () => {
+    if (typeof Notification === 'undefined') return;
+    const permission = await Notification.requestPermission();
+    setNotifyPermission(permission);
+  };
+
+  /**
+   * 先展示已有预警，再尝试重新检查。
+   * 检查失败时保留旧数据并提示「以下为上次结果」，绝不显示「暂无预警，状态正常」。
+   */
+  const loadAlerts = useCallback(async ({ refresh = false, silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    if (refresh) setRefreshing(true);
+    setError('');
+    setRefreshError('');
+
+    let before = [];
+    try {
       const data = await alerts.list();
-      setList(Array.isArray(data) ? data : []);
+      before = Array.isArray(data) ? data : [];
+      setList(before);
     } catch (err) {
       setError(err.message || '加载失败，请确认已登录');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+
+    if (!refresh) {
+      setRefreshing(false);
+      return;
+    }
+
+    try {
+      await alerts.refresh();
+      const data = await alerts.list();
+      const after = Array.isArray(data) ? data : [];
+      setList(after);
+      setError('');
+      notifyNewAlerts(before, after);
+    } catch (err) {
+      setRefreshError(err.message || '本次检查失败，以下为上次结果');
+    } finally {
       setRefreshing(false);
     }
   }, []);
@@ -106,6 +159,11 @@ export default function AlertsPage() {
           <p className="page-subtitle">按未来 24 小时天气、作物阶段和地块作物自动检查</p>
         </div>
         <div className="alerts-head-actions">
+          {notifyPermission === 'default' && (
+            <button type="button" className="btn-cancel" onClick={enableNotifications}>
+              开启通知
+            </button>
+          )}
           {stats.unread > 0 && (
             <button type="button" className="btn-cancel" onClick={handleMarkAllRead} disabled={refreshing}>
               全部已读
@@ -157,22 +215,44 @@ export default function AlertsPage() {
           {error}
         </div>
       )}
+      {refreshError && list.length > 0 && (
+        <div className="auth-notice" role="status" style={{ marginBottom: 12 }}>
+          ⚠️ 本次检查失败，以下为上次结果：{refreshError}
+        </div>
+      )}
 
       {loading ? (
-        <p className="empty-text">正在检查地块预警…</p>
+        <p className="empty-text">正在加载预警…</p>
       ) : filtered.length === 0 ? (
         <div className="glass alerts-empty">
-          <p className="alerts-empty-icon">{list.length === 0 ? '✅' : '🔍'}</p>
-          <p>{list.length === 0 ? '暂无预警，地块状态正常' : '当前筛选下没有预警'}</p>
-          {list.length === 0 && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => loadAlerts({ refresh: true })}
-              disabled={refreshing}
-            >
-              {refreshing ? '检查中…' : '立即检查全部地块'}
-            </button>
+          {error || refreshError ? (
+            <>
+              <p className="alerts-empty-icon">⚠️</p>
+              <p>{refreshError || error}</p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => loadAlerts({ refresh: true })}
+                disabled={refreshing}
+              >
+                {refreshing ? '检查中…' : '重新检查'}
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="alerts-empty-icon">{list.length === 0 ? '✅' : '🔍'}</p>
+              <p>{list.length === 0 ? '暂无预警，地块状态正常' : '当前筛选下没有预警'}</p>
+              {list.length === 0 && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => loadAlerts({ refresh: true })}
+                  disabled={refreshing}
+                >
+                  {refreshing ? '检查中…' : '立即检查全部地块'}
+                </button>
+              )}
+            </>
           )}
         </div>
       ) : (

@@ -12,6 +12,31 @@ export function getSearchHistory() {
   }
 }
 
+/** 把「湖南省长沙市」之类的地区转成适合地名搜索的城市：长沙市 → 长沙 */
+export function regionToCity(region) {
+  if (!region) return '';
+  const cities = region.match(/[^省市县区]+市/g);
+  if (cities && cities.length > 0) return cities[cities.length - 1].replace(/市$/, '');
+  // 「湖南长沙」「新疆维吾尔自治区乌鲁木齐」这类没有“市”字的写法，取最后一个行政区片段
+  const parts = region
+    .replace(/(省|自治区|特别行政区)/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : region.trim();
+}
+
+/**
+ * 上次搜索的城市优先；如果只是默认的北京，则用账号地区；
+ * 都没有才回落到北京。
+ */
+export function defaultWeatherCity(region) {
+  const history = getSearchHistory();
+  const regionCity = regionToCity(region);
+  if (regionCity && (!history[0] || history[0] === '北京')) return regionCity;
+  return history[0] || regionCity || '北京';
+}
+
 function saveSearchHistory(city) {
   if (!city || city === '当前位置') return;
   let history = getSearchHistory();
@@ -92,6 +117,9 @@ export default function useWeather() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [history, setHistory] = useState(getSearchHistory);
+  const [updatedAt, setUpdatedAt] = useState(null);
+  // 定位失败用页面内提示，不再用阻塞式 alert
+  const [locateMessage, setLocateMessage] = useState('');
 
   const fetchWeather = useCallback(async (lat, lon, city, region = '') => {
     setLoading(true);
@@ -107,6 +135,7 @@ export default function useWeather() {
       setAirQuality(air);
       setCityName(city);
       setRegionName(region);
+      setUpdatedAt(Date.now());
       saveSearchHistory(city);
       setHistory(getSearchHistory());
     } catch (err) {
@@ -155,10 +184,11 @@ export default function useWeather() {
 
   const locateUser = useCallback(async () => {
     if (!navigator.geolocation) {
-      alert('您的浏览器不支持地理定位');
+      setLocateMessage('当前浏览器不支持定位，请手动搜索城市');
       return;
     }
 
+    setLocateMessage('');
     setLoading(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -168,7 +198,7 @@ export default function useWeather() {
         await fetchWeather(lat, lon, city, region);
       },
       () => {
-        alert('无法获取您的位置，请检查定位权限后重试');
+        setLocateMessage('无法获取位置，请检查定位权限后重试，或手动搜索城市');
         setLoading(false);
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
@@ -183,6 +213,8 @@ export default function useWeather() {
     loading,
     error,
     history,
+    updatedAt,
+    locateMessage,
     searchCity,
     locateUser,
     setError,

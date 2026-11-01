@@ -484,6 +484,8 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     role VARCHAR(20) NOT NULL,
     content MEDIUMTEXT,
     vision MEDIUMTEXT COMMENT '图片识别结果 JSON',
+    document_name VARCHAR(255) COMMENT '本轮上传的文档名',
+    document_context MEDIUMTEXT COMMENT '本轮上传的文档正文，用于刷新后继续追问',
     tool_calls MEDIUMTEXT COMMENT '工具调用轨迹 JSON',
     thoughts MEDIUMTEXT COMMENT '模型思考 JSON',
     knowledge_used MEDIUMTEXT COMMENT '引用知识 JSON',
