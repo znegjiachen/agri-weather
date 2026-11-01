@@ -215,19 +215,13 @@ export default function AgentDock() {
     const question = content || (files.length > 0
       ? '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。'
       : '请阅读这份文档，提取与当前地块相关的农事建议。');
-    // 和完整对话页保持一致：图片识别结果 / 文档名称随历史带上，后续追问仍能参考
-    const latestDoc = [...messages].reverse()
-      .find((m) => m.role === 'user' && m.document?.text);
+    // 历史里只保留文档名；当前引用的文档通过 documentId 走后端检索
     const history = messages
       .filter((m) => !m.streaming)
       .map((m) => {
         const parts = [];
         if (m.role === 'user' && m.document) {
-          if (m === latestDoc) {
-            parts.push(`【此前上传的文档《${m.document.filename}》（节选，仅作资料）】\n${String(m.document.text).slice(0, 6000)}`);
-          } else {
-            parts.push(`【用户上传了文档：${m.document.filename}】`);
-          }
+          parts.push(`【用户上传了文档：${m.document.filename}】`);
         }
         if (m.role === 'user' && m.vision) {
           parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
@@ -312,10 +306,10 @@ export default function AgentDock() {
         agentId: field?.agentId,
         farmlandId: field?.id,
         visionJson: vision ? JSON.stringify(vision) : null,
+        documentId: docForTurn?.documentId,
         documentName: docForTurn?.filename,
-        documentContext: docForTurn?.text,
+        documentContext: docForTurn?.documentId ? undefined : docForTurn?.text,
       });
-      setDocAttachment(null);
 
       clearLive();
       setMessages((prev) => {
@@ -427,9 +421,11 @@ export default function AgentDock() {
     try {
       const data = await agentApi.document(file);
       setDocAttachment({
-        filename: file.name,
-        text: data.text,
+        documentId: data.id,
+        filename: data.filename || file.name,
+        preview: data.preview || '',
         charCount: data.charCount,
+        chunkCount: data.chunkCount,
         truncated: data.truncated,
       });
     } catch (e) {
@@ -691,10 +687,11 @@ export default function AgentDock() {
       {error && <div className="agent-dock-error">{error}</div>}
 
       {docAttachment && (
-        <div className="agent-dock-doc">
+        <div className="agent-dock-doc" title={docAttachment.preview || ''}>
           <span>📄 {docAttachment.filename}</span>
           <small>
-            {docAttachment.charCount} 字{docAttachment.truncated ? ' · 已截断' : ''}
+            {docAttachment.charCount} 字 · {docAttachment.chunkCount ?? 0} 段
+            {docAttachment.truncated ? ' · 部分索引' : ''}
           </small>
           <button type="button" onClick={() => setDocAttachment(null)} aria-label="移除文档">×</button>
         </div>

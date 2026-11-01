@@ -84,6 +84,13 @@ app:
     language: ${ASR_LANGUAGE:zh}
     timeout-seconds: ${ASR_TIMEOUT_SECONDS:60}
 
+  # 对话内文档检索：上传切块建索引，提问时只注入相关片段
+  document:
+    ttl-days: ${DOCUMENT_TTL_DAYS:7}
+    max-chunks: ${DOCUMENT_MAX_CHUNKS:120}
+    top-k: ${DOCUMENT_TOP_K:4}
+    max-block-chars: ${DOCUMENT_MAX_BLOCK_CHARS:2400}
+
   # 后台定时生成地块预警（多实例用 Redis 锁互斥）
   alerts:
     refresh-initial-delay-ms: ${ALERT_REFRESH_INITIAL_DELAY_MS:120000}

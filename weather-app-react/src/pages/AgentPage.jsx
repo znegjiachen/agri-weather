@@ -171,18 +171,11 @@ export default function AgentPage() {
     setInput('');
     setAttachments([]);
 
-    // 历史里把之前的图片识别结果 / 文档名称带上，后续追问时模型仍能参考
-    // 只带最近一份文档的正文，避免每轮把历史里的所有长文档重复发给模型
-    const latestDoc = [...messages].reverse()
-      .find((m) => m.role === 'user' && m.document?.text);
+    // 历史里只保留文档名；当前引用的文档通过 documentId 走后端检索
     const history = messages.map((m) => {
       const parts = [];
       if (m.role === 'user' && m.document) {
-        if (m === latestDoc) {
-          parts.push(`【此前上传的文档《${m.document.filename}》（节选，仅作资料）】\n${String(m.document.text).slice(0, 6000)}`);
-        } else {
-          parts.push(`【用户上传了文档：${m.document.filename}】`);
-        }
+        parts.push(`【用户上传了文档：${m.document.filename}】`);
       }
       if (m.role === 'user' && m.vision) {
         parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
@@ -291,10 +284,11 @@ export default function AgentPage() {
         agentId: selectedId,
         farmlandId: selectedAgent?.farmlandId,
         visionJson: vision ? JSON.stringify(vision) : null,
+        documentId: docForTurn?.documentId,
         documentName: docForTurn?.filename,
-        documentContext: docForTurn?.text,
+        // 兼容旧附件数据；新链路只传 documentId
+        documentContext: docForTurn?.documentId ? undefined : docForTurn?.text,
       });
-      setDocAttachment(null);
 
       clearLiveBuffer();
       setLoading(false);
@@ -413,9 +407,11 @@ export default function AgentPage() {
     try {
       const data = await agentApi.document(file);
       setDocAttachment({
-        filename: file.name,
-        text: data.text,
+        documentId: data.id,
+        filename: data.filename || file.name,
+        preview: data.preview || '',
         charCount: data.charCount,
+        chunkCount: data.chunkCount,
         truncated: data.truncated,
       });
     } catch (e) {
@@ -645,11 +641,12 @@ export default function AgentPage() {
         )}
 
         {docAttachment && (
-          <div className="agent-doc-attachment">
+          <div className="agent-doc-attachment" title={docAttachment.preview || ''}>
             <span>📄 {docAttachment.filename}</span>
             <small>
-              {docAttachment.charCount} 字
-              {docAttachment.truncated ? ' · 已截断' : ''}
+              {docAttachment.charCount} 字 · {docAttachment.chunkCount ?? 0} 个片段
+              {docAttachment.truncated ? ' · 仅索引前部' : ''}
+              {' · 后续提问会参考'}
             </small>
             <button type="button" onClick={() => setDocAttachment(null)} aria-label="移除文档">×</button>
           </div>

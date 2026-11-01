@@ -41,7 +41,7 @@
 
 **语音提问**：输入框右侧的 🎤 按钮支持录音转文字，田间不方便打字时直接说话即可。配置 `ASR_*` 后由后端调用 Whisper / 兼容的 `/audio/transcriptions`；未配置时自动回退到浏览器语音识别（Chrome / Edge），两种方式都不可用时会给出明确提示。
 
-**对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB），复用知识库的文档解析器提取正文，作为本轮对话资料注入（不落库、不进知识库），适合「帮我看一下这份种植方案」这类需求。文档内容按资料处理，提示词里明确要求模型不执行文档中的指令。
+**对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB）。上传时复用知识库解析器切块并建立向量索引，提问时按问题检索相关片段注入，不再截断整篇正文；文档保留 7 天后自动清理，不进入知识库。附件会持续作为后续提问的参考资料，点 × 可解除。适合「帮我看一下这份种植方案」这类需求，长文档也不会丢内容。
 
 可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
 
@@ -113,6 +113,8 @@ mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261029_farm
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 # 对话内文档：历史保存文档名与正文，刷新后仍可继续追问
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261101_agent_document_context.sql
+# 对话文档检索：上传切块建索引，提问时按问题注入片段
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261102_agent_document_rag.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
@@ -175,7 +177,7 @@ cd weather-app-react && npm install && npm run dev
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
-| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析）· `GET /tools` · `GET /status` |
+| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析并建索引，返回 `documentId`）· `GET /tools` · `GET /status` |
 | 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · 知识库 `/knowledge`（文本/文件/检索/重建向量） |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
@@ -205,6 +207,7 @@ cd weather-app-react && npm install && npm run dev
 | `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL` | 可选，OpenAI 兼容的语音识别服务（如 Whisper）；不配置时前端回退浏览器语音识别 |
 | `ASR_LANGUAGE` | 可选，识别语言，默认 `zh` |
 | `ALERT_REFRESH_INTERVAL_MS` | 可选，后台预警检查间隔，默认 1800000（30 分钟） |
+| `DOCUMENT_TTL_DAYS` / `DOCUMENT_MAX_CHUNKS` | 可选，对话文档保留天数（默认 7）与最多索引片段数（默认 120） |
 | `SERVER_PORT` | 后端端口，默认 8082 |
 
 **不要把密钥写进 `application.yml` 并提交**——该文件会进 Git。本地开发用环境变量注入。

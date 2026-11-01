@@ -7,11 +7,12 @@ function mapMessage(message) {
     role: message.role,
     content: message.content || '',
     vision: message.vision || null,
-    document: message.documentContext
+    document: (message.documentId || message.documentContext)
       ? {
+        documentId: message.documentId || null,
         filename: message.documentName || '上传的文档',
-        text: message.documentContext,
-        charCount: message.documentContext.length,
+        text: message.documentContext || '',
+        charCount: message.documentContext?.length || 0,
         truncated: false,
       }
       : null,

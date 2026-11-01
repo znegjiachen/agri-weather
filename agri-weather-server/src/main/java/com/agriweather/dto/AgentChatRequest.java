@@ -25,6 +25,9 @@ public class AgentChatRequest {
     @Size(max = 20000, message = "图片识别结果过长")
     private String visionJson;
 
+    /** 对话内文档 ID；上传接口返回，后续追问可继续引用（可选） */
+    private Long documentId;
+
     /** 用户在对话里上传的文档名称（可选） */
     @Size(max = 255, message = "文档名称过长")
     private String documentName;

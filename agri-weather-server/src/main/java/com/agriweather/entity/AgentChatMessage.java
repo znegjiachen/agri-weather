@@ -32,7 +32,10 @@ public class AgentChatMessage {
     @Column(columnDefinition = "MEDIUMTEXT")
     private String vision;
 
-    /** 用户本轮上传的文档名与正文，用于刷新后继续追问 */
+    /** 用户本轮上传的文档 ID / 名称 / 旧版正文 */
+    @Column(name = "document_id")
+    private Long documentId;
+
     @Column(name = "document_name", length = 255)
     private String documentName;
 
