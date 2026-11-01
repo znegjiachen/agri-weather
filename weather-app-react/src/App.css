@@ -2523,77 +2523,136 @@ main {
    ============================================================ */
 
 .profile-page {
-  max-width: 920px;
+  max-width: 960px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  align-items: start;
-  gap: 16px;
-  width: 100%;
-}
-
-.profile-col {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-width: 0;
+  gap: 18px;
+  width: 100%;
+  padding-bottom: 28px;
 }
 
-@media (max-width: 900px) {
-  .profile-page { grid-template-columns: 1fr; }
+/* 顶部账号概览：头像、身份、联系方式与退出登录 */
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 22px 24px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(238, 242, 255, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 30px rgba(31, 41, 80, 0.08);
 }
 
-.profile-card {
-  padding: 28px 24px;
-  text-align: center;
-  border-radius: var(--radius-lg);
+.profile-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 220px;
 }
 
-.profile-avatar { font-size: 52px; line-height: 1; }
+.profile-avatar {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  font-size: 36px;
+  line-height: 1;
+  background: linear-gradient(135deg, #eef4ff, #dfe8ff);
+  border: 1px solid rgba(102, 126, 234, 0.18);
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.8);
+}
+
+.profile-hero-text { min-width: 0; }
 
 .profile-name {
-  margin: 10px 0 2px;
-  font-size: 1.3rem;
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
 .profile-role {
+  margin-top: 4px;
   color: var(--text-muted);
-  font-size: 13px;
-  margin-bottom: 20px;
+  font-size: 12.5px;
 }
 
-.profile-rows {
-  text-align: left;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.profile-row {
+.profile-hero-chips {
   display: flex;
-  justify-content: space-between;
-  padding: 12px 0;
-  font-size: 14px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  color: var(--text-primary);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.profile-row span:first-child { color: var(--text-muted); }
+.profile-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(102, 126, 234, 0.14);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
 
-.profile-logout { margin-top: 20px; }
+.profile-logout-btn {
+  padding: 8px 15px;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #dc2626;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
 
-.profile-section {
+.profile-logout-btn:hover { background: rgba(239, 68, 68, 0.08); }
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 18px;
+}
+
+.profile-panel {
   padding: 22px 24px;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   text-align: left;
 }
 
-.profile-section h3 {
+.profile-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.profile-panel-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 10px;
+  background: rgba(102, 126, 234, 0.12);
+  font-size: 17px;
+}
+
+.profile-panel-head h3 {
+  margin: 0;
   color: var(--text-primary);
   font-size: 15px;
 }
 
-.profile-section-sub {
-  margin: 4px 0 14px;
+.profile-panel-head p {
+  margin-top: 3px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -2601,17 +2660,13 @@ main {
 .profile-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .profile-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-}
-
-@media (max-width: 560px) {
-  .profile-form-grid { grid-template-columns: 1fr; }
 }
 
 .profile-form label {
@@ -2623,32 +2678,49 @@ main {
 .profile-form input {
   display: block;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 5px;
   padding: 9px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
+  border: 1px solid rgba(31, 41, 80, 0.1);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text-primary);
+  font-size: 13.5px;
   outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.profile-form input:focus { border-color: #667eea; }
+.profile-form input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
+}
 
 .profile-form button {
   align-self: flex-start;
-  margin-top: 4px;
-  padding: 8px 18px;
+  margin-top: 2px;
+  padding: 9px 20px;
+  border-radius: 10px;
   font-size: 13px;
 }
 
-.profile-about {
-  padding: 20px 24px;
-  border-radius: var(--radius-lg);
+.profile-about-line {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
 }
 
-.profile-about h3 { margin-bottom: 8px; color: var(--text-primary); }
-.profile-about p { color: var(--text-secondary); font-size: 13px; }
-.profile-version { color: var(--text-muted) !important; font-size: 12px !important; margin-top: 6px; }
+@media (max-width: 900px) {
+  .profile-grid { grid-template-columns: 1fr; }
+  .profile-hero-chips { margin-left: 0; width: 100%; }
+  .profile-logout-btn { margin-left: auto; }
+}
+
+@media (max-width: 560px) {
+  .profile-form-grid { grid-template-columns: 1fr; }
+  .profile-hero { padding: 18px; }
+  .profile-avatar { width: 54px; height: 54px; font-size: 30px; }
+  .profile-name { font-size: 19px; }
+}
 
 /* ============================================================
    农事助手：占满剩余高度（避免手机地址栏把输入框顶出视口）
