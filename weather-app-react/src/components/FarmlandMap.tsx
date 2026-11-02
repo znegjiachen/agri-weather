@@ -403,6 +403,12 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
         maximumAge: 0,
       });
     },
+    /** 定位到指定 GCJ-02 坐标（省市县选择用） */
+    flyTo(lat: number, lng: number, zoom = 12) {
+      const map = mapRef.current;
+      if (!map) return;
+      map.flyTo([lat, lng], zoom, { duration: 0.8 });
+    },
     fitAll,
   }));
 

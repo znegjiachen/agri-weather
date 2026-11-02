@@ -7,6 +7,36 @@ import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
 
+interface RegionOption {
+  name: string;
+  adcode: number;
+  center: [number, number];
+  level: string;
+}
+
+const REGION_ROOT_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+const regionUrl = (adcode: number) =>
+  `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
+
+async function fetchRegionOptions(url: string): Promise<RegionOption[]> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('行政区划数据加载失败');
+  const data = await response.json();
+  return (data.features || [])
+    .map((feature: any) => {
+      const props = feature.properties || {};
+      const center = props.center;
+      if (!Array.isArray(center) || center.length < 2) return null;
+      return {
+        name: props.name,
+        adcode: Number(props.adcode),
+        center: [Number(center[0]), Number(center[1])] as [number, number],
+        level: props.level || '',
+      };
+    })
+    .filter(Boolean) as RegionOption[];
+}
+
 const WEATHER_ICONS = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
   51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
@@ -39,6 +69,17 @@ export default function MapPage() {
   const mapRef = useRef(null);
   const draftArea = useMemo(() => polygonAreaMu(draft), [draft]);
 
+  // 省 / 市 / 县区选择：数据来自阿里 DataV 行政区划（GCJ-02，与高德底图一致）
+  const [provinces, setProvinces] = useState<RegionOption[]>([]);
+  const [cities, setCities] = useState<RegionOption[]>([]);
+  const [districts, setDistricts] = useState<RegionOption[]>([]);
+  const [provinceCode, setProvinceCode] = useState('');
+  const [cityCode, setCityCode] = useState('');
+  const [districtCode, setDistrictCode] = useState('');
+  const [regionLoading, setRegionLoading] = useState(false);
+  const [regionError, setRegionError] = useState('');
+  const regionSeq = useRef(0);
+
   useEffect(() => {
     farmlandApi.list()
       .then(setList)
@@ -52,6 +93,77 @@ export default function MapPage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetchRegionOptions(REGION_ROOT_URL)
+      .then((options) => { if (alive) setProvinces(options); })
+      .catch(() => { if (alive) setRegionError('行政区划数据加载失败，可手动拖动地图'); });
+    return () => { alive = false; };
+  }, []);
+
+  const flyToRegion = (region?: RegionOption, zoom = 12) => {
+    if (!region) return;
+    const [lng, lat] = region.center;
+    mapRef.current?.flyTo(lat, lng, zoom);
+  };
+
+  const handleProvinceChange = async (value: string) => {
+    setProvinceCode(value);
+    setCityCode('');
+    setDistrictCode('');
+    setCities([]);
+    setDistricts([]);
+    setRegionError('');
+    if (!value) return;
+
+    const province = provinces.find((item) => String(item.adcode) === value);
+    flyToRegion(province, 8);
+    const seq = ++regionSeq.current;
+    setRegionLoading(true);
+    try {
+      const options = await fetchRegionOptions(regionUrl(Number(value)));
+      if (seq !== regionSeq.current) return;
+      if (options.some((item) => item.level === 'city')) {
+        setCities(options);
+      } else {
+        // 直辖市等：省下一级直接是区县
+        setDistricts(options);
+      }
+    } catch {
+      if (seq === regionSeq.current) setRegionError('该省份下级区划加载失败');
+    } finally {
+      if (seq === regionSeq.current) setRegionLoading(false);
+    }
+  };
+
+  const handleCityChange = async (value: string) => {
+    setCityCode(value);
+    setDistrictCode('');
+    setDistricts([]);
+    setRegionError('');
+    if (!value) return;
+
+    const city = cities.find((item) => String(item.adcode) === value);
+    flyToRegion(city, 10);
+    const seq = ++regionSeq.current;
+    setRegionLoading(true);
+    try {
+      const options = await fetchRegionOptions(regionUrl(Number(value)));
+      if (seq !== regionSeq.current) return;
+      setDistricts(options);
+    } catch {
+      if (seq === regionSeq.current) setRegionError('该城市区县数据加载失败');
+    } finally {
+      if (seq === regionSeq.current) setRegionLoading(false);
+    }
+  };
+
+  const handleDistrictChange = (value: string) => {
+    setDistrictCode(value);
+    const district = districts.find((item) => String(item.adcode) === value);
+    flyToRegion(district, 13);
+  };
 
   const handleSelect = useCallback((farmland) => {
     setSelected(farmland);
@@ -175,6 +287,47 @@ export default function MapPage() {
 
       {!loading && (
         <>
+          <div className="map-region-bar">
+            <span className="map-region-label">📍 区域定位</span>
+            <select
+              value={provinceCode}
+              onChange={(e) => handleProvinceChange(e.target.value)}
+              aria-label="选择省份"
+            >
+              <option value="">省份</option>
+              {provinces.map((item) => (
+                <option key={item.adcode} value={item.adcode}>{item.name}</option>
+              ))}
+            </select>
+            <select
+              value={cityCode}
+              onChange={(e) => handleCityChange(e.target.value)}
+              disabled={cities.length === 0}
+              aria-label="选择城市"
+            >
+              <option value="">城市</option>
+              {cities.map((item) => (
+                <option key={item.adcode} value={item.adcode}>{item.name}</option>
+              ))}
+            </select>
+            <select
+              value={districtCode}
+              onChange={(e) => handleDistrictChange(e.target.value)}
+              disabled={districts.length === 0}
+              aria-label="选择区县"
+            >
+              <option value="">区 / 县</option>
+              {districts.map((item) => (
+                <option key={item.adcode} value={item.adcode}>{item.name}</option>
+              ))}
+            </select>
+            {regionLoading && <span className="map-region-tip">加载中…</span>}
+            {regionError && <span className="map-region-tip error">{regionError}</span>}
+            {districtCode && !regionLoading && (
+              <span className="map-region-tip">已定位，点「圈地」开始</span>
+            )}
+          </div>
+
           <div className="map-toolbar">
             <button
               type="button"

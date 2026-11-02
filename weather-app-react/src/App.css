@@ -5259,6 +5259,51 @@ main {
 }
 
 /* 地图圈地工具栏与边界标签 */
+.map-region-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.map-region-label {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.map-region-bar select {
+  max-width: 150px;
+  padding: 6px 8px;
+  border: 1px solid rgba(31, 41, 80, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.map-region-bar select:focus { border-color: #667eea; }
+.map-region-bar select:disabled { opacity: 0.5; }
+
+.map-region-tip {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.map-region-tip.error { color: #b91c1c; }
+
+@media (max-width: 700px) {
+  .map-region-bar select { flex: 1 1 30%; max-width: none; }
+}
+
 .map-toolbar {
   display: flex;
   flex-wrap: wrap;
