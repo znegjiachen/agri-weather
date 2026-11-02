@@ -408,9 +408,14 @@ export default function DesktopHome() {
                 {fields.length > 0 && ` · 共 ${fields.reduce((sum, f) => sum + (Number(f.areaMu) || 0), 0).toFixed(1)} 亩`}
               </span>
             </h2>
-            <button type="button" className="dh-link" onClick={() => navigate('/home/map')}>
-              在地图上查看 ›
-            </button>
+            <div className="dh-section-actions">
+              {fields.length > 5 && (
+                <span className="dh-fields-hint">左右滑动查看更多</span>
+              )}
+              <button type="button" className="dh-link" onClick={() => navigate('/home/map')}>
+                在地图上查看 ›
+              </button>
+            </div>
           </div>
 
           <div className="dh-fields">
@@ -460,10 +465,12 @@ export default function DesktopHome() {
               );
             })}
 
-            <button type="button" className="dh-add-field" onClick={() => navigate('/home/farmlands')}>
-              <span className="dh-add-plus">＋</span>
-              添加地块
-            </button>
+            {fields.length < 5 && (
+              <button type="button" className="dh-add-field" onClick={() => navigate('/home/farmlands')}>
+                <span className="dh-add-plus">＋</span>
+                添加地块
+              </button>
+            )}
           </div>
 
           <div className="dh-bottom">
