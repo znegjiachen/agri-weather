@@ -14,13 +14,11 @@ export default function AppLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const isWide = useMediaQuery('(min-width: 1200px)');
-  const isUltraWide = useMediaQuery('(min-width: 1440px)');
+  const isDockWide = useMediaQuery('(min-width: 1600px)');
 
   const sub = SUB_NAV.find((item) => item.to === pathname);
-  // 完整对话页已经有整页聊天；控制台在超宽屏用浮窗作为实时预览
-  const showDock = isWide
-    && pathname !== '/agent/chat'
-    && (pathname !== '/agent' || isUltraWide);
+  // 完整对话页已经有整页聊天；其他页面在桌面端保留助手。
+  const showDock = isWide && pathname !== '/agent/chat';
 
   return (
     <div className="app-layout">
@@ -39,7 +37,8 @@ export default function AppLayout() {
         <Outlet />
       </main>
 
-      {showDock && <AgentDock />}
+      {/* 小于 1600px 时默认收起为侧边标签，避免固定 360px 的浮窗把驾驶舱挤扁 */}
+      {showDock && <AgentDock defaultCollapsed={!isDockWide} />}
 
       <BottomTabBar />
     </div>

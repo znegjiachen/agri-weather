@@ -33,10 +33,10 @@ function clampDockWidth(value) {
  * 与 /agent 共用 AgentContext 里的 messages，所以两边看到的是同一段对话；
  * 这里做紧凑版渲染（工具轨迹 + 回答），照片识别结果用一行摘要展示。
  */
-export default function AgentDock() {
+export default function AgentDock({ defaultCollapsed = false }) {
   const navigate = useNavigate();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [width, setWidth] = useState(() => {
     const saved = Number(localStorage.getItem(DOCK_WIDTH_KEY));
     return clampDockWidth(Number.isFinite(saved) && saved > 0 ? saved : DOCK_DEFAULT_WIDTH);
@@ -77,6 +77,16 @@ export default function AgentDock() {
     onText: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
     onError: setError,
   });
+
+  // 窗口缩到窄屏时自动收起，避免浮窗把主内容挤扁；放大后不强制展开
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 1599px)');
+    const onChange = (event) => {
+      if (event.matches) setCollapsed(true);
+    };
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     attachmentsRef.current = attachments;
