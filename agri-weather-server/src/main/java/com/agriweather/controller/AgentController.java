@@ -369,17 +369,21 @@ public class AgentController {
         }
 
         // 新链路：只检索与问题相关的片段，不再塞整篇文档
-        if (body.getDocumentId() != null) {
+        List<Long> documentIds = body.getDocumentIds();
+        if ((documentIds == null || documentIds.isEmpty()) && body.getDocumentId() != null) {
+            documentIds = List.of(body.getDocumentId());
+        }
+        if (documentIds != null && !documentIds.isEmpty()) {
             try {
                 String block = agentDocumentService.buildContextBlock(
-                        userId, body.getDocumentId(), body.getMessage());
+                        userId, documentIds, body.getMessage());
                 if (block != null && !block.isBlank()) {
                     message = message + "\n\n" + block;
                 }
             } catch (IllegalArgumentException e) {
                 message = message + "\n\n【文档无法读取：" + e.getMessage() + "】";
             } catch (Exception e) {
-                log.warn("文档检索失败 documentId={}: {}", body.getDocumentId(), e.getMessage());
+                log.warn("文档检索失败 documentIds={}: {}", documentIds, e.getMessage());
                 message = message + "\n\n【文档检索暂时失败，请根据问题本身回答或提示用户重新上传】";
             }
         } else if (body.getDocumentContext() != null && !body.getDocumentContext().isBlank()) {
@@ -402,8 +406,8 @@ public class AgentController {
                              AgentChatRequest body, AgentResult result) {
         try {
             historyService.saveTurn(prep.context().agentId(), userId, body.getMessage(),
-                    body.getVisionJson(), body.getDocumentId(), body.getDocumentName(),
-                    body.getDocumentContext(), result, prep.knowledgeUsed());
+                    body.getVisionJson(), body.getDocumentId(), body.getDocumentIds(),
+                    body.getDocumentName(), body.getDocumentContext(), result, prep.knowledgeUsed());
         } catch (Exception e) {
             log.warn("保存智能体对话历史失败: {}", e.getMessage());
         }

@@ -54,7 +54,7 @@ export default function AgentPage() {
   const [status, setStatus] = useState(null);
   const [statusError, setStatusError] = useState(false);
   const [attachments, setAttachments] = useState([]);
-  const [docAttachment, setDocAttachment] = useState(null);
+  const [docAttachments, setDocAttachments] = useState([]);
   const [docLoading, setDocLoading] = useState(false);
 
   const listRef = useRef(null);
@@ -161,21 +161,23 @@ export default function AgentPage() {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
-    const docForTurn = docAttachment;
-    if ((!content && files.length === 0 && !docForTurn) || loading || historyLoading || notConfigured) return;
+    const docsForTurn = docAttachments;
+    if ((!content && files.length === 0 && docsForTurn.length === 0)
+      || loading || historyLoading || notConfigured) return;
 
     const question = content || (files.length > 0
       ? '请看看这些作物照片，帮我判断植物种类、生长阶段和健康状况。'
-      : '请阅读这份文档，提取与当前地块相关的农事建议。');
+      : '请阅读这些文档，提取与当前地块相关的农事建议。');
     setError('');
     setInput('');
     setAttachments([]);
 
-    // 历史里只保留文档名；当前引用的文档通过 documentId 走后端检索
+    // 历史里只保留文档名；当前引用的文档通过 documentIds 走后端检索
     const history = messages.map((m) => {
       const parts = [];
-      if (m.role === 'user' && m.document) {
-        parts.push(`【用户上传了文档：${m.document.filename}】`);
+      const docs = m.documents || (m.document ? [m.document] : []);
+      if (m.role === 'user' && docs.length > 0) {
+        parts.push(`【用户上传了文档：${docs.map((doc) => doc.filename).join('、')}】`);
       }
       if (m.role === 'user' && m.vision) {
         parts.push(`【图片识别结果（视觉模型提供，供参考）】\n${formatVision(m.vision)}`);
@@ -186,7 +188,13 @@ export default function AgentPage() {
 
     clearLiveBuffer();
     liveRef.current.round = null;
-    setMessages((prev) => [...prev, { role: 'user', content: question, images: previews, document: docForTurn }]);
+    setMessages((prev) => [...prev, {
+      role: 'user',
+      content: question,
+      images: previews,
+      documents: docsForTurn,
+      document: docsForTurn[0] || null,
+    }]);
     setLoading(true);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -284,10 +292,13 @@ export default function AgentPage() {
         agentId: selectedId,
         farmlandId: selectedAgent?.farmlandId,
         visionJson: vision ? JSON.stringify(vision) : null,
-        documentId: docForTurn?.documentId,
-        documentName: docForTurn?.filename,
-        // 兼容旧附件数据；新链路只传 documentId
-        documentContext: docForTurn?.documentId ? undefined : docForTurn?.text,
+        documentId: docsForTurn[0]?.documentId,
+        documentIds: docsForTurn.map((doc) => doc.documentId).filter(Boolean),
+        documentName: docsForTurn.map((doc) => doc.filename).join('、'),
+        // 兼容旧附件数据；新链路只传 documentIds
+        documentContext: docsForTurn.some((doc) => doc.documentId)
+          ? undefined
+          : docsForTurn.map((doc) => doc.text).filter(Boolean).join('\n\n'),
       });
 
       clearLiveBuffer();
@@ -406,14 +417,23 @@ export default function AgentPage() {
     setError('');
     try {
       const data = await agentApi.document(file);
-      setDocAttachment({
+      const attachment = {
         documentId: data.id,
         filename: data.filename || file.name,
         preview: data.preview || '',
         charCount: data.charCount,
         chunkCount: data.chunkCount,
         truncated: data.truncated,
-      });
+      };
+      if (docAttachments.length >= 3
+        && !docAttachments.some((doc) => doc.documentId === attachment.documentId)) {
+        setError('最多同时引用 3 份文档');
+      } else {
+        setDocAttachments((prev) => [
+          ...prev.filter((doc) => doc.documentId !== attachment.documentId),
+          attachment,
+        ].slice(-3));
+      }
     } catch (e) {
       setError(e.message || '文档解析失败');
     } finally {
@@ -450,14 +470,22 @@ export default function AgentPage() {
 
   const restoreDocument = (doc) => {
     if (!doc?.documentId) return;
-    setDocAttachment({
+    const attachment = {
       documentId: doc.documentId,
       filename: doc.filename,
       charCount: doc.charCount || 0,
       chunkCount: doc.chunkCount || 0,
       truncated: false,
       preview: doc.preview || '',
-    });
+    };
+    setDocAttachments((prev) => [
+      ...prev.filter((item) => item.documentId !== attachment.documentId),
+      attachment,
+    ].slice(-3));
+  };
+
+  const removeDocument = (documentId) => {
+    setDocAttachments((prev) => prev.filter((doc) => doc.documentId !== documentId));
   };
 
   const clearChat = () => {
@@ -465,12 +493,14 @@ export default function AgentPage() {
     clearLiveBuffer();
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
     setAttachments([]);
+    setDocAttachments([]);
     clearHistory();
     setError('');
   };
 
   const notConfigured = !statusError && status && status.configured === false;
-  const canSend = !loading && !historyLoading && !notConfigured && (input.trim().length > 0 || attachments.length > 0 || !!docAttachment);
+  const canSend = !loading && !historyLoading && !notConfigured
+    && (input.trim().length > 0 || attachments.length > 0 || docAttachments.length > 0);
 
   return (
     <div className="agent-page">
@@ -581,20 +611,21 @@ export default function AgentPage() {
                   </div>
                 )}
 
-                {m.document && (
-                  m.document.documentId ? (
+                {(m.documents?.length ? m.documents : m.document ? [m.document] : []).map((doc, docIndex) => (
+                  doc.documentId ? (
                     <button
                       type="button"
+                      key={doc.documentId || docIndex}
                       className="agent-doc-chip clickable"
-                      onClick={() => restoreDocument(m.document)}
+                      onClick={() => restoreDocument(doc)}
                       title="点击继续参考该文档"
                     >
-                      📄 {m.document.filename}
+                      📄 {doc.filename}
                     </button>
                   ) : (
-                    <div className="agent-doc-chip">📄 {m.document.filename}</div>
+                    <div className="agent-doc-chip" key={docIndex}>📄 {doc.filename}</div>
                   )
-                )}
+                ))}
 
                 {m.role === 'assistant' && m.streaming
                   && !(m.thoughts?.length > 0) && !(m.toolCalls?.length > 0)
@@ -699,17 +730,27 @@ export default function AgentPage() {
           </div>
         )}
 
-        {docAttachment && (
-          <div className="agent-doc-attachment" title={docAttachment.preview || ''}>
-            <span>📄 {docAttachment.filename}</span>
-            <small>
-              {docAttachment.chunkCount
-                ? `${docAttachment.charCount} 字 · ${docAttachment.chunkCount} 个片段`
-                : '已建立检索索引'}
-              {docAttachment.truncated ? ' · 仅索引前部' : ''}
-              {' · 后续提问会参考'}
-            </small>
-            <button type="button" onClick={() => setDocAttachment(null)} aria-label="移除文档">×</button>
+        {docAttachments.length > 0 && (
+          <div className="agent-doc-list">
+            {docAttachments.map((doc) => (
+              <div className="agent-doc-attachment" key={doc.documentId || doc.filename} title={doc.preview || ''}>
+                <span>📄 {doc.filename}</span>
+                <small>
+                  {doc.chunkCount
+                    ? `${doc.charCount} 字 · ${doc.chunkCount} 个片段`
+                    : '已建立检索索引'}
+                  {doc.truncated ? ' · 仅索引前部' : ''}
+                  {' · 后续提问会参考'}
+                </small>
+                <button
+                  type="button"
+                  onClick={() => removeDocument(doc.documentId)}
+                  aria-label={`移除文档 ${doc.filename}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

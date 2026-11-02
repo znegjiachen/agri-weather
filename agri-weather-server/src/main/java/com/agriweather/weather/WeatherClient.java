@@ -38,7 +38,7 @@ public class WeatherClient {
     private static final String CACHE_NAME = "weather";
 
     /** 载荷结构变更时递增，避免旧 JSON 反序列化失败 */
-    private static final String KEY_PREFIX = "v1:";
+    private static final String KEY_PREFIX = "v2:";
 
     private final WeatherProperties props;
     private final ObjectMapper mapper;
@@ -145,8 +145,11 @@ public class WeatherClient {
         String url = String.format(
                 Locale.ROOT,
                 "%s/v1/forecast?latitude=%s&longitude=%s"
-                        + "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,visibility,surface_pressure"
-                        + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max"
+                        + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,"
+                        + "wind_speed_10m,visibility,surface_pressure,uv_index"
+                        + "&hourly=temperature_2m,weather_code"
+                        + "&daily=weather_code,temperature_2m_max,temperature_2m_min,"
+                        + "precipitation_sum,wind_speed_10m_max,sunrise,sunset"
                         + "&timezone=auto&forecast_days=%d",
                 props.getBaseUrl(), c.queryLat(), c.queryLng(), props.getForecastDays());
 

@@ -2,20 +2,29 @@ import { useEffect, useRef, useState } from 'react';
 import { agents as agentsApi } from '../api';
 import { useAgent } from '../context/AgentContext';
 
+function mapDocuments(message) {
+  const ids = Array.isArray(message.documentIds) && message.documentIds.length > 0
+    ? message.documentIds
+    : (message.documentId ? [message.documentId] : []);
+  if (ids.length === 0 && !message.documentContext) return [];
+
+  const names = (message.documentName || '上传的文档').split('、');
+  return ids.map((id, index) => ({
+    documentId: id,
+    filename: names[index] || names[0] || '上传的文档',
+    text: message.documentContext || '',
+    charCount: message.documentContext?.length || 0,
+    truncated: false,
+  }));
+}
+
 function mapMessage(message) {
   return {
     role: message.role,
     content: message.content || '',
     vision: message.vision || null,
-    document: (message.documentId || message.documentContext)
-      ? {
-        documentId: message.documentId || null,
-        filename: message.documentName || '上传的文档',
-        text: message.documentContext || '',
-        charCount: message.documentContext?.length || 0,
-        truncated: false,
-      }
-      : null,
+    documents: mapDocuments(message),
+    document: mapDocuments(message)[0] || null,
     toolCalls: Array.isArray(message.toolCalls) ? message.toolCalls : [],
     thoughts: Array.isArray(message.thoughts) ? message.thoughts : [],
     knowledgeUsed: Array.isArray(message.knowledgeUsed) ? message.knowledgeUsed : [],

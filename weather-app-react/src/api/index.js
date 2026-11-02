@@ -41,6 +41,11 @@ export const auth = {
   changePassword: (body) => request('/api/auth/password', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
+// Weather（天气页统一走后端缓存/备源）
+export const weather = {
+  forecast: (lat, lng) => request(`/api/weather?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`),
+};
+
 // Crops
 export const crops = {
   list: () => request('/api/crops'),
@@ -163,6 +168,7 @@ export const agent = {
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
         ...(context.visionJson ? { visionJson: context.visionJson } : {}),
         ...(context.documentId ? { documentId: context.documentId } : {}),
+        ...(context.documentIds?.length ? { documentIds: context.documentIds } : {}),
         ...(context.documentName ? { documentName: context.documentName } : {}),
         ...(context.documentContext ? { documentContext: context.documentContext } : {}),
       }),
@@ -191,6 +197,7 @@ export const agent = {
         ...(context.farmlandId ? { farmlandId: context.farmlandId } : {}),
         ...(context.visionJson ? { visionJson: context.visionJson } : {}),
         ...(context.documentId ? { documentId: context.documentId } : {}),
+        ...(context.documentIds?.length ? { documentIds: context.documentIds } : {}),
         ...(context.documentName ? { documentName: context.documentName } : {}),
         ...(context.documentContext ? { documentContext: context.documentContext } : {}),
       }),

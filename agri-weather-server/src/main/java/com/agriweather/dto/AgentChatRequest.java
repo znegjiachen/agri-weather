@@ -28,6 +28,10 @@ public class AgentChatRequest {
     /** 对话内文档 ID；上传接口返回，后续追问可继续引用（可选） */
     private Long documentId;
 
+    /** 同时引用的多份文档 ID（最多 5 份） */
+    @Size(max = 5, message = "一次最多引用 5 份文档")
+    private List<Long> documentIds;
+
     /** 用户在对话里上传的文档名称（可选） */
     @Size(max = 255, message = "文档名称过长")
     private String documentName;

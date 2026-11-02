@@ -485,6 +485,7 @@ CREATE TABLE IF NOT EXISTS agent_chat_message (
     content MEDIUMTEXT,
     vision MEDIUMTEXT COMMENT '图片识别结果 JSON',
     document_id BIGINT COMMENT '本轮上传的对话文档 ID',
+    document_ids VARCHAR(500) COMMENT '本轮引用的文档 ID CSV',
     document_name VARCHAR(255) COMMENT '本轮上传的文档名',
     document_context MEDIUMTEXT COMMENT '旧版：本轮上传的文档正文',
     tool_calls MEDIUMTEXT COMMENT '工具调用轨迹 JSON',

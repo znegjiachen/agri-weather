@@ -4724,6 +4724,15 @@ main {
 }
 
 /* 对话文档：待发送附件条 + 历史消息里的文件标记 */
+.agent-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 18px;
+}
+
+.agent-doc-list .agent-doc-attachment { margin: 0; }
+
 .agent-doc-attachment {
   display: flex;
   align-items: center;
@@ -6704,6 +6713,15 @@ main {
 }
 
 /* 对话文档：待发送附件条 + 历史消息里的文件标记 */
+.agent-dock-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 16px 0;
+}
+
+.agent-dock-doc-list .agent-dock-doc { margin: 0; }
+
 .agent-dock-doc {
   flex: none;
   display: flex;

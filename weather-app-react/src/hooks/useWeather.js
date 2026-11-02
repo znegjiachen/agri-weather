@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { weather as weatherApi } from '../api';
 
 const HISTORY_KEY = 'weather_search_history';
 const MAX_HISTORY = 6;
@@ -62,11 +63,8 @@ async function reverseGeocode(lat, lon) {
 }
 
 async function fetchWeatherData(lat, lon) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,visibility,surface_pressure,uv_index&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`;
-
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Weather API error');
-  return response.json();
+  // 服务端统一缓存、超时与和风天气备源
+  return weatherApi.forecast(lat, lon);
 }
 
 async function geocode(name) {

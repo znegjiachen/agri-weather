@@ -11,6 +11,7 @@ public record AgentMessageView(
         String content,
         Map<String, Object> vision,
         Long documentId,
+        List<Long> documentIds,
         String documentName,
         String documentContext,
         List<Map<String, Object>> toolCalls,

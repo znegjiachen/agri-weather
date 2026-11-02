@@ -36,7 +36,7 @@ public class AgentChatHistoryService {
 
     @Transactional
     public void saveTurn(Long agentId, Long userId, String userContent, String visionJson,
-                         Long documentId, String documentName, String documentContext,
+                         Long documentId, List<Long> documentIds, String documentName, String documentContext,
                          AgentResult result, List<KnowledgeRef> knowledgeUsed) {
         if (agentId == null || result == null) return;
         agentService.requireOwned(agentId, userId);
@@ -48,6 +48,7 @@ public class AgentChatHistoryService {
         user.setContent(userContent);
         user.setVision(normalizeJson(visionJson));
         user.setDocumentId(documentId);
+        user.setDocumentIds(toCsv(documentIds));
         user.setDocumentName(documentName);
         user.setDocumentContext(documentContext);
         user.setCreatedAt(LocalDateTime.now());
@@ -80,6 +81,7 @@ public class AgentChatHistoryService {
                     message.getContent(),
                     parseObject(message.getVision()),
                     message.getDocumentId(),
+                    parseCsv(message.getDocumentIds()),
                     message.getDocumentName(),
                     message.getDocumentContext(),
                     parseList(message.getToolCalls()),
@@ -109,6 +111,25 @@ public class AgentChatHistoryService {
 
     private String normalizeJson(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private String toCsv(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return null;
+        return ids.stream().filter(id -> id != null).distinct()
+                .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private List<Long> parseCsv(String csv) {
+        if (csv == null || csv.isBlank()) return List.of();
+        List<Long> result = new ArrayList<>();
+        for (String part : csv.split(",")) {
+            try {
+                result.add(Long.valueOf(part.trim()));
+            } catch (NumberFormatException ignored) {
+                // 忽略脏数据，不影响历史展示
+            }
+        }
+        return result;
     }
 
     private Map<String, Object> parseObject(String json) {

@@ -36,6 +36,10 @@ public class AgentChatMessage {
     @Column(name = "document_id")
     private Long documentId;
 
+    /** 多文档引用：逗号分隔的文档 ID */
+    @Column(name = "document_ids", length = 500)
+    private String documentIds;
+
     @Column(name = "document_name", length = 255)
     private String documentName;
 

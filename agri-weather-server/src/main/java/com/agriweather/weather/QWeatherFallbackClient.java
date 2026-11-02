@@ -42,12 +42,18 @@ public class QWeatherFallbackClient {
         }
         String location = coord.queryLng() + "," + coord.queryLat();
         JsonNode now = get("/v7/weather/now?location=" + location);
+        JsonNode hourly = get("/v7/weather/24h?location=" + location);
         JsonNode daily = get("/v7/weather/7d?location=" + location);
+
+        Map<String, Object> current = mapCurrent(now.path("now"));
+        JsonNode days = daily.path("daily");
+        current.put("uv_index", days.path(0).path("uvIndex").asDouble(0));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("_source", "qweather");
-        result.put("current", mapCurrent(now.path("now")));
-        result.put("daily", mapDaily(daily.path("daily")));
+        result.put("current", current);
+        result.put("hourly", mapHourly(hourly.path("hourly")));
+        result.put("daily", mapDaily(days));
         return result;
     }
 
@@ -79,12 +85,30 @@ public class QWeatherFallbackClient {
         Map<String, Object> current = new LinkedHashMap<>();
         current.put("time", text(now, "obsTime"));
         current.put("temperature_2m", number(now, "temp"));
+        current.put("apparent_temperature", number(now, "feelsLike"));
         current.put("relative_humidity_2m", number(now, "humidity"));
         current.put("weather_code", weatherCode(now.path("icon").asInt(0), text(now, "text")));
         current.put("wind_speed_10m", number(now, "windSpeed"));
         current.put("visibility", number(now, "vis") * 1000);
         current.put("surface_pressure", number(now, "pressure"));
         return current;
+    }
+
+    private Map<String, Object> mapHourly(JsonNode hours) {
+        List<String> time = new ArrayList<>();
+        List<Double> temp = new ArrayList<>();
+        List<Integer> codes = new ArrayList<>();
+        for (JsonNode hour : hours) {
+            String fxTime = hour.path("fxTime").asText("");
+            time.add(fxTime.length() > 16 ? fxTime.substring(0, 16) : fxTime);
+            temp.add(hour.path("temp").asDouble());
+            codes.add(weatherCode(hour.path("icon").asInt(0), hour.path("text").asText("")));
+        }
+        Map<String, Object> hourly = new LinkedHashMap<>();
+        hourly.put("time", time);
+        hourly.put("temperature_2m", temp);
+        hourly.put("weather_code", codes);
+        return hourly;
     }
 
     private Map<String, Object> mapDaily(JsonNode days) {

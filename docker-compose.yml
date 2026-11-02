@@ -28,8 +28,7 @@ services:
     volumes:
       # 数据持久化（容器删除后数据不丢）
       - mysql_data:/var/lib/mysql
-      # 自动建表 + 初始数据
-      - ./agri-weather-server/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      # 表结构与种子数据由后端 Flyway 的 V1__baseline.sql 初始化
     ports:
       - "3306:3306"
     healthcheck:

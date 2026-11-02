@@ -41,7 +41,7 @@
 
 **语音提问**：输入框右侧的 🎤 按钮支持录音转文字，田间不方便打字时直接说话即可。配置 `ASR_*` 后由后端调用 Whisper / 兼容的 `/audio/transcriptions`；未配置时自动回退到浏览器语音识别（Chrome / Edge），两种方式都不可用时会给出明确提示。
 
-**对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB）。上传时复用知识库解析器切块并建立向量索引，提问时按问题检索相关片段注入，不再截断整篇正文；文档保留 7 天后自动清理，不进入知识库。附件会持续作为后续提问的参考资料，点 × 可解除。适合「帮我看一下这份种植方案」这类需求，长文档也不会丢内容。
+**对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB，最多同时引用 3 份）。上传时复用知识库解析器切块并建立向量索引，提问时按问题检索相关片段注入，不再截断整篇正文；文档保留 7 天后自动清理，不进入知识库。附件会持续作为后续提问的参考资料，刷新后可从历史消息重新引用，点 × 可解除。
 
 可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
 
@@ -62,7 +62,7 @@
 
 ## 技术栈
 
-**后端** — Spring Boot 3.5.2 · Java 17 · Spring Security + JWT (jjwt 0.12.6) · Spring Data JPA · MySQL 8 · Lombok
+**后端** — Spring Boot 3.5.2 · Java 17 · Spring Security + JWT (jjwt 0.12.6) · Spring Data JPA · MySQL 8 · Flyway（数据库版本管理）· Lombok
 
 **前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 核心工具与地图几何使用 TypeScript（`npm run typecheck`）
 
@@ -101,25 +101,12 @@ docker-compose down       # 停止
 **前置**：JDK 17+、Node.js 18+、MySQL 8
 
 ```bash
-# 1. 建库并导入表结构
+# 1. 只建空库，表结构和种子数据由后端 Flyway 自动初始化
 mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
-mysql -u root -p agri_weather < agri-weather-server/sql/schema.sql
 
-# 已有旧库升级（新库可跳过）：社区富文本/图片 + 地块边界 + 作物库扩充 + 地块智能体/知识库
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261023_community_rich_text.sql
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261024_farmland_boundary.sql
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261026_more_crops.sql
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261029_farmland_agents_knowledge.sql
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
-# 对话内文档：历史保存文档名与正文，刷新后仍可继续追问
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261101_agent_document_context.sql
-# 对话文档检索：上传切块建索引，提问时按问题注入片段
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261102_agent_document_rag.sql
-# Web Push：浏览器订阅表
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261103_web_push.sql
-# AI 回答反馈（点赞/点踩）
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261104_agent_feedback.sql
-mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
+# 老库从旧版本升级：先手动执行 sql/migrations 中尚未执行过的脚本，
+# 再启动后端；Flyway 会把已有库标记为 V1 基线，不重复建表。
+# 新库/当前版本库直接启动即可，无需手工导入 schema.sql。
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -177,6 +164,7 @@ cd weather-app-react && npm install && npm run dev
 |---|---|
 | 认证 `/api/auth` | `POST /register` · `POST /login` · `GET/PUT /profile`（资料）· `PUT /password`（修改密码） |
 | 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice`（创建/更新支持 `boundary` 边界数组） |
+| 天气 `/api/weather` | `GET /?lat=&lng=`（统一走服务端缓存与 Open-Meteo / 和风备源） |
 | 作物 `/api/crops` | `GET /` · `GET /{id}` · `GET /search` · `GET /{id}/stages` · `GET /{id}/weather-match` · `GET /{id}/current-stage` |
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
@@ -202,6 +190,16 @@ cd weather-app-react && npm install && npm run dev
 ### MCP 工具服务
 
 [mcp-server/](mcp-server/) 把地块、天气、农事建议、作物检索封装成标准 MCP tools（stdio），Claude Desktop / Claude Code 等客户端可直接调用；配置见 [mcp-server/README.md](mcp-server/README.md)。
+
+### 数据库迁移
+
+表结构由 Flyway 管理，脚本在 `agri-weather-server/src/main/resources/db/migration/`：
+
+- `V1__baseline.sql`：完整基线（建表 + 种子数据）
+- `V2__agent_document_ids.sql`：多文档引用
+- 新增结构变更时添加 `V{n}__描述.sql`，启动时自动执行
+
+老库首次接入 Flyway 时会被标记为 V1 基线，不会重复建表；升级旧版本仍需先执行 `sql/migrations/` 中尚未运行的手工脚本。
 
 ### 数据库表
 
