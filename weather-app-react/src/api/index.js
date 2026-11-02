@@ -330,6 +330,11 @@ export const agents = {
   sync: () => request('/api/agents/sync', { method: 'POST' }),
   messages: (id, limit = 50) => request(`/api/agents/${id}/messages?limit=${limit}`),
   clearMessages: (id) => request(`/api/agents/${id}/messages`, { method: 'DELETE' }),
+  feedback: (id, body) => request(`/api/agents/${id}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }),
+  metrics: () => request('/api/agent/metrics'),
 
   knowledge: {
     list: (agentId) => request(`/api/agents/${agentId}/knowledge`),

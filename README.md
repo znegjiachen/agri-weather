@@ -64,7 +64,7 @@
 
 **后端** — Spring Boot 3.5.2 · Java 17 · Spring Security + JWT (jjwt 0.12.6) · Spring Data JPA · MySQL 8 · Lombok
 
-**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）
+**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 核心工具与地图几何使用 TypeScript（`npm run typecheck`）
 
 **外部服务** — [Open-Meteo](https://open-meteo.com/)（天气，免费无密钥）· [DeepSeek](https://platform.deepseek.com/)（农事智能体）· 可选 OpenAI 兼容 Embedding（不配置时使用本地向量）
 
@@ -117,6 +117,8 @@ mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261101_agen
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261102_agent_document_rag.sql
 # Web Push：浏览器订阅表
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261103_web_push.sql
+# AI 回答反馈（点赞/点踩）
+mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261104_agent_feedback.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/migrations/20261030_agent_history_embeddings_tools.sql
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
@@ -179,17 +181,28 @@ cd weather-app-react && npm install && npm run dev
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
 | 病虫害 `/api/pests` | `GET /` · `GET /type/{type}` |
 | 农事建议 `/api/operations` | `POST /advice/{farmlandId}` |
-| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析并建索引，返回 `documentId`）· `GET /tools` · `GET /status` |
+| 智能体 `/api/agent` | `POST /chat` · `POST /chat/stream`（SSE 实时轨迹）· `POST /vision`（multipart，需要登录）· `POST /transcribe`（multipart 音频转文字）· `POST /document`（multipart 文档解析并建索引，返回 `documentId`）· `GET /tools` · `GET /status` · `GET /metrics`（成功率/延迟/工具/检索/安全/反馈指标） |
 | 推送 `/api/push` | `GET /public-key` · `POST /subscribe` · `DELETE /subscribe`（Web Push，需要 HTTPS） |
-| 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · 知识库 `/knowledge`（文本/文件/检索/重建向量） |
+| 智能体控制台 `/api/agents` | `GET /` · `GET/PUT /{id}` · `POST /{id}/reset` · `POST /sync` · `GET/DELETE /{id}/messages` · `POST /{id}/feedback`（点赞/点踩）· 知识库 `/knowledge`（文本/文件/检索/重建向量） |
 | 社区 `/api/community` | `GET /posts` · `POST /posts` · `GET /posts/{id}` · `POST /posts/{id}/comments` · `POST`/`DELETE /posts/{id}/like` · `DELETE /posts/{id}` |
 | 社区图片 `/api/community/images` | `POST /`（multipart，需登录）· `GET /{publicId}`（公开） |
 
 社区发帖支持富文本（Quill 编辑器，HTML 经服务端白名单净化后入库）和图片：JPG/PNG、单张 ≤5MB、每帖 ≤9 张，图片存 MySQL 并由后端出图；上传后 24 小时未发布会被定时清理。
 
+### AI 评测与安全
+
+- **运行指标**：`GET /api/agent/metrics` 返回请求数、成功率、平均延迟、工具调用数、知识命中、文档轮次、安全提示次数、点赞/点踩数
+- **用户反馈**：回答下方 👍/👎 写入 `agent_feedback`，可按消息去重更新
+- **安全兜底**：`AgriSafetyGuard` 检测高毒/禁用农药和绝对化承诺，自动追加安全提示
+- **演示材料**：[docs/demo-script.md](docs/demo-script.md)（5 分钟答辩脚本）· [docs/pilot-guide.md](docs/pilot-guide.md)（小范围试点与指标口径）
+
+### MCP 工具服务
+
+[mcp-server/](mcp-server/) 把地块、天气、农事建议、作物检索封装成标准 MCP tools（stdio），Claude Desktop / Claude Code 等客户端可直接调用；配置见 [mcp-server/README.md](mcp-server/README.md)。
+
 ### 数据库表
 
-`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide` · `community_post` · `community_comment` · `community_like` · `community_image` · `farmland_agent` · `agent_knowledge_doc` · `agent_knowledge_chunk` · `agent_chat_message`
+`sys_user` · `crop_info` · `crop_growth_stage` · `farmland` · `pest_knowledge` · `weather_alert` · `farm_operation` · `solar_term_guide` · `community_post` · `community_comment` · `community_like` · `community_image` · `farmland_agent` · `agent_knowledge_doc` · `agent_knowledge_chunk` · `agent_chat_message` · `agent_document` · `agent_document_chunk` · `push_subscription` · `agent_feedback`
 
 ---
 

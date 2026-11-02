@@ -2207,6 +2207,41 @@ main {
   padding: 6px 10px;
 }
 
+/* AI 回答反馈 */
+.agent-feedback {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: -2px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.agent-feedback button {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all var(--transition-fast);
+}
+
+.agent-feedback button:hover {
+  opacity: 1;
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.agent-feedback button.active {
+  opacity: 1;
+  border-color: rgba(102, 126, 234, 0.45);
+  background: rgba(102, 126, 234, 0.14);
+}
+
 /* ---------- 思考中动画 ---------- */
 .agent-thinking {
   display: flex;

@@ -7,6 +7,7 @@ function pushLabel(state) {
   if (state === 'subscribed') return '已开启 · 新预警会推送到浏览器';
   if (state === 'denied') return '已被浏览器禁用，请在浏览器设置中开启';
   if (state === 'unsupported') return '当前浏览器不支持 Web Push';
+  if (state === 'unavailable') return '页面尚未启用离线服务，请刷新后重试';
   if (state === 'server-disabled') return '服务端未配置 VAPID 密钥';
   if (state === 'error') return '状态检查失败，点击重试';
   if (state === 'loading') return '正在检查推送状态…';
@@ -121,6 +122,10 @@ export default function ProfilePage() {
     }
     if (state === 'unsupported') {
       showNotice('当前浏览器不支持 Web Push');
+      return;
+    }
+    if (state === 'unavailable') {
+      showNotice('页面尚未启用离线服务，请刷新后重试');
       return;
     }
 

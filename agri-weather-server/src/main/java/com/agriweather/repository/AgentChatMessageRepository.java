@@ -8,10 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface AgentChatMessageRepository extends JpaRepository<AgentChatMessage, Long> {
 
     List<AgentChatMessage> findByAgentIdAndUserIdOrderByIdDesc(Long agentId, Long userId, Pageable pageable);
+
+    Optional<AgentChatMessage> findFirstByAgentIdAndUserIdAndRoleOrderByIdDesc(
+            Long agentId, Long userId, String role);
 
     @Modifying
     @Query("delete from AgentChatMessage m where m.agentId = :agentId and m.userId = :userId")

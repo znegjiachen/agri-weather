@@ -1,0 +1,16 @@
+{
+  "name": "agri-weather-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "问田农事工具 MCP Server（stdio）",
+  "bin": {
+    "agri-weather-mcp": "./server.mjs"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

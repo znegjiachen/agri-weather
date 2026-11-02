@@ -436,6 +436,18 @@ export default function AgentPage() {
     }
   };
 
+  const rateMessage = async (index, rating) => {
+    if (!selectedId) return;
+    try {
+      await agentsApi.feedback(selectedId, { rating });
+      setMessages((prev) => prev.map((message, i) => (
+        i === index ? { ...message, feedback: rating } : message
+      )));
+    } catch (e) {
+      setError(e.message || '反馈提交失败');
+    }
+  };
+
   const clearChat = () => {
     if (!window.confirm('清空后对话记录无法恢复，确定清空吗？')) return;
     clearLiveBuffer();
@@ -601,6 +613,30 @@ export default function AgentPage() {
                 )}
 
                 {m.vision && <VisionCard vision={m.vision} />}
+
+                {m.role === 'assistant' && !m.streaming && m.content && selectedId && (
+                  <div className="agent-feedback">
+                    <span>这个回答有帮助吗？</span>
+                    <button
+                      type="button"
+                      className={m.feedback === 'UP' ? 'active' : ''}
+                      onClick={() => rateMessage(i, 'UP')}
+                      aria-label="回答有帮助"
+                      title="有帮助"
+                    >
+                      👍
+                    </button>
+                    <button
+                      type="button"
+                      className={m.feedback === 'DOWN' ? 'active' : ''}
+                      onClick={() => rateMessage(i, 'DOWN')}
+                      aria-label="回答没帮助"
+                      title="没帮助"
+                    >
+                      👎
+                    </button>
+                  </div>
+                )}
 
                 {!m.streaming && m.knowledgeUsed?.length > 0 && (
                   <div className="agent-knowledge-refs">

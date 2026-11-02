@@ -5,21 +5,33 @@
  * 都只是「默认值」，用户可以在表单里手动改。
  */
 
-export const SOIL_TYPES = ['壤土', '沙土', '黏土', '红壤', '黑土', '盐碱土'];
-export const IRRIGATION_TYPES = ['漫灌', '滴灌', '喷灌', '渗灌', '雨水'];
-export const DEFAULT_SOIL = '壤土';
-export const DEFAULT_IRRIGATION = '滴灌';
+export const SOIL_TYPES = ['壤土', '沙土', '黏土', '红壤', '黑土', '盐碱土'] as const;
+export const IRRIGATION_TYPES = ['漫灌', '滴灌', '喷灌', '渗灌', '雨水'] as const;
+
+export type SoilType = typeof SOIL_TYPES[number];
+export type IrrigationType = typeof IRRIGATION_TYPES[number];
+
+export const DEFAULT_SOIL: SoilType = '壤土';
+export const DEFAULT_IRRIGATION: IrrigationType = '滴灌';
+
+interface SoilRegion {
+  soil: SoilType;
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
 
 // 粗略的分区经验值，仅用于给表单一个合理的初始值，不构成土壤普查结论
-const SOIL_REGIONS = [
-  { soil: '黑土', minLat: 42, maxLat: 50, minLng: 118, maxLng: 135 },   // 东北平原
-  { soil: '沙土', minLat: 35, maxLat: 48, minLng: 73, maxLng: 100 },    // 新疆绿洲
+const SOIL_REGIONS: SoilRegion[] = [
+  { soil: '黑土', minLat: 42, maxLat: 50, minLng: 118, maxLng: 135 }, // 东北平原
+  { soil: '沙土', minLat: 35, maxLat: 48, minLng: 73, maxLng: 100 }, // 新疆绿洲
   { soil: '盐碱土', minLat: 36, maxLat: 42, minLng: 100, maxLng: 112 }, // 河西 / 河套
-  { soil: '红壤', minLat: 18, maxLat: 32, minLng: 105, maxLng: 123 },   // 华南 / 江南丘陵
-  { soil: '黏土', minLat: 22, maxLat: 32, minLng: 97, maxLng: 105 },    // 西南山地
+  { soil: '红壤', minLat: 18, maxLat: 32, minLng: 105, maxLng: 123 }, // 华南 / 江南丘陵
+  { soil: '黏土', minLat: 22, maxLat: 32, minLng: 97, maxLng: 105 }, // 西南山地
 ];
 
-export function suggestSoil(lat, lng) {
+export function suggestSoil(lat: number, lng: number): SoilType {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return DEFAULT_SOIL;
   const hit = SOIL_REGIONS.find((r) => (
     lat >= r.minLat && lat <= r.maxLat && lng >= r.minLng && lng <= r.maxLng
@@ -28,7 +40,7 @@ export function suggestSoil(lat, lng) {
 }
 
 // 各作物最常见的灌溉方式
-const CROP_IRRIGATION = {
+const CROP_IRRIGATION: Record<string, IrrigationType> = {
   水稻: '漫灌',
   甘蔗: '漫灌',
   香蕉: '漫灌',
@@ -65,7 +77,7 @@ const CROP_IRRIGATION = {
   葡萄: '滴灌',
 };
 
-export function suggestIrrigation(cropName) {
+export function suggestIrrigation(cropName?: string | null): IrrigationType {
   if (!cropName) return DEFAULT_IRRIGATION;
   return CROP_IRRIGATION[cropName] || DEFAULT_IRRIGATION;
 }

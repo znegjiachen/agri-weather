@@ -8,6 +8,7 @@ import com.agriweather.agent.AgentResult;
 import com.agriweather.agent.ToolCall;
 import com.agriweather.agent.ToolRegistry;
 import com.agriweather.ai.AgriContext;
+import com.agriweather.ai.AgriSafetyGuard;
 import com.agriweather.ai.AsrClient;
 import com.agriweather.ai.DeepSeekClient;
 import com.agriweather.ai.DeepSeekProperties;
@@ -22,6 +23,7 @@ import com.agriweather.entity.FarmlandAgent;
 import com.agriweather.service.AgentChatHistoryService;
 import com.agriweather.service.AgentPromptBuilder;
 import com.agriweather.service.AgentService;
+import com.agriweather.service.AiMetricsService;
 import com.agriweather.service.BuiltInKnowledgeService;
 import com.agriweather.service.CommunityImageProcessor;
 import com.agriweather.service.EmbeddingService;
@@ -76,6 +78,8 @@ public class AgentController {
     private final EmbeddingService embeddingService;
     private final AsrClient asrClient;
     private final AgentDocumentService agentDocumentService;
+    private final AgriSafetyGuard safetyGuard;
+    private final AiMetricsService metricsService;
 
     /**
      * 与农事智能体对话
@@ -92,6 +96,9 @@ public class AgentController {
         }
 
         ChatPreparation prep = prepare(body, userId);
+        metricsService.requestStarted(false);
+        long started = System.currentTimeMillis();
+        boolean success = false;
 
         try {
             AgentResult result = agentHarness.run(
@@ -101,7 +108,13 @@ public class AgentController {
                     AgentObserver.NOOP,
                     prep.systemPrompt(), prep.enabledTools());
 
+            boolean risky = safetyGuard.isRisky(result.reply());
+            result = safetyGuard.review(result);
             saveHistory(prep, userId, body, result);
+            success = true;
+            metricsService.completed(false, true, System.currentTimeMillis() - started,
+                    result.trace().size(), prep.knowledgeUsed().size(),
+                    body.getDocumentId() != null, risky);
 
             return new AgentChatResponse(
                     result.reply(), toDto(result.trace()), toThoughts(result.thoughts()),
@@ -116,6 +129,11 @@ public class AgentController {
             log.error("智能体对话异常", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "智能体处理失败：" + e.getClass().getSimpleName());
+        } finally {
+            if (!success) {
+                metricsService.completed(false, false, System.currentTimeMillis() - started,
+                        0, 0, body.getDocumentId() != null, false);
+            }
         }
     }
 
@@ -141,9 +159,11 @@ public class AgentController {
             emitter.complete();
         });
         emitter.onError(e -> cancelled.set(true));
+        metricsService.requestStarted(true);
 
         try {
             agentStreamExecutor.execute(() -> {
+                long started = System.currentTimeMillis();
                 try {
                     AgentResult result = agentHarness.run(
                             message,
@@ -218,7 +238,12 @@ public class AgentController {
                             },
                             prep.systemPrompt(), prep.enabledTools());
 
+                    boolean risky = safetyGuard.isRisky(result.reply());
+                    result = safetyGuard.review(result);
                     saveHistory(prep, userId, body, result);
+                    metricsService.completed(true, true, System.currentTimeMillis() - started,
+                            result.trace().size(), prep.knowledgeUsed().size(),
+                            body.getDocumentId() != null, risky);
 
                     Map<String, Object> done = new LinkedHashMap<>();
                     done.put("reply", result.reply());
@@ -231,11 +256,16 @@ public class AgentController {
                     sendEvent(emitter, "done", done);
                     emitter.complete();
                 } catch (AgentCancelledException e) {
+                    metricsService.cancelled();
                     emitter.complete();
                 } catch (DeepSeekClient.DeepSeekException | IllegalStateException e) {
+                    metricsService.completed(true, false, System.currentTimeMillis() - started,
+                            0, 0, body.getDocumentId() != null, false);
                     sendEvent(emitter, "error", Map.of("message", String.valueOf(e.getMessage())));
                     emitter.complete();
                 } catch (Exception e) {
+                    metricsService.completed(true, false, System.currentTimeMillis() - started,
+                            0, 0, body.getDocumentId() != null, false);
                     log.error("智能体流式对话异常", e);
                     sendEvent(emitter, "error",
                             Map.of("message", "智能体处理失败：" + e.getClass().getSimpleName()));
@@ -243,6 +273,8 @@ public class AgentController {
                 }
             });
         } catch (RejectedExecutionException e) {
+            metricsService.completed(true, false, 0, 0, 0,
+                    body.getDocumentId() != null, false);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "当前咨询人数较多，请稍后再试");
         }
 
@@ -523,6 +555,19 @@ public class AgentController {
         result.put("asrConfigured", asrClient.isConfigured());
         result.put("asrModel", asrClient.model());
         return result;
+    }
+
+    /**
+     * AI 运行指标：成功率、平均延迟、工具调用、检索命中、安全标记、用户反馈
+     * GET /api/agent/metrics
+     */
+    @GetMapping("/metrics")
+    public Map<String, Object> metrics(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
+        }
+        return metricsService.snapshot();
     }
 
     /**

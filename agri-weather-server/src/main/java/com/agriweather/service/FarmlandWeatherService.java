@@ -175,6 +175,7 @@ public class FarmlandWeatherService {
             String suggestion = (String) a.get("suggestion");
             WeatherAlert existing = todayByType.get(type);
             if (existing != null) {
+                int previousRank = alertLevelRank(existing.getAlertLevel());
                 boolean changed = !Objects.equals(existing.getAlertLevel(), level)
                         || !Objects.equals(existing.getAlertContent(), content)
                         || !Objects.equals(existing.getSuggestion(), suggestion);
@@ -185,7 +186,10 @@ public class FarmlandWeatherService {
                 if (changed) {
                     existing.setIsRead(false);
                     existing.setIsHandled(false);
-                    toNotify.add(existing);
+                    // 只在等级升高时推送，避免预报数值微调造成重复通知
+                    if (alertLevelRank(level) > previousRank) {
+                        toNotify.add(existing);
+                    }
                 }
                 alertRepo.save(existing);
             } else {
