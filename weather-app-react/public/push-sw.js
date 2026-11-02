@@ -1,6 +1,6 @@
 /* Web Push 事件处理：由 vite.config.js 的 workbox.importScripts 注入到生成的 SW */
 self.addEventListener('push', (event) => {
-  let data = {};
+  let data;
   try {
     data = event.data ? event.data.json() : {};
   } catch {
