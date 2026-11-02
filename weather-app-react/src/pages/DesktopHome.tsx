@@ -224,8 +224,6 @@ export default function DesktopHome() {
   }, [todayAlerts]);
 
   const todayAdvice = advice[0];
-  const adviceBan = todayAdvice?.bans?.[0];
-  const adviceTask = todayAdvice?.tasks?.join(' · ');
 
   const selectedAlerts = useMemo(
     () => todayAlerts.filter((a) => a.farmlandId === selectedField?.id && !a.isHandled),
@@ -298,7 +296,7 @@ export default function DesktopHome() {
         alertLevelMeta(b.top.alertLevel).rank - alertLevelMeta(a.top.alertLevel).rank
         || new Date(b.latest || 0).getTime() - new Date(a.latest || 0).getTime()
       ))
-      .slice(0, 3);
+      .slice(0, 2);
   }, [todayAlerts]);
 
   return (
@@ -401,22 +399,31 @@ export default function DesktopHome() {
                 </div>
               </div>
 
-              <div className={`dh-advice ${selectedAlerts.length > 0 || adviceBan ? 'warn' : 'ok'}`}>
-                <span className="dh-advice-icon">{selectedAlerts.length > 0 || adviceBan ? '⚠️' : '🌿'}</span>
-                <div>
-                  {selectedAlerts.length > 0 ? (
-                    <>
-                      <b>{selectedAlerts.length} 条预警待处理</b>
-                      <span>{alertTypeMeta(topSelectedAlert?.alertType).label} · 建议先查看预警</span>
-                    </>
-                  ) : (
-                    <>
-                      <b>{adviceBan || (adviceTask ? `适宜：${adviceTask}` : '今日暂无特别限制')}</b>
-                      <span>{adviceBan ? '建议调整今天的田间作业' : '按计划作业即可'}</span>
-                    </>
+            </div>
+
+            <div className="dh-hero-foot">
+              {selectedAlerts.length > 0 ? (
+                <span className="dh-hero-foot-chip warn">
+                  ⚠️ {selectedAlerts.length} 条预警待处理 · {alertTypeMeta(topSelectedAlert?.alertType).label}
+                </span>
+              ) : (
+                <>
+                  {todayAdvice?.tasks?.length > 0 && (
+                    <span className="dh-hero-foot-chip ok">适宜 {todayAdvice.tasks.join(' · ')}</span>
                   )}
-                </div>
-              </div>
+                  {todayAdvice?.bans?.length > 0 && (
+                    <span className="dh-hero-foot-chip warn">不宜 {todayAdvice.bans.join(' · ')}</span>
+                  )}
+                  {!todayAdvice?.tasks?.length && !todayAdvice?.bans?.length && (
+                    <span className="dh-hero-foot-chip ok">今日无特殊限制，按计划作业即可</span>
+                  )}
+                </>
+              )}
+              <span className="dh-hero-foot-meta">
+                风速 {todayAdvice?.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
+                {' · '}
+                降水 {todayAdvice?.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
+              </span>
             </div>
             </section>
 
@@ -462,38 +469,6 @@ export default function DesktopHome() {
                 )}
               </section>
 
-              <section className="dh-card glass">
-                <div className="dh-card-head">
-                  <h3>📅 今日农事</h3>
-                  {selectedField && <span className="dh-card-sub">{selectedField.fieldName}</span>}
-                </div>
-                {!todayAdvice ? (
-                  <p className="dh-empty">暂无农事建议</p>
-                ) : (
-                  <div className="dh-advice-list">
-                    {todayAdvice.tasks?.length > 0 && (
-                      <div className="dh-advice-row ok">
-                        <span className="dh-advice-tag">适宜</span>
-                        <span>{todayAdvice.tasks.join(' · ')}</span>
-                      </div>
-                    )}
-                    {todayAdvice.bans?.length > 0 && (
-                      <div className="dh-advice-row warn">
-                        <span className="dh-advice-tag">不宜</span>
-                        <span>{todayAdvice.bans.join(' · ')}</span>
-                      </div>
-                    )}
-                    {todayAdvice.tasks?.length === 0 && todayAdvice.bans?.length === 0 && (
-                      <p className="dh-empty">今日无特殊限制</p>
-                    )}
-                    <div className="dh-advice-foot">
-                      今日最大风速 {todayAdvice.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
-                      {' · '}
-                      今日降水 {todayAdvice.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
-                    </div>
-                  </div>
-                )}
-              </section>
             </div>
           </div>
 
