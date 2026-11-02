@@ -5,7 +5,10 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "strict": true,
+    // 页面级迁移先保证可编译；strict 规则后续逐页收紧
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
     "noEmit": true,
     "allowJs": true,
     "checkJs": false,

@@ -132,7 +132,7 @@ export default function FarmlandsPage() {
 
     setLoading(true);
     const numberOrNull = (value) => (String(value).trim() === '' ? null : Number(value));
-    const body = {
+    const body: Record<string, any> = {
       fieldName: form.fieldName.trim(),
       lat,
       lng,

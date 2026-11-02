@@ -157,7 +157,7 @@ export default function AlertsPage() {
     return items.sort((a, b) => {
       const rankDiff = alertLevelMeta(b.alertLevel).rank - alertLevelMeta(a.alertLevel).rank;
       if (rankDiff !== 0) return rankDiff;
-      return new Date(b.alertTime || 0) - new Date(a.alertTime || 0);
+      return new Date(b.alertTime || 0).getTime() - new Date(a.alertTime || 0).getTime();
     });
   }, [list, filter]);
 

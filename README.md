@@ -66,7 +66,7 @@
 
 **后端** — Spring Boot 3.5.2 · Java 17 · Spring Security + JWT (jjwt 0.12.6) · Spring Data JPA · MySQL 8 · Flyway（数据库版本管理）· Lombok
 
-**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 核心工具与地图几何使用 TypeScript（`npm run typecheck`）
+**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 页面层已迁移 TypeScript（`npm run typecheck`，strict 规则逐页收紧）· Playwright 冒烟测试
 
 **外部服务** — [Open-Meteo](https://open-meteo.com/)（天气，免费无密钥）· [DeepSeek](https://platform.deepseek.com/)（农事智能体）· 可选 OpenAI 兼容 Embedding（不配置时使用本地向量）
 

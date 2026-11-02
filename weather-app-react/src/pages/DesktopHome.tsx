@@ -277,7 +277,7 @@ export default function DesktopHome() {
     return [...groups.values()]
       .sort((a, b) => (
         alertLevelMeta(b.top.alertLevel).rank - alertLevelMeta(a.top.alertLevel).rank
-        || new Date(b.latest || 0) - new Date(a.latest || 0)
+        || new Date(b.latest || 0).getTime() - new Date(a.latest || 0).getTime()
       ))
       .slice(0, 3);
   }, [todayAlerts]);
@@ -648,7 +648,7 @@ function FieldSelect({ fields, value, weatherMap, onChange }) {
     if (options.length === 0) return;
     const index = options.indexOf(document.activeElement);
     const next = index < 0 ? 0 : (index + step + options.length) % options.length;
-    options[next].focus();
+    (options[next] as HTMLElement).focus();
     event.preventDefault();
   };
 

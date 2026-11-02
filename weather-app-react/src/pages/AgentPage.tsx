@@ -157,7 +157,7 @@ export default function AgentPage() {
     liveRef.current.timer = setTimeout(flushLive, 50);
   };
 
-  const send = async (text) => {
+  const send = async (text = undefined) => {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
