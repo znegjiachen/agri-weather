@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Web Push 发送：VAPID 签名由 web-push 库完成，发送失败不影响预警入库。
@@ -37,6 +38,9 @@ public class WebPushService {
 
     private PushService pushService;
     private ExecutorService executor;
+    private final AtomicLong sentCount = new AtomicLong();
+    private final AtomicLong failedCount = new AtomicLong();
+    private final AtomicLong expiredCount = new AtomicLong();
 
     @PostConstruct
     void init() {
@@ -107,18 +111,31 @@ public class WebPushService {
                 HttpResponse response = pushService.send(notification);
                 int status = response.getStatusLine().getStatusCode();
                 if (status >= 200 && status < 300) {
+                    sentCount.incrementAndGet();
                     subscription.setLastSuccessAt(LocalDateTime.now());
                     subscriptionRepository.save(subscription);
                 } else if (status == 404 || status == 410) {
                     // 浏览器已取消订阅
+                    expiredCount.incrementAndGet();
                     subscriptionRepository.delete(subscription);
                 } else {
+                    failedCount.incrementAndGet();
                     log.warn("Web Push 返回 HTTP {} endpoint={}", status, safeEndpoint(subscription));
                 }
             } catch (Exception e) {
+                failedCount.incrementAndGet();
                 log.warn("Web Push 发送失败 endpoint={}: {}", safeEndpoint(subscription), e.getMessage());
             }
         }
+    }
+
+    public Map<String, Object> metrics() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("enabled", isConfigured());
+        result.put("sent", sentCount.get());
+        result.put("failed", failedCount.get());
+        result.put("expired", expiredCount.get());
+        return result;
     }
 
     private String safeEndpoint(PushSubscription subscription) {

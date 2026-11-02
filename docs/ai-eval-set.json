@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "question": "稻瘟病在什么温湿度条件下容易发生？",
+      "expectedKeywords": ["稻瘟病", "湿度", "温度"]
+    },
+    {
+      "question": "水稻育秧期遇到低温应该怎么处理？",
+      "expectedKeywords": ["低温", "育秧", "薄膜"]
+    },
+    {
+      "question": "水稻分蘖期适合施什么肥？",
+      "expectedKeywords": ["分蘖", "氮肥", "施肥"]
+    },
+    {
+      "question": "水稻主要害虫有哪些，怎么防治？",
+      "expectedKeywords": ["螟虫", "稻飞虱", "防治"]
+    },
+    {
+      "question": "水稻抽穗扬花期遇到连续降雨怎么办？",
+      "expectedKeywords": ["抽穗", "降雨", "排水"]
+    },
+    {
+      "question": "水稻收获后如何烘干和储存？",
+      "expectedKeywords": ["收获", "烘干", "储存"]
+    },
+    {
+      "question": "水稻田什么时候需要晒田？",
+      "expectedKeywords": ["晒田", "分蘖", "灌溉"]
+    },
+    {
+      "question": "水稻纹枯病怎么识别和防治？",
+      "expectedKeywords": ["纹枯病", "病斑", "防治"]
+    },
+    {
+      "question": "杂交水稻和常规稻在管理上有什么区别？",
+      "expectedKeywords": ["杂交", "常规", "品种"]
+    },
+    {
+      "question": "水稻插秧深度多少合适？",
+      "expectedKeywords": ["插秧", "深度", "移栽"]
+    }
+  ]
+}

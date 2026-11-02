@@ -24,11 +24,13 @@ import com.agriweather.service.AgentChatHistoryService;
 import com.agriweather.service.AgentPromptBuilder;
 import com.agriweather.service.AgentService;
 import com.agriweather.service.AiMetricsService;
+import com.agriweather.service.AiQuotaService;
 import com.agriweather.service.BuiltInKnowledgeService;
 import com.agriweather.service.CommunityImageProcessor;
 import com.agriweather.service.EmbeddingService;
 import com.agriweather.service.AgentDocumentService;
 import com.agriweather.service.KnowledgeRetrievalService;
+import com.agriweather.push.WebPushService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -80,6 +82,8 @@ public class AgentController {
     private final AgentDocumentService agentDocumentService;
     private final AgriSafetyGuard safetyGuard;
     private final AiMetricsService metricsService;
+    private final AiQuotaService quotaService;
+    private final WebPushService webPushService;
 
     /**
      * 与农事智能体对话
@@ -93,6 +97,10 @@ public class AgentController {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
+        }
+        if (!quotaService.tryConsume(userId)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "今日 AI 问答次数已用完，请明天再试");
         }
 
         ChatPreparation prep = prepare(body, userId);
@@ -146,6 +154,10 @@ public class AgentController {
         Long userId = (Long) request.getAttribute("userId");
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
+        }
+        if (!quotaService.tryConsume(userId)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "今日 AI 问答次数已用完，请明天再试");
         }
 
         ChatPreparation prep = prepare(body, userId);
@@ -567,7 +579,9 @@ public class AgentController {
         if (userId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "登录已过期，请重新登录");
         }
-        return metricsService.snapshot();
+        Map<String, Object> result = new LinkedHashMap<>(metricsService.snapshot());
+        result.put("push", webPushService.metrics());
+        return result;
     }
 
     /**

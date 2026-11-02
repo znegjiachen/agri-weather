@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AgentProvider } from './context/AgentContext';
 import AppRoutes from './router';
 import AppStatusBanner from './components/AppStatusBanner';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import './App.css';
@@ -28,7 +29,9 @@ export default function App() {
       <AppStatusBanner />
       <AuthProvider>
         <AgentProvider>
-          <AppGate />
+          <ErrorBoundary>
+            <AppGate />
+          </ErrorBoundary>
         </AgentProvider>
       </AuthProvider>
     </BrowserRouter>

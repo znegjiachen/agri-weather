@@ -448,6 +448,18 @@ export default function AgentPage() {
     }
   };
 
+  const restoreDocument = (doc) => {
+    if (!doc?.documentId) return;
+    setDocAttachment({
+      documentId: doc.documentId,
+      filename: doc.filename,
+      charCount: doc.charCount || 0,
+      chunkCount: doc.chunkCount || 0,
+      truncated: false,
+      preview: doc.preview || '',
+    });
+  };
+
   const clearChat = () => {
     if (!window.confirm('清空后对话记录无法恢复，确定清空吗？')) return;
     clearLiveBuffer();
@@ -570,7 +582,18 @@ export default function AgentPage() {
                 )}
 
                 {m.document && (
-                  <div className="agent-doc-chip">📄 {m.document.filename}</div>
+                  m.document.documentId ? (
+                    <button
+                      type="button"
+                      className="agent-doc-chip clickable"
+                      onClick={() => restoreDocument(m.document)}
+                      title="点击继续参考该文档"
+                    >
+                      📄 {m.document.filename}
+                    </button>
+                  ) : (
+                    <div className="agent-doc-chip">📄 {m.document.filename}</div>
+                  )
                 )}
 
                 {m.role === 'assistant' && m.streaming
@@ -680,7 +703,9 @@ export default function AgentPage() {
           <div className="agent-doc-attachment" title={docAttachment.preview || ''}>
             <span>📄 {docAttachment.filename}</span>
             <small>
-              {docAttachment.charCount} 字 · {docAttachment.chunkCount ?? 0} 个片段
+              {docAttachment.chunkCount
+                ? `${docAttachment.charCount} 字 · ${docAttachment.chunkCount} 个片段`
+                : '已建立检索索引'}
               {docAttachment.truncated ? ' · 仅索引前部' : ''}
               {' · 后续提问会参考'}
             </small>

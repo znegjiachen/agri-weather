@@ -443,6 +443,18 @@ export default function AgentDock() {
     });
   };
 
+  const restoreDocument = (doc) => {
+    if (!doc?.documentId) return;
+    setDocAttachment({
+      documentId: doc.documentId,
+      filename: doc.filename,
+      charCount: doc.charCount || 0,
+      chunkCount: doc.chunkCount || 0,
+      truncated: false,
+      preview: doc.preview || '',
+    });
+  };
+
   const clearChat = () => {
     if (!window.confirm('清空后对话记录无法恢复，确定清空吗？')) return;
     attachments.forEach((item) => URL.revokeObjectURL(item.preview));
@@ -584,7 +596,18 @@ export default function AgentDock() {
             {m.role === 'user' && (
               <>
                 {m.document && (
-                  <div className="agent-dock-doc-chip">📄 {m.document.filename}</div>
+                  m.document.documentId ? (
+                    <button
+                      type="button"
+                      className="agent-dock-doc-chip clickable"
+                      onClick={() => restoreDocument(m.document)}
+                      title="点击继续参考该文档"
+                    >
+                      📄 {m.document.filename}
+                    </button>
+                  ) : (
+                    <div className="agent-dock-doc-chip">📄 {m.document.filename}</div>
+                  )
                 )}
                 <div className="agent-dock-bubble user">{m.content}</div>
                 {m.vision && (
@@ -690,7 +713,9 @@ export default function AgentDock() {
         <div className="agent-dock-doc" title={docAttachment.preview || ''}>
           <span>📄 {docAttachment.filename}</span>
           <small>
-            {docAttachment.charCount} 字 · {docAttachment.chunkCount ?? 0} 段
+            {docAttachment.chunkCount
+              ? `${docAttachment.charCount} 字 · ${docAttachment.chunkCount} 段`
+              : '已建立索引'}
             {docAttachment.truncated ? ' · 部分索引' : ''}
           </small>
           <button type="button" onClick={() => setDocAttachment(null)} aria-label="移除文档">×</button>

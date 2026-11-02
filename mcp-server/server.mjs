@@ -7,13 +7,32 @@
  *
  * 环境变量：
  *   AGRI_API_BASE  后端地址，默认 http://localhost:8082
- *   AGRI_TOKEN     登录后拿到的 JWT，必填
+ *   AGRI_TOKEN     可选，JWT；不填时用账号密码自动登录
+ *   AGRI_USERNAME  可选，配合 AGRI_PASSWORD 自动登录/续期
+ *   AGRI_PASSWORD  可选
  */
 
 import readline from 'node:readline';
 
 const API_BASE = (process.env.AGRI_API_BASE || 'http://localhost:8082').replace(/\/$/, '');
-const TOKEN = process.env.AGRI_TOKEN || '';
+const USERNAME = process.env.AGRI_USERNAME || '';
+const PASSWORD = process.env.AGRI_PASSWORD || '';
+let TOKEN = process.env.AGRI_TOKEN || '';
+
+async function login() {
+  if (!USERNAME || !PASSWORD) return false;
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.token) {
+    throw new Error(data?.message || data?.error || 'MCP 自动登录失败');
+  }
+  TOKEN = data.token;
+  return true;
+}
 
 const TOOLS = [
   {
@@ -63,10 +82,15 @@ const TOOLS = [
   },
 ];
 
-async function api(path) {
+async function api(path, retried = false) {
+  if (!TOKEN && USERNAME && PASSWORD) await login();
   const response = await fetch(`${API_BASE}${path}`, {
     headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
   });
+  if (response.status === 401 && !retried && USERNAME && PASSWORD) {
+    await login();
+    return api(path, true);
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(data?.message || data?.error || `HTTP ${response.status}`);
@@ -152,8 +176,10 @@ async function handle(message) {
   });
 }
 
-if (!TOKEN) {
-  console.error('缺少 AGRI_TOKEN，请先登录问田并设置环境变量');
+if (!TOKEN && !(USERNAME && PASSWORD)) {
+  console.error('缺少 AGRI_TOKEN，或同时设置 AGRI_USERNAME / AGRI_PASSWORD 自动登录');
+} else if (!TOKEN) {
+  login().catch((error) => console.error('MCP 自动登录失败:', error.message));
 }
 
 const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });

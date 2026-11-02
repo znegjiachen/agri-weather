@@ -440,6 +440,10 @@ export default function AgentStudioPage() {
             <b>{metrics.feedbackUp ?? 0} / {metrics.feedbackDown ?? 0}</b>
             <span>👍 / 👎</span>
           </div>
+          <div className="studio-metric" title="Web Push 成功 / 失败">
+            <b>{metrics.push ? `${metrics.push.sent ?? 0} / ${metrics.push.failed ?? 0}` : '—'}</b>
+            <span>推送成功 / 失败</span>
+          </div>
         </section>
       )}
 

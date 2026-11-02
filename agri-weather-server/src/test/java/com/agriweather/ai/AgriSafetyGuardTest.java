@@ -32,6 +32,15 @@ class AgriSafetyGuardTest {
     }
 
     @Test
+    void redactsPhoneAndIdCard() {
+        AgentResult result = result("联系人 13812345678，身份证 430102199001011234。");
+        AgentResult reviewed = guard.review(result);
+        assertTrue(reviewed.reply().contains("手机号已隐去"));
+        assertTrue(reviewed.reply().contains("身份证号已隐去"));
+        assertTrue(reviewed.reply().contains("【隐私提示】"));
+    }
+
+    @Test
     void keepsNormalReplyUntouched() {
         AgentResult result = result("明天风速较大，建议推迟打药。");
         assertFalse(guard.isRisky(result.reply()));

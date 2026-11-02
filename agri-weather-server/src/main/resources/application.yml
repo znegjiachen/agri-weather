@@ -84,7 +84,12 @@ app:
     language: ${ASR_LANGUAGE:zh}
     timeout-seconds: ${ASR_TIMEOUT_SECONDS:60}
 
-  # 按分钟限流：登录爆破 / AI 调用被刷 / 上传滥用
+  # 每日 AI 额度（与每分钟限流互补）
+  ai:
+    quota-enabled: ${AI_QUOTA_ENABLED:true}
+    daily-chat-quota: ${AI_DAILY_CHAT_QUOTA:80}
+
+# 按分钟限流：登录爆破 / AI 调用被刷 / 上传滥用
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:20}

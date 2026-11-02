@@ -11,6 +11,13 @@ AGRI_TOKEN=你的JWT AGRI_API_BASE=http://localhost:8082 node server.mjs
 
 `AGRI_TOKEN` 来自登录接口返回的 `token`，也可以从浏览器的 `localStorage.getItem('token')` 获取。
 
+JWT 24 小时后过期。长期运行建议改用账号密码自动登录/续期：
+
+```bash
+cd mcp-server
+AGRI_USERNAME=你的用户名 AGRI_PASSWORD=你的密码 AGRI_API_BASE=http://localhost:8082 node server.mjs
+```
+
 ## 客户端配置
 
 ```json
