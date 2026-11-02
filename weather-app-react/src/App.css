@@ -5634,6 +5634,10 @@ main {
 
 /* ---------- 今日天气卡片 ---------- */
 .dh-hero {
+  /* glass 的 backdrop-filter 会创建层叠上下文；提高 hero 的层级，
+     否则下拉菜单会被后面的地块卡片盖住 */
+  position: relative;
+  z-index: 20;
   margin-bottom: 20px;
   padding: 17px 20px 18px;
   border-radius: 20px;
