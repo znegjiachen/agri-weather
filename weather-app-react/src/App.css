@@ -4858,6 +4858,91 @@ main {
 .records-status.planted { background: rgba(34, 197, 94, 0.12); color: #15803d; }
 .records-status.harvested { background: rgba(102, 126, 234, 0.12); color: #4c5bd4; }
 .records-status.fallow { background: rgba(234, 179, 8, 0.14); color: #b45309; }
+.records-status.pending { background: rgba(234, 179, 8, 0.14); color: #b45309; }
+.records-status.done { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+.records-status.skipped { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+
+.records-plan-upload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.records-plan-upload > span {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.records-upload-btn {
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.records-uploading { color: #4c5bd4 !important; }
+
+.records-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px dashed rgba(102, 126, 234, 0.35);
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.records-preview-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.records-preview-head span { color: var(--text-muted); font-size: 10.5px; }
+
+.records-preview > .btn-primary {
+  align-self: flex-start;
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.records-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.records-summary b { color: var(--text-primary); font-size: 13px; }
+.records-summary .warn b { color: #b91c1c; }
+
+.records-task-done {
+  flex: none;
+  padding: 4px 9px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 7px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #15803d;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.records-task-done:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .records-danger {
   flex: none;

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { farmlands as farmlandApi } from '../api';
+import { agent as agentApi, farmlands as farmlandApi } from '../api';
 
 const SEASON_STATUS = { PLANTED: '在种', HARVESTED: '已收获', FALLOW: '休耕' };
 const OPERATION_TYPES = ['施肥', '打药', '灌溉', '播种', '除草', '其他'];
+const TASK_TYPES = {
+  SOW: '播种', FERTILIZE: '施肥', SPRAY: '打药',
+  IRRIGATE: '灌溉', HARVEST: '收获', OTHER: '其他',
+};
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -13,6 +17,11 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   const [tab, setTab] = useState('seasons');
   const [seasons, setSeasons] = useState(null);
   const [operations, setOperations] = useState(null);
+  const [tasks, setTasks] = useState(null);
+  const [taskSummary, setTaskSummary] = useState(null);
+  const [planPreview, setPlanPreview] = useState(null);
+  const [planSourceName, setPlanSourceName] = useState('');
+  const [planLoading, setPlanLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -40,8 +49,18 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   const load = async () => {
     setError('');
     try {
-      if (tab === 'seasons') setSeasons(await farmlandApi.seasons.list(farmland.id));
-      else setOperations(await farmlandApi.farmOperations.list(farmland.id));
+      if (tab === 'seasons') {
+        setSeasons(await farmlandApi.seasons.list(farmland.id));
+      } else if (tab === 'operations') {
+        setOperations(await farmlandApi.farmOperations.list(farmland.id));
+      } else {
+        const [taskList, summary] = await Promise.all([
+          farmlandApi.tasks.list(farmland.id),
+          farmlandApi.tasks.summary(farmland.id),
+        ]);
+        setTasks(taskList);
+        setTaskSummary(summary);
+      }
     } catch (e) {
       setError(e.message || '加载失败');
     }
@@ -135,6 +154,74 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
+  const handlePlanFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
+      setError('方案文档支持 TXT、Markdown、PDF、Word');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('方案文档不能超过 5MB');
+      return;
+    }
+    setPlanLoading(true);
+    setError('');
+    try {
+      const document = await agentApi.document(file);
+      const preview = await farmlandApi.tasks.extract(farmland.id, document.id);
+      setPlanPreview(preview);
+      setPlanSourceName(document.filename || file.name);
+    } catch (e) {
+      setError(e.message || '方案解析失败');
+    } finally {
+      setPlanLoading(false);
+    }
+  };
+
+  const savePlanTasks = async () => {
+    if (!planPreview?.length) return;
+    setSaving(true);
+    setError('');
+    try {
+      await farmlandApi.tasks.confirm(farmland.id, {
+        tasks: planPreview,
+        sourceName: planSourceName,
+      });
+      setPlanPreview(null);
+      setPlanSourceName('');
+      await load();
+    } catch (e) {
+      setError(e.message || '任务保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateTask = async (task, status) => {
+    setSaving(true);
+    setError('');
+    try {
+      await farmlandApi.tasks.update(farmland.id, task.id, { status });
+      await load();
+    } catch (e) {
+      setError(e.message || '任务更新失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeTask = async (taskId) => {
+    if (!window.confirm('删除这条计划任务？')) return;
+    try {
+      await farmlandApi.tasks.remove(farmland.id, taskId);
+      await load();
+    } catch (e) {
+      setError(e.message || '删除失败');
+    }
+  };
+
   return (
     <div
       className="form-overlay"
@@ -164,11 +251,109 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
           >
             农事记录
           </button>
+          <button
+            type="button"
+            className={tab === 'tasks' ? 'active' : ''}
+            onClick={() => setTab('tasks')}
+          >
+            计划任务
+          </button>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
 
-        {tab === 'seasons' ? (
+        {tab === 'tasks' ? (
+          <>
+            <div className="records-plan-upload">
+              <label className="records-upload-btn">
+                📄 上传种植方案，生成任务
+                <input
+                  type="file"
+                  accept=".txt,.md,.markdown,.pdf,.doc,.docx"
+                  hidden
+                  onChange={handlePlanFile}
+                />
+              </label>
+              <span>支持 PDF / Word / TXT / Markdown，生成后需确认才保存</span>
+              {planLoading && <span className="records-uploading">正在解析方案…</span>}
+            </div>
+
+            {planPreview && (
+              <div className="records-preview">
+                <div className="records-preview-head">
+                  <b>识别到 {planPreview.length} 条任务</b>
+                  <span>{planSourceName}</span>
+                </div>
+                {planPreview.map((task, index) => (
+                  <div className="records-row" key={`${task.title}-${index}`}>
+                    <div>
+                      <b>{task.title}</b>
+                      <span>
+                        {TASK_TYPES[task.taskType] || '其他'}
+                        {task.plannedDate ? ` · ${task.plannedDate}` : ' · 日期待定'}
+                        {task.sourceQuote ? ` · 「${task.sourceQuote}」` : ''}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="records-danger"
+                      onClick={() => setPlanPreview((prev) => prev.filter((_, i) => i !== index))}
+                    >
+                      移除
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="btn-primary" onClick={savePlanTasks} disabled={saving}>
+                  {saving ? '保存中…' : '确认保存为任务'}
+                </button>
+              </div>
+            )}
+
+            {taskSummary && (
+              <div className="records-summary">
+                <span>完成率 <b>{taskSummary.completionRate}%</b></span>
+                <span>按时率 <b>{taskSummary.onTimeRate}%</b></span>
+                <span>待办 <b>{taskSummary.pending}</b></span>
+                <span className={taskSummary.overdue > 0 ? 'warn' : ''}>逾期 <b>{taskSummary.overdue}</b></span>
+              </div>
+            )}
+
+            <div className="records-list">
+              {tasks === null ? <p className="empty-text">加载中…</p>
+                : tasks.length === 0 ? (
+                  <p className="empty-text">还没有计划任务，上传一份种植方案试试。</p>
+                ) : tasks.map((task) => (
+                  <div className="records-row" key={task.id}>
+                    <div>
+                      <b>{task.title}</b>
+                      <span>
+                        {TASK_TYPES[task.taskType] || '其他'}
+                        {task.plannedDate ? ` · 计划 ${task.plannedDate}` : ''}
+                        {task.actualDate ? ` · 实际 ${task.actualDate}` : ''}
+                        {task.sourceName ? ` · ${task.sourceName}` : ''}
+                      </span>
+                    </div>
+                    <span className={`records-status ${task.status?.toLowerCase()}`}>
+                      {task.status === 'DONE' ? '已完成' : task.status === 'SKIPPED' ? '已跳过' : '待执行'}
+                    </span>
+                    {task.status === 'PENDING' && (
+                      <>
+                        <button type="button" className="records-task-done" onClick={() => updateTask(task, 'DONE')} disabled={saving}>
+                          完成
+                        </button>
+                        <button type="button" className="records-danger" onClick={() => updateTask(task, 'SKIPPED')} disabled={saving}>
+                          跳过
+                        </button>
+                      </>
+                    )}
+                    <button type="button" className="records-danger" onClick={() => removeTask(task.id)}>
+                      删除
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </>
+        ) : tab === 'seasons' ? (
           <>
             <form className="records-form" onSubmit={submitSeason}>
               <div className="records-grid">

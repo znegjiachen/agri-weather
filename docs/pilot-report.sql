@@ -59,3 +59,18 @@ SELECT operation_type, COUNT(*) AS total
 FROM farm_operation
 GROUP BY operation_type
 ORDER BY total DESC;
+
+-- 9. 方案任务执行情况（证明“方案→任务→执行→偏差”闭环被使用）
+SELECT status, COUNT(*) AS total
+FROM farm_plan_task
+GROUP BY status;
+
+SELECT
+  COUNT(*) AS total_tasks,
+  SUM(status = 'DONE') AS done_tasks,
+  SUM(status = 'SKIPPED') AS skipped_tasks,
+  SUM(status = 'PENDING' AND planned_date < CURDATE()) AS overdue_tasks,
+  ROUND(SUM(status = 'DONE' AND actual_date <= planned_date)
+        / NULLIF(SUM(status = 'DONE' AND planned_date IS NOT NULL AND actual_date IS NOT NULL), 0) * 100, 1)
+    AS on_time_pct
+FROM farm_plan_task;

@@ -105,6 +105,16 @@ public class AgentDocumentService {
                 document.getCharCount(), document.getChunkCount(), truncated, preview);
     }
 
+    /** 读取文档正文，供方案任务抽取使用；校验归属和过期时间 */
+    public String documentText(Long userId, Long documentId) {
+        AgentDocument document = documentRepository.findByIdAndUserId(documentId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("文档不存在或无权访问"));
+        if (document.getExpiresAt() != null && document.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("文档已过期，请重新上传");
+        }
+        return document.getContent() == null ? "" : document.getContent();
+    }
+
     /** 单文档兼容入口 */
     public String buildContextBlock(Long userId, Long documentId, String query) {
         return documentId == null ? "" : buildContextBlock(userId, List.of(documentId), query);

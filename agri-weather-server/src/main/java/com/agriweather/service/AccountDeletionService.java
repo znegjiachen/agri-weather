@@ -40,6 +40,10 @@ public class AccountDeletionService {
                 DELETE FROM farmland_season
                 WHERE farmland_id IN (SELECT id FROM farmland WHERE user_id = ?)
                 """, userId);
+        jdbc.update("""
+                DELETE FROM farm_plan_task
+                WHERE farmland_id IN (SELECT id FROM farmland WHERE user_id = ?)
+                """, userId);
         jdbc.update("DELETE FROM farmland WHERE user_id = ?", userId);
 
         jdbc.update("""

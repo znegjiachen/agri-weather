@@ -147,6 +147,24 @@ export const farmlands = {
       { method: 'DELETE' },
     ),
   },
+  tasks: {
+    list: (farmlandId) => request(`/api/farmlands/${farmlandId}/tasks`),
+    extract: (farmlandId, documentId) => request(`/api/farmlands/${farmlandId}/tasks/extract`, {
+      method: 'POST', body: JSON.stringify({ documentId }),
+    }),
+    confirm: (farmlandId, body) => request(`/api/farmlands/${farmlandId}/tasks/confirm`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+    update: (farmlandId, taskId, body) => request(
+      `/api/farmlands/${farmlandId}/tasks/${taskId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+    remove: (farmlandId, taskId) => request(
+      `/api/farmlands/${farmlandId}/tasks/${taskId}`,
+      { method: 'DELETE' },
+    ),
+    summary: (farmlandId) => request(`/api/farmlands/${farmlandId}/tasks/summary`),
+  },
   farmOperations: {
     list: (farmlandId) => request(`/api/farmlands/${farmlandId}/operations`),
     create: (farmlandId, body) => request(`/api/farmlands/${farmlandId}/operations`, {
