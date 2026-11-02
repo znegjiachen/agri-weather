@@ -330,7 +330,8 @@ export default function DesktopHome() {
         <div className="dh-loading">正在加载地块与天气…</div>
       ) : (
         <>
-          <section className="dh-hero glass">
+          <div className="dh-top-grid">
+            <section className="dh-hero glass">
             <div className="dh-hero-head">
               {selectedField ? (
                 <FieldSelect
@@ -417,7 +418,103 @@ export default function DesktopHome() {
                 </div>
               </div>
             </div>
-          </section>
+            </section>
+
+            <div className="dh-col-side">
+              <section className="dh-card glass dh-todo-card">
+                <div className="dh-card-head">
+                  <h3>
+                    ✅ 今日待办
+                    {todayTasks.length > 0 && <span className="dh-count-pill">{todayTasks.length}</span>}
+                  </h3>
+                  <button type="button" className="dh-link" onClick={() => navigate('/home/farmlands')}>
+                    农事记录 ›
+                  </button>
+                </div>
+
+                {taskError && <p className="dh-todo-error">{taskError}</p>}
+
+                {todayTasks.length === 0 ? (
+                  <p className="dh-empty">今天没有到期或逾期的农事任务</p>
+                ) : (
+                  <div className="dh-todo-list">
+                    {todayTasks.map((task) => (
+                      <div className={`dh-todo-item ${task.overdue ? 'overdue' : ''}`} key={task.id}>
+                        <div className="dh-todo-main">
+                          <b>{task.title}</b>
+                          <span>
+                            {task.farmlandName}
+                            {' · '}
+                            {task.overdue ? `已逾期（计划 ${task.plannedDate}）` : '今天到期'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="dh-todo-done"
+                          onClick={() => completeTodayTask(task)}
+                          disabled={completingTaskId === task.id}
+                        >
+                          {completingTaskId === task.id ? '处理中…' : '完成'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="dh-card glass">
+                <div className="dh-card-head">
+                  <h3>
+                    ⚠️ 预警中心
+                    {todayAlerts.length > 0 && <span className="dh-count-pill">{todayAlerts.length}</span>}
+                  </h3>
+                  <button type="button" className="dh-link" onClick={() => navigate('/home/alerts')}>
+                    全部 ›
+                  </button>
+                </div>
+
+                {alertGroups.length === 0 ? (
+                  <p className="dh-empty">暂无待处理预警，一切正常</p>
+                ) : (
+                  <div className="dh-alerts">
+                    {alertGroups.map((group) => {
+                      const level = alertLevelMeta(group.top.alertLevel);
+                      const type = alertTypeMeta(group.top.alertType);
+                      const seen = new Set();
+                      const types = group.alerts.filter((a) => {
+                        if (seen.has(a.alertType)) return false;
+                        seen.add(a.alertType);
+                        return true;
+                      }).slice(0, 3);
+                      return (
+                        <div key={group.key} className={`dh-alert ${level.cls}`}>
+                          <span className="dh-alert-icon">{type.icon}</span>
+                          <div className="dh-alert-body">
+                            <div className="dh-alert-title">
+                              <span className="dh-alert-group-name">{group.farmlandName}</span>
+                              <span className="dh-alert-group-count">{group.alerts.length} 条</span>
+                            </div>
+                            <div className="dh-alert-types">
+                              {types.map((a) => {
+                                const t = alertTypeMeta(a.alertType);
+                                return (
+                                  <span key={a.id} className={`dh-alert-type-chip ${alertLevelMeta(a.alertLevel).cls}`}>
+                                    {t.label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            <div className="dh-alert-meta">{group.top.alertContent}</div>
+                          </div>
+                          <span className="dh-alert-time">{alertTimeLabel(group.latest)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
 
           <div className="dh-section-head">
             <h2>
@@ -525,99 +622,6 @@ export default function DesktopHome() {
             </section>
 
             <div className="dh-col-right">
-              <section className="dh-card glass dh-todo-card">
-                <div className="dh-card-head">
-                  <h3>
-                    ✅ 今日待办
-                    {todayTasks.length > 0 && <span className="dh-count-pill">{todayTasks.length}</span>}
-                  </h3>
-                  <button type="button" className="dh-link" onClick={() => navigate('/home/farmlands')}>
-                    农事记录 ›
-                  </button>
-                </div>
-
-                {taskError && <p className="dh-todo-error">{taskError}</p>}
-
-                {todayTasks.length === 0 ? (
-                  <p className="dh-empty">今天没有到期或逾期的农事任务</p>
-                ) : (
-                  <div className="dh-todo-list">
-                    {todayTasks.map((task) => (
-                      <div className={`dh-todo-item ${task.overdue ? 'overdue' : ''}`} key={task.id}>
-                        <div className="dh-todo-main">
-                          <b>{task.title}</b>
-                          <span>
-                            {task.farmlandName}
-                            {' · '}
-                            {task.overdue ? `已逾期（计划 ${task.plannedDate}）` : '今天到期'}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          className="dh-todo-done"
-                          onClick={() => completeTodayTask(task)}
-                          disabled={completingTaskId === task.id}
-                        >
-                          {completingTaskId === task.id ? '处理中…' : '完成'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="dh-card glass">
-                <div className="dh-card-head">
-                  <h3>
-                    ⚠️ 预警中心
-                    {todayAlerts.length > 0 && <span className="dh-count-pill">{todayAlerts.length}</span>}
-                  </h3>
-                  <button type="button" className="dh-link" onClick={() => navigate('/home/alerts')}>
-                    全部 ›
-                  </button>
-                </div>
-
-                {alertGroups.length === 0 ? (
-                  <p className="dh-empty">暂无待处理预警，一切正常</p>
-                ) : (
-                  <div className="dh-alerts">
-                    {alertGroups.map((group) => {
-                      const level = alertLevelMeta(group.top.alertLevel);
-                      const type = alertTypeMeta(group.top.alertType);
-                      const seen = new Set();
-                      const types = group.alerts.filter((a) => {
-                        if (seen.has(a.alertType)) return false;
-                        seen.add(a.alertType);
-                        return true;
-                      }).slice(0, 3);
-                      return (
-                        <div key={group.key} className={`dh-alert ${level.cls}`}>
-                          <span className="dh-alert-icon">{type.icon}</span>
-                          <div className="dh-alert-body">
-                            <div className="dh-alert-title">
-                              <span className="dh-alert-group-name">{group.farmlandName}</span>
-                              <span className="dh-alert-group-count">{group.alerts.length} 条</span>
-                            </div>
-                            <div className="dh-alert-types">
-                              {types.map((a) => {
-                                const t = alertTypeMeta(a.alertType);
-                                return (
-                                  <span key={a.id} className={`dh-alert-type-chip ${alertLevelMeta(a.alertLevel).cls}`}>
-                                    {t.label}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                            <div className="dh-alert-meta">{group.top.alertContent}</div>
-                          </div>
-                          <span className="dh-alert-time">{alertTimeLabel(group.latest)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
               <section className="dh-card glass">
                 <div className="dh-card-head">
                   <h3>📅 今日农事</h3>

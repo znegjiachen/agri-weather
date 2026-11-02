@@ -6030,12 +6030,28 @@ main {
 }
 
 /* ---------- 今日天气卡片 ---------- */
+.dh-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.85fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+
+.dh-col-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
 .dh-hero {
   /* glass 的 backdrop-filter 会创建层叠上下文；提高 hero 的层级，
      否则下拉菜单会被后面的地块卡片盖住 */
   position: relative;
   z-index: 20;
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
   padding: 17px 20px 18px;
   border-radius: 20px;
 }
@@ -6218,6 +6234,7 @@ main {
 
 .dh-hero-body {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 20px;
 }
@@ -6691,10 +6708,28 @@ main {
 }
 
 /* 今日待办 */
+.dh-todo-card {
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  background: linear-gradient(150deg, rgba(240, 253, 244, 0.9), rgba(255, 255, 255, 0.72));
+}
+
+.dh-todo-card .dh-card-head h3 { color: #166534; }
+
 .dh-todo-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 216px;
+  overflow-y: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.3) transparent;
+}
+
+.dh-todo-list::-webkit-scrollbar { width: 4px; }
+.dh-todo-list::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: rgba(34, 197, 94, 0.28);
 }
 
 .dh-todo-item {
@@ -6891,15 +6926,22 @@ main {
   .dh-updated { display: none; }
 }
 
+@media (max-width: 1100px) {
+  .dh-top-grid { grid-template-columns: 1fr; }
+  .dh-col-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
 @media (max-width: 980px) {
-  .dh-fields { grid-template-columns: repeat(2, 1fr); }
   .dh-bottom { grid-template-columns: 1fr; }
   .dh-col-right {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: start;
   }
-  .dh-col-right > :last-child { grid-column: 1 / -1; }
 }
 
 @media (max-width: 860px) {
@@ -6907,9 +6949,8 @@ main {
   .dh-greeting h1 { font-size: 20px; }
   .dh-actions { flex-shrink: 0; }
   .dh-advice { display: none; }
-  .dh-fields { grid-template-columns: 1fr 1fr; }
+  .dh-col-side { grid-template-columns: 1fr; }
   .dh-col-right { grid-template-columns: 1fr; }
-  .dh-col-right > :last-child { grid-column: auto; }
   .dh-chart { overflow-x: auto; }
   .forecast-trend { min-width: 420px; }
 }
