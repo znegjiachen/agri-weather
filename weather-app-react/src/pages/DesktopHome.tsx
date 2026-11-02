@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { farmlands, alerts as alertsApi, crops } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -409,7 +409,7 @@ export default function DesktopHome() {
               </span>
             </h2>
             <div className="dh-section-actions">
-              {fields.length > 5 && (
+              {fields.length > 8 && (
                 <span className="dh-fields-hint">左右滑动查看更多</span>
               )}
               <button type="button" className="dh-link" onClick={() => navigate('/home/map')}>
@@ -418,7 +418,13 @@ export default function DesktopHome() {
             </div>
           </div>
 
-          <div className="dh-fields">
+          <div
+            className="dh-fields"
+            style={{
+              '--dh-field-count': Math.max(fields.length, 5),
+              '--dh-field-gaps': `${(Math.max(fields.length, 5) - 1) * 14}px`,
+            } as CSSProperties}
+          >
             {fields.map((f) => {
               const w = weatherMap[f.id];
               const info = w?.current ? getWeatherInfo(w.current.weather_code) : null;

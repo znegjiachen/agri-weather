@@ -6134,8 +6134,9 @@ main {
 }
 
 .dh-field-card {
-  flex: 0 0 calc((100% - 4 * 14px) / 5);
-  min-width: 170px;
+  /* 默认最多 5 张一行；超过 5 块时按实际数量均分，尽量一屏显示全部 */
+  flex: 0 0 calc((100% - var(--dh-field-gaps, 56px)) / var(--dh-field-count, 5));
+  min-width: 145px;
   scroll-snap-align: start;
 }
 
