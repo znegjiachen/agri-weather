@@ -6814,6 +6814,73 @@ main {
   margin-bottom: 20px;
 }
 
+/* AI 运行指标条 */
+.studio-metrics {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(7, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  border-radius: 15px;
+}
+
+.studio-metrics-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio-metrics-head small {
+  margin-left: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 400;
+}
+
+.studio-metrics-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.studio-metric {
+  min-width: 0;
+  padding-left: 9px;
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  text-align: left;
+}
+
+.studio-metric b {
+  display: block;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-metric span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .studio-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .studio-metrics-head { grid-column: 1 / -1; }
+  .studio-metric { border-left: 0; padding-left: 0; }
+}
+
 .studio-head h1 {
   margin: 0;
   color: #fff;

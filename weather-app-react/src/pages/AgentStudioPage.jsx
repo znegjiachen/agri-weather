@@ -46,6 +46,7 @@ export default function AgentStudioPage() {
   const [saveMsg, setSaveMsg] = useState('');
 
   const [runtimeStatus, setRuntimeStatus] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState('');
 
@@ -67,6 +68,21 @@ export default function AgentStudioPage() {
   const reloadList = useCallback(async () => {
     const data = await agentsApi.list();
     setAgents(Array.isArray(data) ? data : []);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const loadMetrics = () => {
+      agentsApi.metrics()
+        .then((data) => { if (alive) setMetrics(data); })
+        .catch(() => {});
+    };
+    loadMetrics();
+    const timer = setInterval(loadMetrics, 30000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -383,6 +399,49 @@ export default function AgentStudioPage() {
       </header>
 
       {listError && <div className="agent-error studio-error">{listError}</div>}
+
+      {metrics && (
+        <section className="studio-metrics glass">
+          <div className="studio-metrics-head">
+            <span className="studio-metrics-dot" />
+            AI 运行指标
+            <small>30 秒刷新</small>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.chatRequests ?? 0}</b>
+            <span>对话请求</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.successRate == null ? '—' : `${metrics.successRate}%`}</b>
+            <span>成功率</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.avgLatencyMs == null
+              ? '—'
+              : metrics.avgLatencyMs >= 1000
+                ? `${(metrics.avgLatencyMs / 1000).toFixed(1)}s`
+                : `${metrics.avgLatencyMs}ms`}
+            </b>
+            <span>平均响应</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.toolCalls ?? 0}</b>
+            <span>工具调用</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.knowledgeHits ?? 0}</b>
+            <span>知识命中</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.documentTurns ?? 0}</b>
+            <span>文档问答</span>
+          </div>
+          <div className="studio-metric">
+            <b>{metrics.feedbackUp ?? 0} / {metrics.feedbackDown ?? 0}</b>
+            <span>👍 / 👎</span>
+          </div>
+        </section>
+      )}
 
       <div className="studio-layout">
         <aside className="studio-sidebar glass">

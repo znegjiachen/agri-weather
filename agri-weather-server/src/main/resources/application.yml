@@ -84,7 +84,14 @@ app:
     language: ${ASR_LANGUAGE:zh}
     timeout-seconds: ${ASR_TIMEOUT_SECONDS:60}
 
-  # 对话内文档检索：上传切块建索引，提问时只注入相关片段
+  # 按分钟限流：登录爆破 / AI 调用被刷 / 上传滥用
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    auth-per-minute: ${RATE_LIMIT_AUTH_PER_MINUTE:20}
+    agent-per-minute: ${RATE_LIMIT_AGENT_PER_MINUTE:10}
+    upload-per-minute: ${RATE_LIMIT_UPLOAD_PER_MINUTE:6}
+
+# 对话内文档检索：上传切块建索引，提问时只注入相关片段
   document:
     ttl-days: ${DOCUMENT_TTL_DAYS:7}
     max-chunks: ${DOCUMENT_MAX_CHUNKS:120}

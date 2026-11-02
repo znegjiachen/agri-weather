@@ -191,7 +191,8 @@ cd weather-app-react && npm install && npm run dev
 
 ### AI 评测与安全
 
-- **运行指标**：`GET /api/agent/metrics` 返回请求数、成功率、平均延迟、工具调用数、知识命中、文档轮次、安全提示次数、点赞/点踩数
+- **运行指标**：`GET /api/agent/metrics` 返回请求数、成功率、平均延迟、工具调用数、知识命中、文档轮次、安全提示次数、点赞/点踩数；智能体控制台顶部同步展示并每 30 秒刷新
+- **接口限流**：登录/注册、智能体对话、上传接口按用户或 IP 每分钟限流，Redis 不可用时自动放行
 - **用户反馈**：回答下方 👍/👎 写入 `agent_feedback`，可按消息去重更新
 - **安全兜底**：`AgriSafetyGuard` 检测高毒/禁用农药和绝对化承诺，自动追加安全提示
 - **演示材料**：[docs/demo-script.md](docs/demo-script.md)（5 分钟答辩脚本）· [docs/pilot-guide.md](docs/pilot-guide.md)（小范围试点与指标口径）
@@ -223,6 +224,7 @@ cd weather-app-react && npm install && npm run dev
 | `ASR_BASE_URL` / `ASR_API_KEY` / `ASR_MODEL` | 可选，OpenAI 兼容的语音识别服务（如 Whisper）；不配置时前端回退浏览器语音识别 |
 | `ASR_LANGUAGE` | 可选，识别语言，默认 `zh` |
 | `ALERT_REFRESH_INTERVAL_MS` | 可选，后台预警检查间隔，默认 1800000（30 分钟） |
+| `RATE_LIMIT_AUTH_PER_MINUTE` / `RATE_LIMIT_AGENT_PER_MINUTE` / `RATE_LIMIT_UPLOAD_PER_MINUTE` | 可选，登录/智能体/上传接口每分钟限流，默认 20 / 10 / 6 |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | 可选，Web Push 后台推送；生成一次后固定使用，多实例共享。生成：`./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.1.0:java -Dexec.mainClass=com.agriweather.push.VapidKeyGenerator` |
 | `DOCUMENT_TTL_DAYS` / `DOCUMENT_MAX_CHUNKS` | 可选，对话文档保留天数（默认 7）与最多索引片段数（默认 120） |
 | `SERVER_PORT` | 后端端口，默认 8082 |
