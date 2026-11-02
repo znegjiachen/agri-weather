@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { agent as agentApi, farmlands as farmlandApi } from '../api';
+import { agent as agentApi, crops as cropsApi, farmlands as farmlandApi } from '../api';
 
 const SEASON_STATUS = { PLANTED: '在种', HARVESTED: '已收获', FALLOW: '休耕' };
 const OPERATION_TYPES = ['施肥', '打药', '灌溉', '播种', '除草', '其他'];
@@ -16,9 +16,21 @@ function today() {
 export default function FarmlandRecordsModal({ farmland, cropList = [], onClose }) {
   const [tab, setTab] = useState('seasons');
   const [seasons, setSeasons] = useState(null);
+  const [seasonStage, setSeasonStage] = useState({});
   const [operations, setOperations] = useState(null);
+  const [pendingTasks, setPendingTasks] = useState([]);
   const [tasks, setTasks] = useState(null);
   const [taskSummary, setTaskSummary] = useState(null);
+  const [completingSeason, setCompletingSeason] = useState(null);
+  const [completeForm, setCompleteForm] = useState({
+    cropId: '',
+    plantDate: today(),
+    seasonName: '',
+    planDocumentId: null,
+    planName: '',
+  });
+  const [completePlanLoading, setCompletePlanLoading] = useState(false);
+  const [completeResult, setCompleteResult] = useState(null);
   const [planPreview, setPlanPreview] = useState(null);
   const [planSourceName, setPlanSourceName] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
@@ -50,9 +62,28 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     setError('');
     try {
       if (tab === 'seasons') {
-        setSeasons(await farmlandApi.seasons.list(farmland.id));
+        const list = await farmlandApi.seasons.list(farmland.id);
+        setSeasons(list);
+        // 按播种日期推算每个在种季节当前所处的生育阶段
+        const entries = await Promise.all(list.map(async (season) => {
+          if (!season.cropId || !season.plantDate || season.status !== 'PLANTED') return null;
+          try {
+            const stage = await cropsApi.currentStage(season.cropId, season.plantDate);
+            return stage?.stageName ? [season.id, stage.stageName] : null;
+          } catch {
+            return null;
+          }
+        }));
+        setSeasonStage(Object.fromEntries(entries.filter(Boolean)));
       } else if (tab === 'operations') {
-        setOperations(await farmlandApi.farmOperations.list(farmland.id));
+        const [operationList, taskList] = await Promise.all([
+          farmlandApi.farmOperations.list(farmland.id),
+          farmlandApi.tasks.list(farmland.id).catch(() => []),
+        ]);
+        setOperations(operationList);
+        setPendingTasks(
+          (Array.isArray(taskList) ? taskList : []).filter((task) => task.status === 'PENDING'),
+        );
       } else {
         const [taskList, summary] = await Promise.all([
           farmlandApi.tasks.list(farmland.id),
@@ -151,6 +182,104 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await load();
     } catch (e) {
       setError(e.message || '删除失败');
+    }
+  };
+
+  // 农事记录里直接完成计划任务，后台会同时生成一条农事操作
+  const completePendingTask = async (task) => {
+    setSaving(true);
+    setError('');
+    try {
+      await farmlandApi.tasks.update(farmland.id, task.id, { status: 'DONE' });
+      await load();
+    } catch (e) {
+      setError(e.message || '任务更新失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startCompleteSeason = (season) => {
+    setCompletingSeason(season);
+    setCompleteResult(null);
+    setError('');
+    setCompleteForm({
+      cropId: season.cropId ? String(season.cropId) : '',
+      plantDate: today(),
+      seasonName: '',
+      planDocumentId: null,
+      planName: '',
+    });
+  };
+
+  const cancelCompleteSeason = () => {
+    setCompletingSeason(null);
+    setCompleteForm({
+      cropId: '',
+      plantDate: today(),
+      seasonName: '',
+      planDocumentId: null,
+      planName: '',
+    });
+  };
+
+  // 新一季计划文档：这里只上传拿 documentId，解析在完成本季接口里做
+  const handleCompletePlanFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
+      setError('方案文档支持 TXT、Markdown、PDF、Word');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('方案文档不能超过 5MB');
+      return;
+    }
+    setCompletePlanLoading(true);
+    setError('');
+    try {
+      const document = await agentApi.document(file);
+      setCompleteForm((prev) => ({
+        ...prev,
+        planDocumentId: document.id,
+        planName: document.filename || file.name,
+      }));
+    } catch (e) {
+      setError(e.message || '方案上传失败');
+    } finally {
+      setCompletePlanLoading(false);
+    }
+  };
+
+  const submitCompleteSeason = async (event) => {
+    event.preventDefault();
+    if (!completingSeason) return;
+    if (!completeForm.cropId) {
+      setError('请选择新一季的作物');
+      return;
+    }
+    if (!completeForm.plantDate) {
+      setError('请选择新一季的播种日期');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const result = await farmlandApi.seasons.complete(farmland.id, completingSeason.id, {
+        cropId: Number(completeForm.cropId),
+        plantDate: completeForm.plantDate,
+        seasonName: completeForm.seasonName || null,
+        planDocumentId: completeForm.planDocumentId,
+        planName: completeForm.planName || null,
+      });
+      setCompleteResult(result);
+      setCompletingSeason(null);
+      await load();
+    } catch (e) {
+      setError(e.message || '完成本季失败');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -355,6 +484,81 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
           </>
         ) : tab === 'seasons' ? (
           <>
+            {completeResult && (
+              <div className="records-complete-result">
+                <div>
+                  <b>已开启新一季：{completeResult.newSeason?.seasonName || '新一季'}</b>
+                  <span>
+                    {completeResult.tasksCreated > 0
+                      ? `已从种植计划生成 ${completeResult.tasksCreated} 条任务，可在「计划任务 / 农事记录」查看`
+                      : '未上传新一季种植计划，可稍后在计划任务里补充'}
+                    {completeResult.warning ? ` · ${completeResult.warning}` : ''}
+                  </span>
+                </div>
+                <button type="button" className="records-complete-close" onClick={() => setCompleteResult(null)}>
+                  知道了
+                </button>
+              </div>
+            )}
+
+            {completingSeason && (
+              <form className="records-form records-complete-form" onSubmit={submitCompleteSeason}>
+                <div className="records-complete-head">
+                  <b>完成「{completingSeason.seasonName || cropName(completingSeason.cropId)}」，开始新一季</b>
+                  <span>旧季标记为已收获，未完成的计划任务会自动跳过。</span>
+                </div>
+                <div className="records-grid">
+                  <label>新一季作物
+                    <select
+                      value={completeForm.cropId}
+                      onChange={(e) => setCompleteForm({ ...completeForm, cropId: e.target.value })}
+                    >
+                      <option value="">请选择</option>
+                      {cropList.map((crop) => (
+                        <option key={crop.id} value={crop.id}>{crop.cropName}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>新一季播种日期
+                    <input
+                      type="date"
+                      value={completeForm.plantDate}
+                      onChange={(e) => setCompleteForm({ ...completeForm, plantDate: e.target.value })}
+                    />
+                  </label>
+                  <label>季名
+                    <input
+                      value={completeForm.seasonName}
+                      maxLength={50}
+                      placeholder="如 2027 早稻（可选）"
+                      onChange={(e) => setCompleteForm({ ...completeForm, seasonName: e.target.value })}
+                    />
+                  </label>
+                </div>
+                <div className="records-plan-field">
+                  <span className="records-plan-label">新一季种植计划（可选，自动生成任务）</span>
+                  <div className="records-plan-line">
+                    <label className="records-upload-btn">
+                      📄 {completeForm.planName || '选择方案文件'}
+                      <input
+                        type="file"
+                        accept=".txt,.md,.markdown,.pdf,.doc,.docx"
+                        hidden
+                        onChange={handleCompletePlanFile}
+                      />
+                    </label>
+                    <span>{completePlanLoading ? '正在上传…' : '支持 PDF / Word / TXT / Markdown'}</span>
+                  </div>
+                </div>
+                <div className="records-complete-actions">
+                  <button type="button" className="btn-cancel" onClick={cancelCompleteSeason}>取消</button>
+                  <button type="submit" className="btn-primary" disabled={saving || completePlanLoading}>
+                    {saving ? '处理中…' : '完成并开始新一季'}
+                  </button>
+                </div>
+              </form>
+            )}
+
             <form className="records-form" onSubmit={submitSeason}>
               <div className="records-grid">
                 <label>季名
@@ -417,11 +621,23 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
                           {cropName(season.cropId)}
                           {season.plantDate ? ` · 播种 ${season.plantDate}` : ''}
                           {season.harvestDate ? ` · 收获 ${season.harvestDate}` : ''}
+                          {season.status === 'PLANTED' && seasonStage[season.id]
+                            ? ` · 当前 ${seasonStage[season.id]}`
+                            : ''}
                         </span>
                       </div>
                       <span className={`records-status ${season.status?.toLowerCase()}`}>
                         {SEASON_STATUS[season.status] || season.status}
                       </span>
+                      {season.status === 'PLANTED' && (
+                        <button
+                          type="button"
+                          className="records-complete-btn"
+                          onClick={() => startCompleteSeason(season)}
+                        >
+                          完成本季
+                        </button>
+                      )}
                       <button type="button" className="records-danger" onClick={() => removeSeason(season.id)}>
                         删除
                       </button>
@@ -431,6 +647,39 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
           </>
         ) : (
           <>
+            {pendingTasks.length > 0 && (
+              <div className="records-pending">
+                <div className="records-pending-head">
+                  <b>🌱 待办农事（{pendingTasks.length}）</b>
+                  <span>点击完成会自动记入下方的农事记录</span>
+                </div>
+                {pendingTasks.map((task) => {
+                  const overdue = task.plannedDate && task.plannedDate < today();
+                  return (
+                    <div className={`records-pending-row ${overdue ? 'overdue' : ''}`} key={task.id}>
+                      <div>
+                        <b>{task.title}</b>
+                        <span>
+                          {TASK_TYPES[task.taskType] || '其他'}
+                          {task.plannedDate
+                            ? ` · ${overdue ? '已逾期，计划 ' : '计划 '}${task.plannedDate}`
+                            : ' · 日期待定'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="records-task-done"
+                        onClick={() => completePendingTask(task)}
+                        disabled={saving}
+                      >
+                        完成
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <form className="records-form" onSubmit={submitOperation}>
               <div className="records-grid">
                 <label>类型

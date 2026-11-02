@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { alerts } from '../api';
+import { alerts, farmlands } from '../api';
 import HomeWeather from '../components/HomeWeather';
 
 const SLIDES = [
@@ -54,6 +54,9 @@ const AGENTS = [
 export default function MobileHome() {
   const [index, setIndex] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [todayTasks, setTodayTasks] = useState([]);
+  const [completingTaskId, setCompletingTaskId] = useState(null);
+  const [taskError, setTaskError] = useState('');
   const [paused, setPaused] = useState(false);
   const touchX = useRef(null);
 
@@ -64,15 +67,36 @@ export default function MobileHome() {
         .then((count) => { if (alive) setUnread(Number(count) || 0); })
         .catch(() => {});
     };
+    const loadTodayTasks = () => {
+      farmlands.tasks.today()
+        .then((list) => { if (alive) setTodayTasks(Array.isArray(list) ? list : []); })
+        .catch(() => {});
+    };
     loadUnread();
+    loadTodayTasks();
     window.addEventListener('focus', loadUnread);
+    window.addEventListener('focus', loadTodayTasks);
     document.addEventListener('visibilitychange', loadUnread);
     return () => {
       alive = false;
       window.removeEventListener('focus', loadUnread);
+      window.removeEventListener('focus', loadTodayTasks);
       document.removeEventListener('visibilitychange', loadUnread);
     };
   }, []);
+
+  const completeTask = async (task) => {
+    setCompletingTaskId(task.id);
+    setTaskError('');
+    try {
+      await farmlands.tasks.update(task.farmlandId, task.id, { status: 'DONE' });
+      setTodayTasks((prev) => prev.filter((item) => item.id !== task.id));
+    } catch (e) {
+      setTaskError(e.message || '任务更新失败');
+    } finally {
+      setCompletingTaskId(null);
+    }
+  };
 
   useEffect(() => {
     if (paused) return undefined;
@@ -110,6 +134,35 @@ export default function MobileHome() {
         )}
         <span className="mh-alert-arrow" aria-hidden>›</span>
       </Link>
+
+      {todayTasks.length > 0 && (
+        <div className="mh-todo">
+          <div className="mh-todo-head">
+            <b>🌱 今日农事</b>
+            <span>{todayTasks.length} 项待办</span>
+            <Link to="/home/farmlands">全部 ›</Link>
+          </div>
+          {taskError && <p className="mh-todo-error">{taskError}</p>}
+          {todayTasks.slice(0, 3).map((task) => (
+            <div className={`mh-todo-row ${task.overdue ? 'overdue' : ''}`} key={task.id}>
+              <div>
+                <b>{task.title}</b>
+                <small>
+                  {task.farmlandName}
+                  {task.overdue ? ` · 已逾期（${task.plannedDate}）` : ' · 今天到期'}
+                </small>
+              </div>
+              <button
+                type="button"
+                onClick={() => completeTask(task)}
+                disabled={completingTaskId === task.id}
+              >
+                {completingTaskId === task.id ? '…' : '完成'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         className="mh-carousel"

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { farmlands as farmlandApi, crops } from '../api';
+import { agent as agentApi, farmlands as farmlandApi, crops } from '../api';
 import FarmlandMap from '../components/FarmlandMap';
 import { polygonAreaMu, polygonCenter, roundCoord } from '../utils/geo';
 import {
@@ -64,6 +64,8 @@ export default function MapPage() {
   const [newIrrigationType, setNewIrrigationType] = useState('');
   const [soilTouched, setSoilTouched] = useState(false);
   const [irrigationTouched, setIrrigationTouched] = useState(false);
+  const [planFile, setPlanFile] = useState(null);
+  const [planNotice, setPlanNotice] = useState('');
   const [saving, setSaving] = useState(false);
 
   const mapRef = useRef(null);
@@ -194,6 +196,8 @@ export default function MapPage() {
     setNewIrrigationType('');
     setSoilTouched(false);
     setIrrigationTouched(false);
+    setPlanFile(null);
+    setPlanNotice('');
     setError('');
   };
 
@@ -218,6 +222,22 @@ export default function MapPage() {
       setNewIrrigationType(suggestIrrigation(cropNameOf(newCropId)));
     }
     setFinishOpen(true);
+    setError('');
+  };
+
+  const handlePlanFile = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
+      setError('种植计划支持 TXT、Markdown、PDF、Word');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('种植计划不能超过 5MB');
+      return;
+    }
+    setPlanFile(file);
     setError('');
   };
 
@@ -249,6 +269,23 @@ export default function MapPage() {
         }))),
       });
 
+      // 圈地时可选带上种植计划：保存后解析成任务，供首页/农事记录直接执行
+      if (planFile) {
+        try {
+          const document = await agentApi.document(planFile);
+          const preview = await farmlandApi.tasks.extract(created.id, document.id);
+          const sourceName = document.filename || planFile.name;
+          if (Array.isArray(preview) && preview.length > 0) {
+            await farmlandApi.tasks.confirm(created.id, { tasks: preview, sourceName });
+            setPlanNotice(`已根据《${sourceName}》生成 ${preview.length} 条种植任务，可在「地块记录 → 计划任务」查看。`);
+          } else {
+            setPlanNotice('种植计划已上传，但没有识别到可执行任务，可在「地块记录 → 计划任务」补充。');
+          }
+        } catch (e) {
+          setPlanNotice(`地块已保存，但种植计划解析失败：${e.message || '请稍后在地块记录里重试'}`);
+        }
+      }
+
       setList((prev) => [...prev, created]);
       setDrawing(false);
       setDraft([]);
@@ -259,6 +296,7 @@ export default function MapPage() {
       setNewIrrigationType('');
       setSoilTouched(false);
       setIrrigationTouched(false);
+      setPlanFile(null);
       setSelected(created);
       handleSelect(created);
     } catch (e) {
@@ -283,6 +321,12 @@ export default function MapPage() {
       </div>
 
       {error && <div className="agent-error">{error}</div>}
+      {planNotice && (
+        <div className="map-plan-notice">
+          <span>🌱 {planNotice}</span>
+          <button type="button" onClick={() => setPlanNotice('')} aria-label="关闭提示">×</button>
+        </div>
+      )}
       {loading && <p className="empty-text">加载中…</p>}
 
       {!loading && (
@@ -461,6 +505,16 @@ export default function MapPage() {
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
+                <label className="map-draw-plan">
+                  <span>📄 {planFile ? planFile.name : '种植计划（可选）'}</span>
+                  <input
+                    type="file"
+                    accept=".txt,.md,.markdown,.pdf,.doc,.docx"
+                    hidden
+                    onChange={handlePlanFile}
+                  />
+                  <small>{planFile ? '保存地块后自动生成任务' : '上传后按计划生成农事任务'}</small>
+                </label>
               </div>
               <p className="map-draw-hint">
                 土壤按圈地位置估算、灌溉按作物常用方式推荐，都可以手动修改。

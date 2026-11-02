@@ -7,9 +7,11 @@ import com.agriweather.dto.PlanTaskUpdateRequest;
 import com.agriweather.entity.FarmOperation;
 import com.agriweather.entity.FarmPlanTask;
 import com.agriweather.entity.Farmland;
+import com.agriweather.entity.FarmlandSeason;
 import com.agriweather.repository.FarmOperationRepository;
 import com.agriweather.repository.FarmPlanTaskRepository;
 import com.agriweather.repository.FarmlandRepository;
+import com.agriweather.repository.FarmlandSeasonRepository;
 import com.agriweather.service.AgentDocumentService;
 import com.agriweather.service.PlanTaskExtractionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +39,7 @@ import java.util.Objects;
 public class FarmlandTaskController {
 
     private final FarmlandRepository farmlandRepository;
+    private final FarmlandSeasonRepository seasonRepository;
     private final FarmPlanTaskRepository taskRepository;
     private final FarmOperationRepository operationRepository;
     private final AgentDocumentService documentService;
@@ -76,11 +79,21 @@ public class FarmlandTaskController {
                                       @Valid @RequestBody PlanTaskConfirmRequest body,
                                       HttpServletRequest request) {
         requireFarmland(farmlandId, userId(request));
+        // 未指定季节时挂到当前在种的那一季，完成换茬时才能一起收口
+        Long seasonId = body.getSeasonId();
+        if (seasonId == null) {
+            seasonId = seasonRepository.findByFarmlandIdOrderByPlantDateDescIdDesc(farmlandId)
+                    .stream()
+                    .filter(season -> "PLANTED".equals(season.getStatus()))
+                    .map(FarmlandSeason::getId)
+                    .findFirst()
+                    .orElse(null);
+        }
         List<FarmPlanTask> saved = new ArrayList<>();
         for (PlanTaskItem item : body.getTasks()) {
             FarmPlanTask task = new FarmPlanTask();
             task.setFarmlandId(farmlandId);
-            task.setSeasonId(body.getSeasonId());
+            task.setSeasonId(seasonId);
             applyItem(task, item);
             task.setSourceName(truncate(body.getSourceName(), 255));
             saved.add(taskRepository.save(task));

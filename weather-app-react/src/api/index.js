@@ -146,6 +146,10 @@ export const farmlands = {
       `/api/farmlands/${farmlandId}/seasons/${seasonId}`,
       { method: 'DELETE' },
     ),
+    complete: (farmlandId, seasonId, body) => request(
+      `/api/farmlands/${farmlandId}/seasons/${seasonId}/complete`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   },
   tasks: {
     list: (farmlandId) => request(`/api/farmlands/${farmlandId}/tasks`),
@@ -164,6 +168,7 @@ export const farmlands = {
       { method: 'DELETE' },
     ),
     summary: (farmlandId) => request(`/api/farmlands/${farmlandId}/tasks/summary`),
+    today: () => request('/api/tasks/today'),
   },
   farmOperations: {
     list: (farmlandId) => request(`/api/farmlands/${farmlandId}/operations`),

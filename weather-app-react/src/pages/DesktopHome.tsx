@@ -67,6 +67,9 @@ export default function DesktopHome() {
   const [weatherMap, setWeatherMap] = useState({});
   const [stageMap, setStageMap] = useState({});
   const [advice, setAdvice] = useState([]);
+  const [todayTasks, setTodayTasks] = useState([]);
+  const [completingTaskId, setCompletingTaskId] = useState(null);
+  const [taskError, setTaskError] = useState('');
   // 渲染期间不直接读 Date.now（保持纯函数），进页面时固定一次
   const [mountedAt] = useState(() => Date.now());
 
@@ -81,15 +84,17 @@ export default function DesktopHome() {
     let alive = true;
     (async () => {
       try {
-        const [fieldList, alertData, unreadCount] = await Promise.all([
+        const [fieldList, alertData, unreadCount, taskList] = await Promise.all([
           farmlands.list(),
           alertsApi.list({ status: 'active' }),
           alertsApi.unreadCount().catch(() => 0),
+          farmlands.tasks.today().catch(() => []),
         ]);
         if (!alive) return;
         setFields(fieldList);
         setAlertList(alertData);
         setUnread(unreadCount);
+        setTodayTasks(Array.isArray(taskList) ? taskList : []);
         if (fieldList.length > 0) {
           setSelectedId(fieldList[0].id);
         } else {
@@ -143,6 +148,20 @@ export default function DesktopHome() {
       .catch(() => { if (alive) setAdvice([]); });
     return () => { alive = false; };
   }, [selectedId]);
+
+  // 完成今日待办：后台会同时写一条农事记录
+  const completeTodayTask = async (task) => {
+    setCompletingTaskId(task.id);
+    setTaskError('');
+    try {
+      await farmlands.tasks.update(task.farmlandId, task.id, { status: 'DONE' });
+      setTodayTasks((prev) => prev.filter((item) => item.id !== task.id));
+    } catch (e) {
+      setTaskError(e.message || '任务更新失败');
+    } finally {
+      setCompletingTaskId(null);
+    }
+  };
 
   const selectedField = fields.find((f) => f.id === selectedId) || fields[0] || null;
   const selectedWeather = selectedField ? weatherMap[selectedField.id] : null;
@@ -506,6 +525,47 @@ export default function DesktopHome() {
             </section>
 
             <div className="dh-col-right">
+              <section className="dh-card glass dh-todo-card">
+                <div className="dh-card-head">
+                  <h3>
+                    ✅ 今日待办
+                    {todayTasks.length > 0 && <span className="dh-count-pill">{todayTasks.length}</span>}
+                  </h3>
+                  <button type="button" className="dh-link" onClick={() => navigate('/home/farmlands')}>
+                    农事记录 ›
+                  </button>
+                </div>
+
+                {taskError && <p className="dh-todo-error">{taskError}</p>}
+
+                {todayTasks.length === 0 ? (
+                  <p className="dh-empty">今天没有到期或逾期的农事任务</p>
+                ) : (
+                  <div className="dh-todo-list">
+                    {todayTasks.map((task) => (
+                      <div className={`dh-todo-item ${task.overdue ? 'overdue' : ''}`} key={task.id}>
+                        <div className="dh-todo-main">
+                          <b>{task.title}</b>
+                          <span>
+                            {task.farmlandName}
+                            {' · '}
+                            {task.overdue ? `已逾期（计划 ${task.plannedDate}）` : '今天到期'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="dh-todo-done"
+                          onClick={() => completeTodayTask(task)}
+                          disabled={completingTaskId === task.id}
+                        >
+                          {completingTaskId === task.id ? '处理中…' : '完成'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
               <section className="dh-card glass">
                 <div className="dh-card-head">
                   <h3>

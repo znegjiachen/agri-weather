@@ -2,13 +2,19 @@ package com.agriweather.controller;
 
 import com.agriweather.dto.FarmOperationRequest;
 import com.agriweather.dto.FarmlandSeasonRequest;
+import com.agriweather.dto.PlanTaskItem;
+import com.agriweather.dto.SeasonCompleteRequest;
 import com.agriweather.entity.FarmOperation;
+import com.agriweather.entity.FarmPlanTask;
 import com.agriweather.entity.Farmland;
 import com.agriweather.entity.FarmlandSeason;
 import com.agriweather.repository.CropInfoRepository;
 import com.agriweather.repository.FarmOperationRepository;
+import com.agriweather.repository.FarmPlanTaskRepository;
 import com.agriweather.repository.FarmlandRepository;
 import com.agriweather.repository.FarmlandSeasonRepository;
+import com.agriweather.service.AgentDocumentService;
+import com.agriweather.service.PlanTaskExtractionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +24,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /** 地块季节历史与农事记录 */
@@ -30,7 +38,10 @@ public class FarmlandRecordController {
     private final FarmlandRepository farmlandRepository;
     private final FarmlandSeasonRepository seasonRepository;
     private final FarmOperationRepository operationRepository;
+    private final FarmPlanTaskRepository taskRepository;
     private final CropInfoRepository cropRepository;
+    private final AgentDocumentService documentService;
+    private final PlanTaskExtractionService extractionService;
 
     @GetMapping("/seasons")
     public List<FarmlandSeason> seasons(@PathVariable Long farmlandId, HttpServletRequest request) {
@@ -70,6 +81,93 @@ public class FarmlandRecordController {
                              HttpServletRequest request) {
         requireFarmland(farmlandId, userId(request));
         seasonRepository.delete(requireSeason(farmlandId, seasonId));
+    }
+
+    /**
+     * 完成当前季并开始新一季：可沿用/更换作物，并上传新一季种植计划。
+     * 旧季未完成任务自动标记为跳过；新计划抽取的任务自动挂到新季。
+     */
+    @PostMapping("/seasons/{seasonId}/complete")
+    public Map<String, Object> completeSeason(@PathVariable Long farmlandId,
+                                              @PathVariable Long seasonId,
+                                              @Valid @RequestBody SeasonCompleteRequest body,
+                                              HttpServletRequest request) {
+        Long userId = userId(request);
+        Farmland farmland = requireFarmland(farmlandId, userId);
+        FarmlandSeason oldSeason = requireSeason(farmlandId, seasonId);
+
+        Long cropId = body.getCropId() != null ? body.getCropId() : oldSeason.getCropId();
+        if (cropId == null) {
+            throw new IllegalArgumentException("请选择新一季的作物");
+        }
+        if (!cropRepository.existsById(cropId)) {
+            throw new IllegalArgumentException("作物不存在");
+        }
+        LocalDate plantDate = parseDate(body.getPlantDate(), "新一季播种日期");
+        if (plantDate == null) {
+            throw new IllegalArgumentException("请填写新一季的播种日期");
+        }
+
+        oldSeason.setStatus("HARVESTED");
+        if (oldSeason.getHarvestDate() == null) oldSeason.setHarvestDate(LocalDate.now());
+        seasonRepository.save(oldSeason);
+
+        // 没有关联季节的旧任务也属于这一茬，一并跳过
+        List<FarmPlanTask> oldTasks = taskRepository.findByFarmlandIdAndStatus(farmlandId, "PENDING")
+                .stream()
+                .filter(task -> task.getSeasonId() == null
+                        || Objects.equals(task.getSeasonId(), oldSeason.getId()))
+                .toList();
+        for (FarmPlanTask task : oldTasks) {
+            task.setStatus("SKIPPED");
+            task.setUpdatedAt(java.time.LocalDateTime.now());
+        }
+        if (!oldTasks.isEmpty()) taskRepository.saveAll(oldTasks);
+
+        FarmlandSeason newSeason = new FarmlandSeason();
+        newSeason.setFarmlandId(farmlandId);
+        newSeason.setCropId(cropId);
+        newSeason.setPlantDate(plantDate);
+        newSeason.setSeasonName(body.getSeasonName() == null || body.getSeasonName().isBlank()
+                ? "新一季" : body.getSeasonName().trim());
+        newSeason.setStatus("PLANTED");
+        newSeason = seasonRepository.save(newSeason);
+
+        farmland.setCropId(cropId);
+        farmland.setPlantDate(plantDate);
+        farmlandRepository.save(farmland);
+
+        int tasksCreated = 0;
+        String warning = null;
+        if (body.getPlanDocumentId() != null) {
+            try {
+                String text = documentService.documentText(userId, body.getPlanDocumentId());
+                List<PlanTaskItem> items = extractionService.extract(body.getPlanName(), text);
+                for (PlanTaskItem item : items) {
+                    FarmPlanTask task = new FarmPlanTask();
+                    task.setFarmlandId(farmlandId);
+                    task.setSeasonId(newSeason.getId());
+                    task.setTitle(truncate(item.getTitle(), 200));
+                    task.setTaskType(item.getTaskType() == null ? "OTHER" : item.getTaskType());
+                    task.setPlannedDate(parseDate(item.getPlannedDate(), "计划日期"));
+                    task.setSourceQuote(truncate(item.getSourceQuote(), 500));
+                    task.setNotes(truncate(item.getNotes(), 500));
+                    task.setSourceName(truncate(body.getPlanName(), 255));
+                    task.setStatus("PENDING");
+                    taskRepository.save(task);
+                }
+                tasksCreated = items.size();
+            } catch (Exception e) {
+                warning = "新一季已创建，但种植计划解析失败：" + e.getMessage();
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("completedSeason", oldSeason);
+        result.put("newSeason", newSeason);
+        result.put("tasksCreated", tasksCreated);
+        result.put("warning", warning);
+        return result;
     }
 
     @GetMapping("/operations")
@@ -181,5 +279,10 @@ public class FarmlandRecordController {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
     }
 }
