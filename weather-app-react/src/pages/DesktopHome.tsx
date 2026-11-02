@@ -464,52 +464,33 @@ export default function DesktopHome() {
 
               <section className="dh-card glass">
                 <div className="dh-card-head">
-                  <h3>
-                    ⚠️ 预警中心
-                    {todayAlerts.length > 0 && <span className="dh-count-pill">{todayAlerts.length}</span>}
-                  </h3>
-                  <button type="button" className="dh-link" onClick={() => navigate('/home/alerts')}>
-                    全部 ›
-                  </button>
+                  <h3>📅 今日农事</h3>
+                  {selectedField && <span className="dh-card-sub">{selectedField.fieldName}</span>}
                 </div>
-
-                {alertGroups.length === 0 ? (
-                  <p className="dh-empty">暂无待处理预警，一切正常</p>
+                {!todayAdvice ? (
+                  <p className="dh-empty">暂无农事建议</p>
                 ) : (
-                  <div className="dh-alerts">
-                    {alertGroups.map((group) => {
-                      const level = alertLevelMeta(group.top.alertLevel);
-                      const type = alertTypeMeta(group.top.alertType);
-                      const seen = new Set();
-                      const types = group.alerts.filter((a) => {
-                        if (seen.has(a.alertType)) return false;
-                        seen.add(a.alertType);
-                        return true;
-                      }).slice(0, 3);
-                      return (
-                        <div key={group.key} className={`dh-alert ${level.cls}`}>
-                          <span className="dh-alert-icon">{type.icon}</span>
-                          <div className="dh-alert-body">
-                            <div className="dh-alert-title">
-                              <span className="dh-alert-group-name">{group.farmlandName}</span>
-                              <span className="dh-alert-group-count">{group.alerts.length} 条</span>
-                            </div>
-                            <div className="dh-alert-types">
-                              {types.map((a) => {
-                                const t = alertTypeMeta(a.alertType);
-                                return (
-                                  <span key={a.id} className={`dh-alert-type-chip ${alertLevelMeta(a.alertLevel).cls}`}>
-                                    {t.label}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                            <div className="dh-alert-meta">{group.top.alertContent}</div>
-                          </div>
-                          <span className="dh-alert-time">{alertTimeLabel(group.latest)}</span>
-                        </div>
-                      );
-                    })}
+                  <div className="dh-advice-list">
+                    {todayAdvice.tasks?.length > 0 && (
+                      <div className="dh-advice-row ok">
+                        <span className="dh-advice-tag">适宜</span>
+                        <span>{todayAdvice.tasks.join(' · ')}</span>
+                      </div>
+                    )}
+                    {todayAdvice.bans?.length > 0 && (
+                      <div className="dh-advice-row warn">
+                        <span className="dh-advice-tag">不宜</span>
+                        <span>{todayAdvice.bans.join(' · ')}</span>
+                      </div>
+                    )}
+                    {todayAdvice.tasks?.length === 0 && todayAdvice.bans?.length === 0 && (
+                      <p className="dh-empty">今日无特殊限制</p>
+                    )}
+                    <div className="dh-advice-foot">
+                      今日最大风速 {todayAdvice.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
+                      {' · '}
+                      今日降水 {todayAdvice.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
+                    </div>
                   </div>
                 )}
               </section>
@@ -624,33 +605,52 @@ export default function DesktopHome() {
             <div className="dh-col-right">
               <section className="dh-card glass">
                 <div className="dh-card-head">
-                  <h3>📅 今日农事</h3>
-                  {selectedField && <span className="dh-card-sub">{selectedField.fieldName}</span>}
+                  <h3>
+                    ⚠️ 预警中心
+                    {todayAlerts.length > 0 && <span className="dh-count-pill">{todayAlerts.length}</span>}
+                  </h3>
+                  <button type="button" className="dh-link" onClick={() => navigate('/home/alerts')}>
+                    全部 ›
+                  </button>
                 </div>
-                {!todayAdvice ? (
-                  <p className="dh-empty">暂无农事建议</p>
+
+                {alertGroups.length === 0 ? (
+                  <p className="dh-empty">暂无待处理预警，一切正常</p>
                 ) : (
-                  <div className="dh-advice-list">
-                    {todayAdvice.tasks?.length > 0 && (
-                      <div className="dh-advice-row ok">
-                        <span className="dh-advice-tag">适宜</span>
-                        <span>{todayAdvice.tasks.join(' · ')}</span>
-                      </div>
-                    )}
-                    {todayAdvice.bans?.length > 0 && (
-                      <div className="dh-advice-row warn">
-                        <span className="dh-advice-tag">不宜</span>
-                        <span>{todayAdvice.bans.join(' · ')}</span>
-                      </div>
-                    )}
-                    {todayAdvice.tasks?.length === 0 && todayAdvice.bans?.length === 0 && (
-                      <p className="dh-empty">今日无特殊限制</p>
-                    )}
-                    <div className="dh-advice-foot">
-                      今日最大风速 {todayAdvice.wind != null ? `${Number(todayAdvice.wind).toFixed(1)} km/h` : '—'}
-                      {' · '}
-                      今日降水 {todayAdvice.rain != null ? `${Number(todayAdvice.rain).toFixed(1)} mm` : '—'}
-                    </div>
+                  <div className="dh-alerts">
+                    {alertGroups.map((group) => {
+                      const level = alertLevelMeta(group.top.alertLevel);
+                      const type = alertTypeMeta(group.top.alertType);
+                      const seen = new Set();
+                      const types = group.alerts.filter((a) => {
+                        if (seen.has(a.alertType)) return false;
+                        seen.add(a.alertType);
+                        return true;
+                      }).slice(0, 3);
+                      return (
+                        <div key={group.key} className={`dh-alert ${level.cls}`}>
+                          <span className="dh-alert-icon">{type.icon}</span>
+                          <div className="dh-alert-body">
+                            <div className="dh-alert-title">
+                              <span className="dh-alert-group-name">{group.farmlandName}</span>
+                              <span className="dh-alert-group-count">{group.alerts.length} 条</span>
+                            </div>
+                            <div className="dh-alert-types">
+                              {types.map((a) => {
+                                const t = alertTypeMeta(a.alertType);
+                                return (
+                                  <span key={a.id} className={`dh-alert-type-chip ${alertLevelMeta(a.alertLevel).cls}`}>
+                                    {t.label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            <div className="dh-alert-meta">{group.top.alertContent}</div>
+                          </div>
+                          <span className="dh-alert-time">{alertTimeLabel(group.latest)}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </section>
