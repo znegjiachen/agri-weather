@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type ChangeEvent,
 } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -30,7 +31,14 @@ const TOOLBAR = [
  *
  * 输出是 HTML；服务端还会再净化一遍，前端这层只负责体验。
  */
-const RichTextEditor = forwardRef(function RichTextEditor(
+interface RichTextEditorProps {
+  placeholder?: string;
+  onChange?: (state: { textLength: number; imageCount: number; html?: string }) => void;
+  onUploadingChange?: (uploading: boolean) => void;
+  onError?: (message: string) => void;
+}
+
+const RichTextEditor = forwardRef<any, RichTextEditorProps>(function RichTextEditor(
   { placeholder = '说点什么…', onChange, onUploadingChange, onError },
   ref,
 ) {
@@ -99,7 +107,7 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     }
   }, [emitChange, replaceToken, setUploading]);
 
-  const uploadFiles = useCallback(async (files) => {
+  const uploadFiles = useCallback(async (files: File[] | FileList | null) => {
     const quill = quillRef.current;
     if (!quill) return;
 
@@ -152,23 +160,23 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     const handleTextChange = () => emitChange();
     quill.on('text-change', handleTextChange);
 
-    const handlePaste = (event) => {
-      const files = Array.from(event.clipboardData?.files || []);
+    const handlePaste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.files || []) as File[];
       if (files.some((f) => f.type?.startsWith('image/'))) {
         event.preventDefault();
         event.stopImmediatePropagation();
         uploadFiles(files);
       }
     };
-    const handleDrop = (event) => {
-      const files = Array.from(event.dataTransfer?.files || []);
+    const handleDrop = (event: DragEvent) => {
+      const files = Array.from(event.dataTransfer?.files || []) as File[];
       if (files.some((f) => f.type?.startsWith('image/'))) {
         event.preventDefault();
         event.stopImmediatePropagation();
         uploadFiles(files);
       }
     };
-    const handleDragOver = (event) => {
+    const handleDragOver = (event: DragEvent) => {
       if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
     };
 
@@ -207,10 +215,10 @@ const RichTextEditor = forwardRef(function RichTextEditor(
     isUploading: () => uploadingRef.current > 0,
   }), [emitChange]);
 
-  const handleFilePicked = (event) => {
+  const handleFilePicked = (event: ChangeEvent<HTMLInputElement>) => {
     // 必须先拷成数组：value='' 会把 live 的 FileList 一起清空，
     // 直接把 files 引用传下去会变成空列表（表现为「选了图却提示仅支持 JPG/PNG」）
-    const files = Array.from(event.target.files || []);
+    const files = Array.from(event.target.files || []) as File[];
     event.target.value = '';
     uploadFiles(files);
   };

@@ -187,9 +187,9 @@ cd weather-app-react && npm install && npm run dev
 - **接口限流与额度**：登录/注册、智能体对话、上传接口按用户或 IP 每分钟限流；每用户每日对话额度默认 80 次，Redis 不可用时自动放行
 - **用户反馈**：回答下方 👍/👎 写入 `agent_feedback`，可按消息去重更新
 - **安全兜底**：`AgriSafetyGuard` 检测高毒/禁用农药、绝对化承诺，并自动隐去手机号/身份证号
-- **RAG 质量评测**：`POST /api/agents/{id}/knowledge/eval`，用问题 + 期望关键词统计检索命中率；样例见 [docs/ai-eval-set.json](docs/ai-eval-set.json)
+- **RAG 质量评测**：`POST /api/agents/{id}/knowledge/eval`，用问题 + 期望关键词统计检索命中率；样例见 [docs/ai-eval-set.json](docs/ai-eval-set.json)，实测报告见 [docs/ai-eval-report.md](docs/ai-eval-report.md)（10 条水稻问题、8 份资料，hit@5 10/10）
 - **推送指标**：`/api/agent/metrics` 的 `push` 字段包含推送成功、失败、失效订阅数
-- **演示材料**：[docs/demo-script.md](docs/demo-script.md)（5 分钟答辩脚本）· [docs/pilot-guide.md](docs/pilot-guide.md)（小范围试点与指标口径）
+- **演示材料**：[docs/demo-script.md](docs/demo-script.md)（5 分钟答辩脚本）· [docs/pilot-guide.md](docs/pilot-guide.md)（小范围试点与指标口径）· [docs/pilot-report.sql](docs/pilot-report.sql)（试点数据导出）
 
 ### MCP 工具服务
 

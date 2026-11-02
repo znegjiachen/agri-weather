@@ -25,6 +25,17 @@ const LABEL_TILE =
 
 const CHINA_CENTER = [35.0, 105.0];
 
+interface FarmlandMapProps {
+  farmlands?: any[];
+  selectedId?: number | null;
+  onSelect?: (farmland: any) => void;
+  drawing?: boolean;
+  draftPoints?: Array<{ lat: number; lng: number }>;
+  onAddPoint?: (point: { lat: number; lng: number }) => void;
+  onLocateError?: (message: string) => void;
+  satellite?: boolean;
+}
+
 function pinIcon(active) {
   return L.divIcon({
     className: 'farm-marker',
@@ -43,7 +54,7 @@ function polygonStyle(active) {
   };
 }
 
-const FarmlandMap = forwardRef(function FarmlandMap({
+const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
   farmlands = [],
   selectedId,
   onSelect,

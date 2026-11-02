@@ -116,7 +116,7 @@ export default function MobileWeather() {
     ? observedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const submitSearch = (value) => {
+  const submitSearch = (value = undefined) => {
     const city = (value ?? term).trim();
     if (!city) return;
     searchCity(city);

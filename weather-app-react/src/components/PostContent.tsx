@@ -6,14 +6,21 @@
  *
  * 图片点击交给父组件打开大图（lightbox），类似小红书/掘金的看图体验。
  */
-export default function PostContent({ content, contentFormat, onImageClick }) {
+interface PostContentProps {
+  content?: string;
+  contentFormat?: string;
+  onImageClick?: (src: string) => void;
+}
+
+export default function PostContent({ content, contentFormat, onImageClick }: PostContentProps) {
   if (contentFormat === 'HTML') {
     return (
       <div
         className="community-rich"
         onClick={(event) => {
-          if (event.target.tagName === 'IMG' && onImageClick) {
-            onImageClick(event.target.currentSrc || event.target.src);
+          const target = event.target as HTMLImageElement;
+          if (target.tagName === 'IMG' && onImageClick) {
+            onImageClick(target.currentSrc || target.src);
           }
         }}
         dangerouslySetInnerHTML={{ __html: content || '' }}
