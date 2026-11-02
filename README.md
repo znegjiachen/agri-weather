@@ -53,6 +53,8 @@
 - **知识库独立**：支持粘贴文本或上传 TXT / Markdown / PDF / Word（UTF-8/GB18030，≤5MB），中文关键词 + 向量混合检索，最多注入 4 段资料；回答下方会标注「参考知识」。
 - **工具可调配**：每个助农手可启用/停用 7 个农事工具；关闭后模型看不到该工具。
 - **历史持久化**：对话记录存后端，刷新页面或换设备后仍可恢复；每个智能体独立会话。
+- **季节与农事记录**：地块可新增多个种植季（作物、播种/预计收获/实际收获、状态、备注），换茬不覆盖历史；施肥、打药、灌溉等农事操作单独记录。
+- **账号安全**：access token 2 小时、refresh token 30 天自动轮换；支持退出全部设备（旧 token 立即失效）和密码确认后注销账号。
 - **范围独立**：智能体的工具只能查询它负责的那块地，跨地块查询会被拒绝；前端浮窗和对话页按智能体分别切换会话。
 - **内置知识**：每轮自动附带该地块的作物档案和当前生长阶段，无需手工维护。
 
@@ -162,8 +164,8 @@ cd weather-app-react && npm install && npm run dev
 
 | 分组 | 接口 |
 |---|---|
-| 认证 `/api/auth` | `POST /register` · `POST /login` · `GET/PUT /profile`（资料）· `PUT /password`（修改密码） |
-| 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice`（创建/更新支持 `boundary` 边界数组） |
+| 认证 `/api/auth` | `POST /register` · `POST /login` · `POST /refresh`（轮换 refresh token）· `POST /logout` · `POST /logout-all` · `DELETE /account` · `GET/PUT /profile` · `PUT /password` |
+| 地块 `/api/farmlands` | `GET /` · `POST /` · `PUT /{id}` · `DELETE /{id}` · `GET /{id}/weather` · `GET /{id}/alerts` · `GET /{id}/advice` · `GET/POST /{id}/seasons` · `PUT/DELETE /{id}/seasons/{seasonId}` · `GET/POST /{id}/operations` · `PUT/DELETE /{id}/operations/{operationId}`（创建/更新支持 `boundary` 边界数组） |
 | 天气 `/api/weather` | `GET /?lat=&lng=`（统一走服务端缓存与 Open-Meteo / 和风备源） |
 | 作物 `/api/crops` | `GET /` · `GET /{id}` · `GET /search` · `GET /{id}/stages` · `GET /{id}/weather-match` · `GET /{id}/current-stage` |
 | 预警 `/api/alerts` | `GET /` · `GET /check/{farmlandId}` · `GET /unread-count` · `PUT /{id}/read` · `PUT /read-all` |
@@ -197,6 +199,8 @@ cd weather-app-react && npm install && npm run dev
 
 - `V1__baseline.sql`：完整基线（建表 + 种子数据）
 - `V2__agent_document_ids.sql`：多文档引用
+- `V3__account_security.sql`：token 版本号 + refresh token
+- `V4__farmland_seasons.sql`：地块季节历史
 - 新增结构变更时添加 `V{n}__描述.sql`，启动时自动执行
 
 老库首次接入 Flyway 时会被标记为 V1 基线，不会重复建表；升级旧版本仍需先执行 `sql/migrations/` 中尚未运行的手工脚本。

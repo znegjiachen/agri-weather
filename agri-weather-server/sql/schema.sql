@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     role VARCHAR(20) DEFAULT 'FARMER',
     phone VARCHAR(20),
     region VARCHAR(100),
+    token_version INT NOT NULL DEFAULT 0 COMMENT '退出全部设备时递增',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -556,3 +557,33 @@ CREATE TABLE IF NOT EXISTS agent_feedback (
     CONSTRAINT fk_feedback_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE,
     CONSTRAINT fk_feedback_agent FOREIGN KEY (agent_id) REFERENCES farmland_agent(id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='助农手回答反馈';
+
+-- 刷新令牌（只存哈希，支持轮换与退出全部设备）
+CREATE TABLE IF NOT EXISTS refresh_token (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_refresh_hash (token_hash),
+    KEY idx_refresh_user (user_id),
+    CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='刷新令牌（只存哈希）';
+
+-- 地块季节历史（换茬不覆盖）
+CREATE TABLE IF NOT EXISTS farmland_season (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    farmland_id BIGINT NOT NULL,
+    crop_id BIGINT,
+    season_name VARCHAR(50),
+    plant_date DATE,
+    expected_harvest_date DATE,
+    harvest_date DATE,
+    status VARCHAR(20) NOT NULL DEFAULT 'PLANTED' COMMENT 'PLANTED/HARVESTED/FALLOW',
+    notes VARCHAR(500),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_season_farmland (farmland_id, plant_date),
+    CONSTRAINT fk_season_farmland FOREIGN KEY (farmland_id) REFERENCES farmland(id) ON DELETE CASCADE,
+    CONSTRAINT fk_season_crop FOREIGN KEY (crop_id) REFERENCES crop_info(id)
+) ENGINE=InnoDB COMMENT='地块季节历史';

@@ -51,7 +51,8 @@ spring:
 app:
   jwt:
     secret: YWdyaS13ZWF0aGVyLXNlY3JldC1rZXktMjAyNi1zbWFydC1mYXJtaW5nLXBsYXRmb3Jt
-    expiration-ms: 86400000
+    # access token 2 小时；refresh token 由 /api/auth/refresh 轮换，默认 30 天
+    expiration-ms: ${JWT_EXPIRATION_MS:7200000}
 
   # 农事智能体（DeepSeek）
   # API Key 用环境变量注入，不要写在本文件里：set DEEPSEEK_API_KEY=sk-xxx

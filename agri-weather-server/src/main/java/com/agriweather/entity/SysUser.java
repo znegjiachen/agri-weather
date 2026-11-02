@@ -31,6 +31,11 @@ public class SysUser {
     @Column(length = 100)
     private String region;
 
+    /** 退出全部设备时递增，旧 access token 立即失效 */
+    @Column(name = "token_version", nullable = false)
+    @Builder.Default
+    private Integer tokenVersion = 0;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

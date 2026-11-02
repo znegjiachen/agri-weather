@@ -5,16 +5,62 @@ function getToken() {
   return localStorage.getItem('token');
 }
 
+function clearAuthStorage() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+}
+
 /** 统一的 401 处理：清登录态并通知全局弹层 */
 function handleUnauthorized(data) {
   const message = data?.message || data?.error || '登录已过期，请重新登录';
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  clearAuthStorage();
   window.dispatchEvent(new CustomEvent('auth:expired', { detail: message }));
   throw new Error(message);
 }
 
-async function request(path, options = {}) {
+// 单飞刷新：多个并发 401 只发一次 refresh 请求
+let refreshPromise = null;
+
+async function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return false;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.token) {
+        clearAuthStorage();
+        return false;
+      }
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      localStorage.setItem('user', JSON.stringify({
+        username: data.username,
+        role: data.role,
+        userId: data.userId,
+        phone: data.phone || '',
+        region: data.region || '',
+      }));
+      window.dispatchEvent(new CustomEvent('auth:refreshed', { detail: data }));
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function request(path, options = {}, retried = false) {
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
@@ -25,7 +71,13 @@ async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json().catch(() => null);
 
-  if (res.status === 401) handleUnauthorized(data);
+  if (res.status === 401) {
+    if (!retried && !path.startsWith('/api/auth/refresh')) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return request(path, options, true);
+    }
+    handleUnauthorized(data);
+  }
 
   // 后端统一把中文提示放在 message，error 只是机器可读的 code
   if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
@@ -36,6 +88,19 @@ async function request(path, options = {}) {
 export const auth = {
   register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  refresh: (refreshToken) => request('/api/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
+  }),
+  logout: (refreshToken) => request('/api/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
+  }),
+  logoutAll: () => request('/api/auth/logout-all', { method: 'POST' }),
+  deleteAccount: (password) => request('/api/auth/account', {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  }),
   profile: () => request('/api/auth/profile'),
   updateProfile: (body) => request('/api/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
   changePassword: (body) => request('/api/auth/password', { method: 'PUT', body: JSON.stringify(body) }),
@@ -68,6 +133,34 @@ export const farmlands = {
   weather: (id) => request(`/api/farmlands/${id}/weather`),
   alerts: (id) => request(`/api/farmlands/${id}/alerts`),
   advice: (id) => request(`/api/farmlands/${id}/advice`),
+  seasons: {
+    list: (farmlandId) => request(`/api/farmlands/${farmlandId}/seasons`),
+    create: (farmlandId, body) => request(`/api/farmlands/${farmlandId}/seasons`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+    update: (farmlandId, seasonId, body) => request(
+      `/api/farmlands/${farmlandId}/seasons/${seasonId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+    remove: (farmlandId, seasonId) => request(
+      `/api/farmlands/${farmlandId}/seasons/${seasonId}`,
+      { method: 'DELETE' },
+    ),
+  },
+  farmOperations: {
+    list: (farmlandId) => request(`/api/farmlands/${farmlandId}/operations`),
+    create: (farmlandId, body) => request(`/api/farmlands/${farmlandId}/operations`, {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+    update: (farmlandId, operationId, body) => request(
+      `/api/farmlands/${farmlandId}/operations/${operationId}`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+    remove: (farmlandId, operationId) => request(
+      `/api/farmlands/${farmlandId}/operations/${operationId}`,
+      { method: 'DELETE' },
+    ),
+  },
 };
 
 // Pests
@@ -205,6 +298,10 @@ export const agent = {
 
     if (res.status === 401) {
       const data = await res.json().catch(() => null);
+      if (!context.__retried && await refreshAccessToken()) {
+        return agent.chatStream(message, history, visionContext, handlers,
+          { ...context, __retried: true });
+      }
       handleUnauthorized(data);
     }
     if (!res.ok) {

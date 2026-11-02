@@ -14,8 +14,9 @@ export function AuthProvider({ children }) {
   // 登录过期等提示：退出后仍需要在登录页展示一次
   const [authNotice, setAuthNotice] = useState('');
 
-  const saveUser = useCallback((userData, token) => {
+  const saveUser = useCallback((userData, token, refreshToken) => {
     localStorage.setItem('token', token);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     setAuthNotice('');
@@ -31,7 +32,7 @@ export function AuthProvider({ children }) {
       userId: data.userId,
       phone: data.phone || '',
       region: data.region || '',
-    }, data.token);
+    }, data.token, data.refreshToken);
     return data;
   }, [saveUser]);
 
@@ -43,7 +44,7 @@ export function AuthProvider({ children }) {
       userId: data.userId,
       phone: data.phone || '',
       region: data.region || '',
-    }, data.token);
+    }, data.token, data.refreshToken);
     return data;
   }, [saveUser]);
 
@@ -55,14 +56,33 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  const logout = useCallback(() => {
+  const clearLocal = useCallback(() => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
     clearApiCache();
     // 避免下一位登录者看到上一位用户的地块上下文
     clearFieldContext();
   }, []);
+
+  const logout = useCallback(() => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      auth.logout(refreshToken).catch(() => {});
+    }
+    clearLocal();
+  }, [clearLocal]);
+
+  const logoutAll = useCallback(async () => {
+    await auth.logoutAll();
+    clearLocal();
+  }, [clearLocal]);
+
+  const deleteAccount = useCallback(async (password) => {
+    await auth.deleteAccount(password);
+    clearLocal();
+  }, [clearLocal]);
 
   // 老账号的 localStorage 里可能没有手机号/地区，登录后补拉一次资料
   useEffect(() => {
@@ -90,12 +110,31 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('auth:expired', handler);
   }, [logout]);
 
+  // API 层自动刷新成功后，同步 Context 里的用户信息
+  useEffect(() => {
+    const handler = (event) => {
+      const data = event.detail || {};
+      updateUser({
+        username: data.username,
+        role: data.role,
+        userId: data.userId,
+        phone: data.phone || '',
+        region: data.region || '',
+      });
+      setAuthNotice('');
+    };
+    window.addEventListener('auth:refreshed', handler);
+    return () => window.removeEventListener('auth:refreshed', handler);
+  }, [updateUser]);
+
   return (
     <AuthContext.Provider value={{
       user,
       login,
       register,
       logout,
+      logoutAll,
+      deleteAccount,
       updateUser,
       authNotice,
       clearAuthNotice: () => setAuthNotice(''),

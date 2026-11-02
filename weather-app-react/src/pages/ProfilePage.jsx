@@ -15,7 +15,7 @@ function pushLabel(state) {
 }
 
 export default function ProfilePage() {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, logoutAll, deleteAccount, updateUser } = useAuth();
 
   const [sheet, setSheet] = useState(null); // profile | password
   const [pageNotice, setPageNotice] = useState('');
@@ -150,6 +150,26 @@ export default function ProfilePage() {
     if (window.confirm('确定退出登录吗？')) logout();
   };
 
+  const handleLogoutAll = async () => {
+    if (!window.confirm('确定退出全部设备吗？其他设备上的登录会立即失效。')) return;
+    try {
+      await logoutAll();
+    } catch (e) {
+      showNotice(e.message || '操作失败');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const password = window.prompt('注销后数据无法恢复，请输入密码确认：');
+    if (!password) return;
+    if (!window.confirm('最后确认：注销账号并删除全部地块、对话和社区内容？')) return;
+    try {
+      await deleteAccount(password);
+    } catch (e) {
+      showNotice(e.message || '注销失败');
+    }
+  };
+
   return (
     <div className="profile-page">
       <header className="page-header">
@@ -209,6 +229,24 @@ export default function ProfilePage() {
             <small>农事气象服务平台 · Spring Boot 3.5 · React 19 · Redis</small>
           </span>
         </div>
+
+        <button type="button" className="settings-row" onClick={handleLogoutAll}>
+          <span className="settings-row-icon" aria-hidden>📤</span>
+          <span className="settings-row-text">
+            <b>退出全部设备</b>
+            <small>使其他设备上的登录立即失效</small>
+          </span>
+          <span className="settings-row-arrow" aria-hidden>›</span>
+        </button>
+
+        <button type="button" className="settings-row danger" onClick={handleDeleteAccount}>
+          <span className="settings-row-icon" aria-hidden>🗑️</span>
+          <span className="settings-row-text">
+            <b>注销账号</b>
+            <small>删除地块、对话和社区内容，不可恢复</small>
+          </span>
+          <span className="settings-row-arrow" aria-hidden>›</span>
+        </button>
       </section>
 
       <button type="button" className="settings-logout" onClick={handleLogout}>

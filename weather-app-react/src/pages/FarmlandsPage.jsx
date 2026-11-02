@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { farmlands, crops } from '../api';
+import FarmlandRecordsModal from '../components/FarmlandRecordsModal';
 import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
@@ -25,6 +26,7 @@ export default function FarmlandsPage() {
 
   // Modal state
   const [modal, setModal] = useState(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
+  const [recordsField, setRecordsField] = useState(null);
 
   // 未填写就保持空：不要用默认土壤/灌溉或 0 代替用户没填的数据
   const [form, setForm] = useState({
@@ -304,6 +306,14 @@ export default function FarmlandsPage() {
       )}
 
       {/* Weather/Alerts/Advice Modal */}
+      {recordsField && (
+        <FarmlandRecordsModal
+          farmland={recordsField}
+          cropList={cropList}
+          onClose={() => setRecordsField(null)}
+        />
+      )}
+
       {modal && (
         <div className="form-overlay" onClick={() => setModal(null)}>
           <div className="form-card glass-heavy" style={{ maxWidth: 700, maxHeight: '80vh', overflow: 'auto' }}>
@@ -434,6 +444,7 @@ export default function FarmlandsPage() {
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>🌤️ 天气</button>
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>⚠️ 预警</button>
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>📋 农事</button>
+                <button className="btn-edit" onClick={() => setRecordsField(f)}>📒 记录</button>
                 <button
                   type="button"
                   className="btn-edit"

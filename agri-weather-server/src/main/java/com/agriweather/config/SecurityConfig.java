@@ -1,5 +1,6 @@
 package com.agriweather.config;
 
+import com.agriweather.repository.UserRepository;
 import com.agriweather.utils.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -56,6 +57,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil,
+                                          UserRepository userRepository,
                                           StringRedisTemplate redis,
                                           RateLimitProperties rateLimitProperties) throws Exception {
         RateLimitFilter rateLimitFilter = new RateLimitFilter(redis, rateLimitProperties);
@@ -68,7 +70,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()
             )
-            .addFilterBefore(new JwtAuthFilter(jwtUtil), UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new JwtAuthFilter(jwtUtil, userRepository), UsernamePasswordAuthenticationFilter.class)
             // JWT 先行，限流才能按 userId 而不是 IP 计数
             .addFilterAfter(rateLimitFilter, JwtAuthFilter.class);
 
@@ -77,8 +79,12 @@ public class SecurityConfig {
 
     static class JwtAuthFilter extends OncePerRequestFilter {
         private final JwtUtil jwtUtil;
+        private final UserRepository userRepository;
 
-        JwtAuthFilter(JwtUtil jwtUtil) { this.jwtUtil = jwtUtil; }
+        JwtAuthFilter(JwtUtil jwtUtil, UserRepository userRepository) {
+            this.jwtUtil = jwtUtil;
+            this.userRepository = userRepository;
+        }
 
         @Override
         protected void doFilterInternal(HttpServletRequest request,
@@ -88,9 +94,20 @@ public class SecurityConfig {
             if (header != null && header.startsWith("Bearer ")) {
                 try {
                     var claims = jwtUtil.parseToken(header.substring(7));
-                    request.setAttribute("userId", claims.get("userId", Long.class));
-                    request.setAttribute("username", claims.getSubject());
-                    request.setAttribute("role", claims.get("role", String.class));
+                    Long userId = claims.get("userId", Long.class);
+                    Integer tokenVersion = claims.get("ver", Integer.class);
+                    var user = userId == null ? null
+                            : userRepository.findById(userId).orElse(null);
+                    int currentVersion = user == null || user.getTokenVersion() == null
+                            ? 0 : user.getTokenVersion();
+                    int tokenVer = tokenVersion == null ? 0 : tokenVersion;
+                    if (user != null && tokenVer == currentVersion) {
+                        request.setAttribute("userId", userId);
+                        request.setAttribute("username", claims.getSubject());
+                        request.setAttribute("role", claims.get("role", String.class));
+                    } else {
+                        request.setAttribute("authError", "登录已过期，请重新登录");
+                    }
                 } catch (Exception e) {
                     // Token存在但无效/过期，标记错误供需要认证的接口使用
                     request.setAttribute("authError", "登录已过期，请重新登录");
