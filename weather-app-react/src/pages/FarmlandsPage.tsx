@@ -438,7 +438,11 @@ export default function FarmlandsPage() {
                   {' | '}🧱 {f.soilType || '土壤未填'}
                   {' | '}💧 {f.irrigationType || '灌溉未填'}
                 </p>
-                {f.plantDate && <p>🌱 播种：{f.plantDate}</p>}
+                {f.plantDate ? (
+                  <p>🌱 播种：{f.plantDate}</p>
+                ) : f.cropId ? (
+                  <p className="farmland-missing">🌱 未填播种日期，无法计算生长阶段</p>
+                ) : null}
               </div>
               <div className="farmland-actions">
                 <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>🌤️ 天气</button>

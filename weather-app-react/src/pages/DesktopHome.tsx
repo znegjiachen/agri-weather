@@ -438,7 +438,9 @@ export default function DesktopHome() {
                       <div className="dh-field-meta">
                         {w?.cropName || '未选择作物'}
                         {f.areaMu ? ` · ${f.areaMu} 亩` : ''}
-                        {stage ? ` · ${stage}` : ''}
+                        {stage
+                          ? ` · ${stage}`
+                          : (f.cropId && !f.plantDate ? ' · 未填播种日期' : '')}
                       </div>
                     </div>
                     <div className="dh-field-weather">

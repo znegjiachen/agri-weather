@@ -1895,6 +1895,10 @@ main {
   margin-bottom: 4px;
 }
 
+.farmland-missing {
+  color: #b45309 !important;
+}
+
 .farmland-actions {
   display: flex;
   flex-wrap: wrap;
