@@ -823,8 +823,14 @@ export default function AgentDock({ defaultCollapsed = false }) {
               type="button"
               className={`agent-dock-tool-btn ${voice.recording ? 'recording' : ''}`}
               onClick={voice.toggle}
-              disabled={loading || historyLoading || voice.processing || notConfigured}
-              title={voice.recording ? '停止录音' : voice.processing ? '正在识别…' : '语音输入'}
+              disabled={loading || historyLoading || voice.processing || notConfigured || !voice.supported}
+              title={
+                !voice.supported ? '当前浏览器不支持语音输入，请改用文字'
+                  : voice.recording ? '停止录音'
+                    : voice.processing ? '正在识别…'
+                      : status?.asrConfigured ? '语音输入'
+                        : '浏览器语音输入（需联网）'
+              }
               aria-label={voice.recording ? '停止录音' : '语音输入'}
             >
               {voice.processing ? '⏳' : voice.recording ? '⏹' : '🎤'}

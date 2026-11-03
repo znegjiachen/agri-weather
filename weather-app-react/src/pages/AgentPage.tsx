@@ -799,9 +799,14 @@ export default function AgentPage() {
             type="button"
             className={`agent-attach-btn ${voice.recording ? 'recording' : ''}`}
             onClick={voice.toggle}
-            disabled={loading || historyLoading || voice.processing || notConfigured}
+            disabled={loading || historyLoading || voice.processing || notConfigured || !voice.supported}
             aria-label="语音输入"
-            title={voice.recording ? '停止录音' : '语音输入'}
+            title={
+              !voice.supported ? '当前浏览器不支持语音输入，请改用文字'
+                : voice.recording ? '停止录音'
+                  : status?.asrConfigured ? '语音输入'
+                    : '浏览器语音输入（需联网）'
+            }
           >
             {voice.processing ? '⏳' : voice.recording ? '⏹' : '🎤'}
           </button>

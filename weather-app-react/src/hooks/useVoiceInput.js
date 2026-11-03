@@ -6,6 +6,14 @@ function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+const BROWSER_ASR_ERRORS = {
+  'not-allowed': '麦克风权限被拒绝，请在浏览器地址栏允许访问麦克风',
+  'service-not-allowed': '浏览器语音服务被禁用，请改用文字输入',
+  network: '浏览器语音识别需要访问在线语音服务，当前网络不可用；请改用文字输入，或配置后端 ASR 服务',
+  'audio-capture': '没有检测到可用麦克风，请检查设备',
+  'no-speech': '没有识别到语音内容，请再说一次',
+};
+
 /**
  * 语音输入：
  * - 后端配置了 ASR：录音后用 MediaRecorder 上传，走 Whisper/兼容服务；
@@ -109,8 +117,10 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         if (text.trim()) callbacksRef.current.onText?.(text.trim());
       };
       recognition.onerror = (event) => {
-        if (event.error !== 'aborted' && event.error !== 'no-speech') {
-          callbacksRef.current.onError?.(`语音识别失败：${event.error}`);
+        if (event.error !== 'aborted') {
+          callbacksRef.current.onError?.(
+            BROWSER_ASR_ERRORS[event.error] || `语音识别失败：${event.error}`,
+          );
         }
         setRecording(false);
       };
@@ -138,7 +148,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
     } else if (asrConfigured) {
       callbacksRef.current.onError?.('当前浏览器不支持录音，请更换浏览器');
     } else {
-      callbacksRef.current.onError?.('未配置语音识别服务，且当前浏览器不支持语音输入');
+      callbacksRef.current.onError?.('语音输入不可用：未配置后端 ASR，且当前浏览器不支持语音识别');
     }
   };
 
