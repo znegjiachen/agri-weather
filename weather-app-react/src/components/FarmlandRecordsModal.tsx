@@ -12,6 +12,41 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function planDateLabel(value) {
+  if (!value) return '日期待定';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const diff = Math.round((date.getTime() - startOfToday.getTime()) / 86400000);
+  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+  const base = `${date.getMonth() + 1}月${date.getDate()}日 ${week}`;
+  if (diff === 0) return `${base} · 今天`;
+  if (diff === 1) return `${base} · 明天`;
+  if (diff > 1) return `${base} · 还有 ${diff} 天`;
+  return `${base} · 已逾期 ${-diff} 天`;
+}
+
+function groupTasksByDate(tasks) {
+  const sorted = [...tasks].sort((a, b) => {
+    if (!a.plannedDate && !b.plannedDate) return a.id - b.id;
+    if (!a.plannedDate) return 1;
+    if (!b.plannedDate) return -1;
+    return a.plannedDate.localeCompare(b.plannedDate) || a.id - b.id;
+  });
+  const groups = [];
+  sorted.forEach((task) => {
+    const key = task.plannedDate || '';
+    let group = groups[groups.length - 1];
+    if (!group || group.date !== key) {
+      group = { date: key, items: [] };
+      groups.push(group);
+    }
+    group.items.push(task);
+  });
+  return groups;
+}
+
 /** 地块季节历史 + 农事记录 */
 export default function FarmlandRecordsModal({ farmland, cropList = [], onClose }) {
   const [tab, setTab] = useState('seasons');
@@ -451,33 +486,41 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
               {tasks === null ? <p className="empty-text">加载中…</p>
                 : tasks.length === 0 ? (
                   <p className="empty-text">还没有计划任务，上传一份种植方案试试。</p>
-                ) : tasks.map((task) => (
-                  <div className="records-row" key={task.id}>
-                    <div>
-                      <b>{task.title}</b>
-                      <span>
-                        {TASK_TYPES[task.taskType] || '其他'}
-                        {task.plannedDate ? ` · 计划 ${task.plannedDate}` : ''}
-                        {task.actualDate ? ` · 实际 ${task.actualDate}` : ''}
-                        {task.sourceName ? ` · ${task.sourceName}` : ''}
-                      </span>
+                ) : groupTasksByDate(tasks).map((group) => (
+                  <div className="records-day-group" key={group.date || 'undated'}>
+                    <div className="records-day-head">
+                      <span className="records-day-title">{planDateLabel(group.date)}</span>
+                      <span className="records-day-count">{group.items.length} 项</span>
                     </div>
-                    <span className={`records-status ${task.status?.toLowerCase()}`}>
-                      {task.status === 'DONE' ? '已完成' : task.status === 'SKIPPED' ? '已跳过' : '待执行'}
-                    </span>
-                    {task.status === 'PENDING' && (
-                      <>
-                        <button type="button" className="records-task-done" onClick={() => updateTask(task, 'DONE')} disabled={saving}>
-                          完成
+                    {group.items.map((task) => (
+                      <div className="records-row" key={task.id}>
+                        <div>
+                          <b>{task.title}</b>
+                          <span>
+                            {TASK_TYPES[task.taskType] || '其他'}
+                            {task.plannedDate ? ` · 计划 ${task.plannedDate}` : ''}
+                            {task.actualDate ? ` · 实际 ${task.actualDate}` : ''}
+                            {task.sourceName ? ` · ${task.sourceName}` : ''}
+                          </span>
+                        </div>
+                        <span className={`records-status ${task.status?.toLowerCase()}`}>
+                          {task.status === 'DONE' ? '已完成' : task.status === 'SKIPPED' ? '已跳过' : '待执行'}
+                        </span>
+                        {task.status === 'PENDING' && (
+                          <>
+                            <button type="button" className="records-task-done" onClick={() => updateTask(task, 'DONE')} disabled={saving}>
+                              完成
+                            </button>
+                            <button type="button" className="records-danger" onClick={() => updateTask(task, 'SKIPPED')} disabled={saving}>
+                              跳过
+                            </button>
+                          </>
+                        )}
+                        <button type="button" className="records-danger" onClick={() => removeTask(task.id)}>
+                          删除
                         </button>
-                        <button type="button" className="records-danger" onClick={() => updateTask(task, 'SKIPPED')} disabled={saving}>
-                          跳过
-                        </button>
-                      </>
-                    )}
-                    <button type="button" className="records-danger" onClick={() => removeTask(task.id)}>
-                      删除
-                    </button>
+                      </div>
+                    ))}
                   </div>
                 ))}
             </div>

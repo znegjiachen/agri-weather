@@ -57,7 +57,7 @@ public class FarmlandTaskController {
                                       @Valid @RequestBody PlanTaskExtractRequest body,
                                       HttpServletRequest request) {
         Long userId = userId(request);
-        requireFarmland(farmlandId, userId);
+        Farmland farmland = requireFarmland(farmlandId, userId);
         String text;
         try {
             text = documentService.documentText(userId, body.getDocumentId());
@@ -65,7 +65,7 @@ public class FarmlandTaskController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
         try {
-            return extractionService.extract(null, text);
+            return extractionService.extract(null, text, farmland.getPlantDate());
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, e.getMessage());
         } catch (IllegalArgumentException e) {

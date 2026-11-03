@@ -142,7 +142,7 @@ public class FarmlandRecordController {
         if (body.getPlanDocumentId() != null) {
             try {
                 String text = documentService.documentText(userId, body.getPlanDocumentId());
-                List<PlanTaskItem> items = extractionService.extract(body.getPlanName(), text);
+                List<PlanTaskItem> items = extractionService.extract(body.getPlanName(), text, plantDate);
                 for (PlanTaskItem item : items) {
                     FarmPlanTask task = new FarmPlanTask();
                     task.setFarmlandId(farmlandId);
