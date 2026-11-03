@@ -90,9 +90,14 @@ public class CropService {
     }
 
     /**
-     * 气象匹配检测（加权精确版）
-     * 温度权重40%、湿度25%、降水20%、光照15%
-     * 基于标准化距离计算单项分，加权汇总综合分
+     * 播种气象适宜度。
+     *
+     * 温度：按 QX/T 734—2024《关键农时气象服务通则》表 A.1 的播种界限温度，
+     *       用日平均气温对 [sowingTempMin, sowingTempMax] 做分段线性评分；
+     * 水分：空气湿度 + 当日降水。降水按 FAO EcoCrop 思路，把全生育期需水
+     *       折算为日均需水，再按“偏少—适宜—偏多”分段评分；
+     * 光照：作为辅助因子保留较低权重；
+     * 综合：加权后叠加限制因子上限，避免某一项严重不适宜却被其他项拉高。
      */
     public Map<String, Object> getWeatherMatch(Long cropId, double temp, double humidity,
                                                 double rainfall, double light) {
@@ -100,43 +105,59 @@ public class CropService {
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("cropName", crop.getCropName());
         report.put("variety", crop.getVariety());
+        report.put("method", "QX/T 734—2024 播种界限温度 + FAO EcoCrop 分段响应");
+        report.put("dataNote", "温度取未来 5 天日平均气温均值（近似稳定通过）；水分由空气湿度和当日降水估算，尚未接入 0–20 cm 土壤墒情");
 
-        // ── 1. 温度评分（权重 40%）──
-        double tempScore = scoreRange(temp, crop.getSuitableTempMin(), crop.getSuitableTempMax(), 8.0);
-        String tempLabel = tempScore >= 85 ? "非常适宜" : tempScore >= 70 ? "适宜" : tempScore >= 50 ? "勉强" : "不适宜";
+        // ── 1. 播种温度（权重 50%，参考 QX/T 734—2024）──
+        double tempMin = crop.getSowingTempMin() != null ? crop.getSowingTempMin()
+                : (crop.getSuitableTempMin() != null ? crop.getSuitableTempMin() : 15);
+        double tempMax = crop.getSowingTempMax() != null ? crop.getSowingTempMax()
+                : (crop.getSuitableTempMax() != null ? crop.getSuitableTempMax() : 30);
+        double tempScore = scoreSowingTemp(temp, tempMin, tempMax);
+        String tempLabel = scoreLabel(tempScore);
         report.put("temperature", Map.of(
             "score", Math.round(tempScore),
             "label", tempLabel,
             "current", Math.round(temp * 10) / 10.0,
-            "range", crop.getSuitableTempMin() + "°C ~ " + crop.getSuitableTempMax() + "°C",
-            "weight", 40
+            "range", tempMin + "°C ~ " + tempMax + "°C",
+            "weight", 50,
+            "basis", "QX/T 734—2024 播种界限温度"
         ));
 
-        // ── 2. 湿度评分（权重 25%）──
-        double humScore = scoreRange(humidity, crop.getSuitableHumidityMin(), crop.getSuitableHumidityMax(), 15.0);
-        String humLabel = humScore >= 85 ? "非常适宜" : humScore >= 70 ? "适宜" : humScore >= 50 ? "勉强" : "不适宜";
+        // ── 2. 空气湿度（权重 10%，播种期采用通用适湿范围）──
+        double humScore = Math.max(20, scoreRange(humidity, 50.0, 85.0, 20.0));
+        String humLabel = scoreLabel(humScore);
         report.put("humidity", Map.of(
             "score", Math.round(humScore),
             "label", humLabel,
             "current", Math.round(humidity * 10) / 10.0,
-            "range", crop.getSuitableHumidityMin() + "% ~ " + crop.getSuitableHumidityMax() + "%",
-            "weight", 25
+            "range", "50% ~ 85%",
+            "weight", 10,
+            "basis", "通用播种空气湿度"
         ));
 
-        // ── 3. 降水评分（权重 20%）──
-        double rainScore = scoreLowerIsBetter(rainfall, crop.getSuitableRainfall(), 200.0);
-        String rainLabel = rainScore >= 85 ? "非常适宜" : rainScore >= 70 ? "适宜" : rainScore >= 50 ? "偏多" : "过多";
+        // ── 3. 当日降水（权重 25%，按日均需水折算适宜区间）──
+        double dailyNeed = crop.getSuitableRainfall() != null && crop.getGrowthCycleDays() != null
+                && crop.getGrowthCycleDays() > 0
+                ? crop.getSuitableRainfall() / crop.getGrowthCycleDays() : 4.0;
+        double rainLow = Math.max(0.5, dailyNeed * 0.3);
+        double rainHigh = Math.max(rainLow + 0.5, dailyNeed * 2.0);
+        double rainScore = scoreSowingRain(rainfall, rainLow, rainHigh, dailyNeed);
+        String rainLabel = rainfall < rainLow ? (rainScore < 50 ? "过少" : "偏少")
+                : rainfall > rainHigh ? (rainScore < 50 ? "过多" : "偏多") : "适宜";
         report.put("rainfall", Map.of(
             "score", Math.round(rainScore),
             "label", rainLabel,
             "current", Math.round(rainfall * 10) / 10.0 + "mm",
-            "reference", crop.getSuitableRainfall() + "mm",
-            "weight", 20
+            "reference", String.format(java.util.Locale.ROOT,
+                "日均需水 %.1f mm（适播 %.1f~%.1f mm）", dailyNeed, rainLow, rainHigh),
+            "weight", 25
         ));
 
-        // ── 4. 光照评分（权重 15%）──
-        double lightScore = scoreExact(light, crop.getSuitableLightHours(), 6.0);
-        String lightLabel = lightScore >= 85 ? "非常适宜" : lightScore >= 70 ? "适宜" : lightScore >= 50 ? "不足/过多" : "严重不足";
+        // ── 4. 光照（权重 15%，辅助因子）──
+        double lightScore = scoreDaylight(light, crop.getSuitableLightHours());
+        String lightLabel = lightScore >= 85 ? "非常适宜" : lightScore >= 70 ? "适宜"
+                : lightScore >= 50 ? "不足/过多" : "严重不足";
         report.put("light", Map.of(
             "score", Math.round(lightScore),
             "label", lightLabel,
@@ -145,60 +166,68 @@ public class CropService {
             "weight", 15
         ));
 
-        // ── 5. 加权综合分 ──
-        double weighted = tempScore * 0.40 + humScore * 0.25 + rainScore * 0.20 + lightScore * 0.15;
-        int overall = (int) Math.round(weighted);
+        // ── 5. 综合分：加权 + 限制因子封顶 ──
+        double moistureScore = humScore * 0.29 + rainScore * 0.71;
+        double weighted = tempScore * 0.50 + moistureScore * 0.35 + lightScore * 0.15;
+        double limited = Math.min(weighted, Math.min(tempScore + 20, moistureScore + 20));
+        int overall = (int) Math.round(Math.max(0, limited));
         report.put("overallScore", overall);
-        report.put("overallGrade", overall >= 90 ? "优秀" : overall >= 75 ? "良好" : overall >= 60 ? "一般" : "较差");
+        report.put("overallGrade", gradeOf(overall));
 
         // ── 6. 灾害风险检测（惩罚扣分）──
         List<Map<String, String>> risks = new ArrayList<>();
-        if (crop.getFrostSensitive() && temp < 5) {
+        if (crop.getFrostSensitive() && temp < tempMin - 4) {
             risks.add(Map.of("type", "FROST", "level", "RED", "msg",
-                "低温冻害风险！" + crop.getCropName() + "不耐寒，当前" + temp + "°C远低于安全线"));
+                "低温冻害风险！" + crop.getCropName() + "播种下限 " + tempMin
+                    + "°C，当前日均温仅 " + temp + "°C"));
             overall = Math.max(0, overall - 25);
-        } else if (crop.getFrostSensitive() && temp < 10) {
+        } else if (crop.getFrostSensitive() && temp < tempMin) {
             risks.add(Map.of("type", "FROST", "level", "YELLOW", "msg",
-                "注意低温，" + crop.getCropName() + "对低温敏感，当前" + temp + "°C"));
+                "日均温低于" + crop.getCropName() + "播种下限 " + tempMin + "°C，建议等温度稳定通过"));
             overall = Math.max(0, overall - 10);
         }
-        if (crop.getHeatSensitive() && temp > 35) {
+        if (crop.getHeatSensitive() && temp > tempMax + 5) {
             risks.add(Map.of("type", "HEAT", "level", "RED", "msg",
-                "高温热害风险！" + crop.getCropName() + "不耐热，当前" + temp + "°C远超安全线"));
+                "高温风险！" + crop.getCropName() + "播种上限 " + tempMax
+                    + "°C，当前日均温 " + temp + "°C"));
             overall = Math.max(0, overall - 25);
-        } else if (crop.getHeatSensitive() && temp > 30) {
+        } else if (crop.getHeatSensitive() && temp > tempMax) {
             risks.add(Map.of("type", "HEAT", "level", "YELLOW", "msg",
-                "注意高温，" + crop.getCropName() + "对热敏感，当前" + temp + "°C"));
+                "日均温高于" + crop.getCropName() + "播种上限 " + tempMax + "°C，建议推迟播种"));
             overall = Math.max(0, overall - 10);
         }
-        if (crop.getWaterlogSensitive() && rainfall > 80) {
+        if (crop.getWaterlogSensitive() && rainfall > rainHigh * 3) {
             risks.add(Map.of("type", "RAINSTORM", "level", "RED", "msg",
-                "暴雨涝害风险！" + crop.getCropName() + "怕涝，当前降水" + rainfall + "mm"));
+                "强降水涝害风险！" + crop.getCropName() + "怕涝，当日降水 " + rainfall + " mm"));
             overall = Math.max(0, overall - 25);
-        } else if (crop.getWaterlogSensitive() && rainfall > 50) {
+        } else if (crop.getWaterlogSensitive() && rainfall > rainHigh * 1.5) {
             risks.add(Map.of("type", "RAINSTORM", "level", "YELLOW", "msg",
-                "注意排水，" + crop.getCropName() + "对涝害敏感"));
+                "降水偏多，" + crop.getCropName() + "播种后注意排水散墒"));
             overall = Math.max(0, overall - 10);
         }
         report.put("risks", risks);
         report.put("hasRisk", !risks.isEmpty());
         report.put("finalScore", overall);
-        report.put("finalGrade", overall >= 90 ? "优秀" : overall >= 75 ? "良好" : overall >= 60 ? "一般" : "较差");
+        report.put("finalGrade", gradeOf(overall));
 
         // ── 7. 综合建议 ──
         List<String> suggestions = new ArrayList<>();
-        double tMin = crop.getSuitableTempMin() != null ? crop.getSuitableTempMin() : 15;
-        double tMax = crop.getSuitableTempMax() != null ? crop.getSuitableTempMax() : 30;
-        if (temp < tMin) suggestions.add("建议覆盖地膜或大棚保温，提升地温");
-        if (temp > tMax) suggestions.add("建议遮阳降温，增加灌溉频率降低田间温度");
-        if (humidity < (crop.getSuitableHumidityMin() != null ? crop.getSuitableHumidityMin() : 50))
-            suggestions.add("建议喷灌增湿或浇跑马水提高田间湿度");
-        if (humidity > (crop.getSuitableHumidityMax() != null ? crop.getSuitableHumidityMax() : 80))
-            suggestions.add("建议通风降湿，预防病害滋生");
-        if (rainfall > (crop.getSuitableRainfall() != null ? crop.getSuitableRainfall() : 100))
-            suggestions.add("建议清沟排水，降低地下水位");
+        if (temp < tempMin) {
+            suggestions.add("日均温低于播种下限 " + tempMin + "°C，建议等温度稳定通过后再播");
+        }
+        if (temp > tempMax) {
+            suggestions.add("日均温高于播种上限 " + tempMax + "°C，建议推迟播种或选耐热品种");
+        }
+        if (humidity < 50)
+            suggestions.add("空气偏干，播前注意造墒或灌溉");
+        if (humidity > 85)
+            suggestions.add("空气偏湿，注意通风散墒，预防烂种和苗期病害");
+        if (rainfall < rainLow)
+            suggestions.add("当日降水偏少，播前需灌溉造墒或覆盖保墒");
+        if (rainfall > rainHigh)
+            suggestions.add("当日降水偏多，先排水散墒，避免烂种烂芽");
         if (light < (crop.getSuitableLightHours() != null ? crop.getSuitableLightHours() * 0.5 : 4))
-            suggestions.add("连续阴雨寡照，注意补光或喷施叶面肥增强光合作用");
+            suggestions.add("光照偏少，注意播种深度和出苗后的光照管理");
         report.put("suggestions", suggestions);
 
         return report;
@@ -224,23 +253,46 @@ public class CropService {
     }
 
     /**
-     * 越小越好型评分：值 <= reference 满分，超出衰减
+     * 播种温度评分：日平均气温落在 [min, max] 内满分，越界按余弦式衰减。
+     * min/max 取自 QX/T 734—2024 的播种界限温度。
      */
-    private double scoreLowerIsBetter(double value, Double reference, double tolerance) {
-        if (reference == null) return 50;
-        if (value <= reference) return 100;
-        double excess = value - reference;
-        double ratio = Math.min(excess / tolerance, 1.0);
+    private double scoreSowingTemp(double value, double min, double max) {
+        if (value >= min && value <= max) return 100;
+        double tolerance = Math.max(6.0, (max - min) * 0.5);
+        double distance = value < min ? min - value : value - max;
+        double ratio = Math.min(distance / tolerance, 1.0);
         return 100 * (1 - ratio) * (1 - ratio * 0.3);
     }
 
     /**
-     * 精确值型评分：越接近 reference 越高
+     * 播种降水评分：按日均需水折算的适宜区间分段。
+     * 无降水仍可通过灌溉造墒，给 55 分兜底；超过上限后快速衰减。
      */
-    private double scoreExact(double value, Double reference, double tolerance) {
-        if (reference == null) return 50;
-        double distance = Math.abs(value - reference);
-        double ratio = Math.min(distance / tolerance, 1.0);
-        return 100 * (1 - ratio) * (1 - ratio * 0.3);
+    private double scoreSowingRain(double value, double low, double high, double dailyNeed) {
+        if (value >= low && value <= high) return 100;
+        if (value < low) {
+            return 55 + 45 * Math.max(0, value) / low;
+        }
+        double limit = Math.max(high + 0.5, dailyNeed * 6.0);
+        double ratio = Math.min((value - high) / (limit - high), 1.0);
+        return 100 * (1 - ratio);
+    }
+
+    private String scoreLabel(double score) {
+        return score >= 85 ? "非常适宜" : score >= 70 ? "适宜" : score >= 50 ? "勉强" : "不适宜";
+    }
+
+    private String gradeOf(int score) {
+        return score >= 90 ? "优秀" : score >= 75 ? "良好" : score >= 60 ? "一般" : "较差";
+    }
+
+    /**
+     * 日照评分：达到作物需光时数即满分，不足时线性下降。
+     * 播种期光照只作辅助，不因日照略多而扣分。
+     */
+    private double scoreDaylight(double value, Double need) {
+        if (need == null || need <= 0) return 100;
+        if (value >= need) return 100;
+        return 40 + 60 * Math.max(0, value) / need;
     }
 }

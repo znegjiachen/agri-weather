@@ -45,6 +45,14 @@ public class CropInfo {
     @Column(name = "sowing_period", length = 120)
     private String sowingPeriod;
 
+    /** 适宜播种的日平均气温下限（℃，参考 QX/T 734—2024） */
+    @Column(name = "sowing_temp_min")
+    private Double sowingTempMin;
+
+    /** 适宜播种的日平均气温上限（℃） */
+    @Column(name = "sowing_temp_max")
+    private Double sowingTempMax;
+
     @Builder.Default
     private Boolean frostSensitive = false;
 

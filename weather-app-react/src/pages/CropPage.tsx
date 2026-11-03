@@ -80,8 +80,19 @@ export default function CropPage() {
         const current = data?.current || {};
         const daily = data?.daily || {};
         const rain = Number(daily.precipitation_sum?.[0]);
+        // QX/T 734 用「稳定通过」界限温度：这里用未来 5 天日均温均值近似
+        const means = [];
+        const days = Math.min(5, daily.time?.length || 0);
+        for (let i = 0; i < days; i += 1) {
+          const hi = Number(daily.temperature_2m_max?.[i]);
+          const lo = Number(daily.temperature_2m_min?.[i]);
+          if (Number.isFinite(hi) && Number.isFinite(lo)) means.push((hi + lo) / 2);
+        }
+        const fiveDayMean = means.length >= 3
+          ? round1(means.reduce((sum, value) => sum + value, 0) / means.length)
+          : (current.temperature_2m != null ? round1(current.temperature_2m) : null);
         const info = {
-          temp: current.temperature_2m != null ? round1(current.temperature_2m) : null,
+          temp: fiveDayMean,
           humidity: current.relative_humidity_2m != null
             ? Math.round(Number(current.relative_humidity_2m)) : null,
           rainfall: Number.isFinite(rain) ? round1(rain) : 0,
@@ -203,7 +214,7 @@ export default function CropPage() {
             <span className="crop-weather-hint">正在读取地块气象…</span>
           ) : weatherInfo ? (
             <div className="crop-weather-chips">
-              <span>🌡 {weatherInfo.temp ?? '--'}°C</span>
+              <span>🌡 5日均温 {weatherInfo.temp ?? '--'}°C</span>
               <span>💧 {weatherInfo.humidity ?? '--'}%</span>
               <span>🌧 {weatherInfo.rainfall ?? '--'} mm</span>
               <span>☀️ {weatherInfo.light ?? '--'} h</span>
@@ -238,7 +249,8 @@ export default function CropPage() {
               <p className="crop-sowing">
                 🌾 适宜播种：{selected.sowingPeriod || '暂无资料'}
               </p>
-              <p>适宜温度：{selected.suitableTempMin}°C ~ {selected.suitableTempMax}°C</p>
+              <p>播种适温（5日均温）：{selected.sowingTempMin ?? '—'}°C ~ {selected.sowingTempMax ?? '—'}°C</p>
+              <p>生长适温：{selected.suitableTempMin}°C ~ {selected.suitableTempMax}°C</p>
               <p>适宜湿度：{selected.suitableHumidityMin}% ~ {selected.suitableHumidityMax}%</p>
               <div className="tags">
                 {selected.frostSensitive && <span className="tag tag-danger">❄️ 怕冻</span>}
@@ -250,9 +262,9 @@ export default function CropPage() {
         </div>
 
         <div className="glass section-card">
-          <h3>气象匹配检测</h3>
+          <h3>播种气象检测</h3>
           <div className="match-form">
-            <label>温度 (°C)<input type="number" value={temp} onChange={(e) => setTemp(+e.target.value)} /></label>
+            <label>5日均温 (°C)<input type="number" value={temp} onChange={(e) => setTemp(+e.target.value)} /></label>
             <label>湿度 (%)<input type="number" value={humidity} onChange={(e) => setHumidity(+e.target.value)} /></label>
             <label>降水 (mm)<input type="number" value={rainfall} onChange={(e) => setRainfall(+e.target.value)} /></label>
             <label>光照 (h)<input type="number" value={light} onChange={(e) => setLight(+e.target.value)} /></label>
@@ -327,6 +339,13 @@ export default function CropPage() {
                   {match.suggestions.map((s, i) => (
                     <div key={i} style={{ fontSize: 12, color: '#555', padding: '3px 0' }}>• {s}</div>
                   ))}
+                </div>
+              )}
+
+              {match.method && (
+                <div className="match-method">
+                  <div>📐 算法依据：{match.method}</div>
+                  {match.dataNote && <div>{match.dataNote}</div>}
                 </div>
               )}
             </div>

@@ -1670,6 +1670,15 @@ main {
 .match-result p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 3px; }
 .match-result .warning { color: #ef4444; font-weight: 600; margin-top: 8px; }
 
+.match-method {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
 .stages-timeline {
   display: flex;
   gap: 12px;

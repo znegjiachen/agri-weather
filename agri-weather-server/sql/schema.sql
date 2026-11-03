@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS crop_info (
     suitable_rainfall DOUBLE,
     suitable_light_hours DOUBLE,
     sowing_period VARCHAR(120),
+    sowing_temp_min DOUBLE,
+    sowing_temp_max DOUBLE,
     frost_sensitive BOOLEAN DEFAULT FALSE,
     heat_sensitive BOOLEAN DEFAULT FALSE,
     waterlog_sensitive BOOLEAN DEFAULT FALSE
