@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { farmlands, crops } from '../api';
 import FarmlandRecordsModal from '../components/FarmlandRecordsModal';
 import {
@@ -15,6 +16,7 @@ const WEATHER_ICONS = {
 const roundCoord = (value) => Math.round(Number(value) * 100) / 100;
 
 export default function FarmlandsPage() {
+  const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [cropList, setCropList] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -141,6 +143,8 @@ export default function FarmlandsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // 新增地块统一走地图圈地，这里只处理编辑
+    if (!editId) return;
     setError('');
 
     const lat = roundCoord(form.lat);
@@ -171,8 +175,7 @@ export default function FarmlandsPage() {
       body.areaMu = numberOrNull(form.areaMu);
     }
     try {
-      if (editId) await farmlands.update(editId, body);
-      else await farmlands.create(body);
+      await farmlands.update(editId, body);
       loadList();
       resetForm();
     } catch (err) {
@@ -255,7 +258,7 @@ export default function FarmlandsPage() {
               : '管理地块、作物与农事记录'}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => { resetForm(); setShowForm(true); }}>
+        <button className="btn-primary" onClick={() => navigate('/home/map?draw=1')}>
           + 添加地块
         </button>
       </div>
@@ -282,7 +285,7 @@ export default function FarmlandsPage() {
             aria-modal="true"
             aria-labelledby="farmland-form-title"
           >
-            <h3 id="farmland-form-title">{editId ? '编辑地块' : '添加地块'}</h3>
+            <h3 id="farmland-form-title">编辑地块</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <label>地块名称 *
@@ -353,7 +356,7 @@ export default function FarmlandsPage() {
               <label>种植日期<input type="date" value={form.plantDate} onChange={(e) => setForm({ ...form, plantDate: e.target.value })} /></label>
               <div className="form-buttons">
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? '提交中...' : editId ? '保存' : '添加'}
+                  {loading ? '提交中...' : '保存'}
                 </button>
                 <button type="button" className="btn-cancel" onClick={resetForm}>取消</button>
               </div>
@@ -478,7 +481,10 @@ export default function FarmlandsPage() {
         </div>
       ) : list.length === 0 ? (
         <div className="glass section-card empty-text">
-          <p>🌱 还没有添加地块，点击上方按钮添加你的第一个地块吧。</p>
+          <p>🌱 还没有添加地块，去地图上圈出第一块地吧。</p>
+          <button className="btn-primary" style={{ marginTop: 12 }} onClick={() => navigate('/home/map?draw=1')}>
+            去地图圈地
+          </button>
         </div>
       ) : (
         <>

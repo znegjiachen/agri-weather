@@ -331,7 +331,7 @@ export default function DesktopHome() {
             🔔
             {unread > 0 && <span className="dh-badge">{unread > 99 ? '99+' : unread}</span>}
           </button>
-          <button type="button" className="dh-primary" onClick={() => navigate('/home/farmlands')}>
+          <button type="button" className="dh-primary" onClick={() => navigate('/home/map?draw=1')}>
             ＋ 添加地块
           </button>
         </div>
@@ -575,7 +575,7 @@ export default function DesktopHome() {
             })}
 
             {fields.length < 5 && (
-              <button type="button" className="dh-add-field" onClick={() => navigate('/home/farmlands')}>
+              <button type="button" className="dh-add-field" onClick={() => navigate('/home/map?draw=1')}>
                 <span className="dh-add-plus">＋</span>
                 添加地块
               </button>

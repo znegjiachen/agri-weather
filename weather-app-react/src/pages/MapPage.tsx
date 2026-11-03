@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { agent as agentApi, farmlands as farmlandApi, crops } from '../api';
 import FarmlandMap from '../components/FarmlandMap';
 import { polygonAreaMu, polygonCenter, roundCoord } from '../utils/geo';
@@ -45,6 +45,7 @@ const WEATHER_ICONS = {
 };
 
 export default function MapPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [cropList, setCropList] = useState([]);
   const [cropMap, setCropMap] = useState({});
@@ -55,7 +56,8 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
 
   const [satellite, setSatellite] = useState(true);
-  const [drawing, setDrawing] = useState(false);
+  // 从「添加地块」跳转过来时直接进入圈地模式
+  const [drawing, setDrawing] = useState(() => searchParams.get('draw') === '1');
   const [draft, setDraft] = useState([]);
   const [finishOpen, setFinishOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -70,6 +72,14 @@ export default function MapPage() {
 
   const mapRef = useRef(null);
   const draftArea = useMemo(() => polygonAreaMu(draft), [draft]);
+
+  // 圈地参数只用一次，清掉以免刷新或返回时重复进入
+  useEffect(() => {
+    if (searchParams.get('draw') !== '1') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('draw');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // 省 / 市 / 县区选择：数据来自阿里 DataV 行政区划（GCJ-02，与高德底图一致）
   const [provinces, setProvinces] = useState<RegionOption[]>([]);
