@@ -53,4 +53,8 @@ public class Farmland {
     /** 对应的专属助农手 ID，仅用于接口返回，不落库 */
     @Transient
     private Long agentId;
+
+    /** 专属助农手名称，仅用于接口返回和前端展示 */
+    @Transient
+    private String agentName;
 }

@@ -249,6 +249,7 @@ public class AgentService {
         for (Farmland field : fields) {
             FarmlandAgent agent = byField.get(field.getId());
             field.setAgentId(agent != null ? agent.getId() : null);
+            field.setAgentName(agent != null ? agent.getName() : null);
         }
     }
 

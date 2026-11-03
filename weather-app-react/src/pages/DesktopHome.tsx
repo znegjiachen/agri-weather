@@ -194,6 +194,7 @@ export default function DesktopHome() {
       name: selectedField.fieldName,
       cropName: selectedCrop,
       agentId: selectedField.agentId || null,
+      agentName: selectedField.agentName || null,
     });
   }, [selectedField, selectedCrop]);
 
