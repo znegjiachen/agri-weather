@@ -12,8 +12,12 @@ import com.agriweather.repository.AgentChatMessageRepository;
 import com.agriweather.repository.AgentKnowledgeChunkRepository;
 import com.agriweather.repository.AgentKnowledgeDocRepository;
 import com.agriweather.repository.CropInfoRepository;
+import com.agriweather.repository.FarmOperationRepository;
+import com.agriweather.repository.FarmPlanTaskRepository;
 import com.agriweather.repository.FarmlandAgentRepository;
 import com.agriweather.repository.FarmlandRepository;
+import com.agriweather.repository.FarmlandSeasonRepository;
+import com.agriweather.repository.WeatherAlertRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -43,6 +47,10 @@ public class AgentService {
     private final AgentKnowledgeChunkRepository chunkRepository;
     private final AgentChatMessageRepository chatMessageRepository;
     private final FarmlandRepository farmlandRepository;
+    private final FarmlandSeasonRepository seasonRepository;
+    private final FarmOperationRepository operationRepository;
+    private final FarmPlanTaskRepository taskRepository;
+    private final WeatherAlertRepository alertRepository;
     private final CropInfoRepository cropInfoRepository;
     private final AgentDefaults defaults;
     private final BuiltInKnowledgeService builtInKnowledgeService;
@@ -206,6 +214,11 @@ public class AgentService {
     @Transactional
     public void deleteFarmlandAndAgent(Long farmlandId, Long userId) {
         Farmland field = requireOwnedFarmland(farmlandId, userId);
+        // weather_alert / farm_operation 的外键没有级联，先按地块清理，避免删除返回 500
+        alertRepository.deleteByFarmlandId(farmlandId);
+        operationRepository.deleteByFarmlandId(farmlandId);
+        taskRepository.deleteByFarmlandId(farmlandId);
+        seasonRepository.deleteByFarmlandId(farmlandId);
         deleteForFarmland(farmlandId, userId);
         farmlandRepository.delete(field);
     }

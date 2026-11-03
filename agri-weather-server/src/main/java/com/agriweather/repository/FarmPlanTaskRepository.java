@@ -22,4 +22,6 @@ public interface FarmPlanTaskRepository extends JpaRepository<FarmPlanTask, Long
             Collection<Long> farmlandIds, String status);
 
     List<FarmPlanTask> findBySeasonIdAndStatus(Long seasonId, String status);
+
+    void deleteByFarmlandId(Long farmlandId);
 }

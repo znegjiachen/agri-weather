@@ -8,4 +8,6 @@ import java.util.List;
 public interface FarmOperationRepository extends JpaRepository<FarmOperation, Long> {
     List<FarmOperation> findByFarmlandIdOrderByOperationDateDesc(Long farmlandId);
     List<FarmOperation> findByFarmlandIdAndOperationDateBetween(Long farmlandId, LocalDate start, LocalDate end);
+
+    void deleteByFarmlandId(Long farmlandId);
 }

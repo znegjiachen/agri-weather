@@ -23,4 +23,6 @@ public interface WeatherAlertRepository extends JpaRepository<WeatherAlert, Long
     List<WeatherAlert> findByFarmlandIdOrderByAlertTimeDesc(Long farmlandId);
     List<WeatherAlert> findByUserIdAndIsReadFalse(Long userId);
     long countByUserIdAndIsReadFalse(Long userId);
+
+    void deleteByFarmlandId(Long farmlandId);
 }
