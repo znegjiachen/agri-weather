@@ -826,12 +826,12 @@ export default function AgentDock({ defaultCollapsed = false }) {
               disabled={loading || historyLoading || voice.processing || notConfigured || !voice.supported}
               title={
                 !voice.supported ? '当前浏览器不支持语音输入，请改用文字'
-                  : voice.recording ? '停止录音'
+                  : voice.recording ? '结束并识别'
                     : voice.processing ? '正在识别…'
                       : status?.asrConfigured ? '语音输入'
                         : '浏览器语音输入（需联网）'
               }
-              aria-label={voice.recording ? '停止录音' : '语音输入'}
+              aria-label={voice.recording ? '结束并识别' : '语音输入'}
             >
               {voice.processing ? '⏳' : voice.recording ? '⏹' : '🎤'}
             </button>

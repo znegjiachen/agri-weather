@@ -27,6 +27,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
 
   const mediaRef = useRef(null);
   const recognitionRef = useRef(null);
+  const browserTextRef = useRef('');
   const callbacksRef = useRef({ onText, onError });
   // 离开页面时丢弃正在录的音，避免卸载后还在上传
   const cancelledRef = useRef(false);
@@ -107,24 +108,38 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
     try {
       const recognition = new browserRecognition();
       recognition.lang = 'zh-CN';
-      recognition.interimResults = false;
-      recognition.continuous = false;
+      // 点击开始说话，再次点击结束；continuous 避免停顿后自动截断
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      let finalText = '';
+      browserTextRef.current = '';
       recognition.onresult = (event) => {
-        let text = '';
+        let interim = '';
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
-          text += event.results[i][0].transcript;
+          const result = event.results[i];
+          if (result.isFinal) finalText += result[0].transcript;
+          else interim += result[0].transcript;
         }
-        if (text.trim()) callbacksRef.current.onText?.(text.trim());
+        browserTextRef.current = `${finalText}${interim}`.trim();
       };
       recognition.onerror = (event) => {
-        if (event.error !== 'aborted') {
-          callbacksRef.current.onError?.(
-            BROWSER_ASR_ERRORS[event.error] || `语音识别失败：${event.error}`,
-          );
+        if (event.error === 'aborted') return;
+        // 已经有识别内容时让 onend 正常提交，不再报无语音
+        if (event.error === 'no-speech' && browserTextRef.current) {
+          setRecording(false);
+          return;
         }
+        callbacksRef.current.onError?.(
+          BROWSER_ASR_ERRORS[event.error] || `语音识别失败：${event.error}`,
+        );
         setRecording(false);
       };
-      recognition.onend = () => setRecording(false);
+      recognition.onend = () => {
+        const text = browserTextRef.current.trim();
+        browserTextRef.current = '';
+        setRecording(false);
+        if (text) callbacksRef.current.onText?.(text);
+      };
       recognitionRef.current = recognition;
       setMode('browser');
       setRecording(true);
