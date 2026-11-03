@@ -6,5 +6,5 @@ export const TOOL_LABELS = {
   get_crop_stage: { icon: '🌱', label: '判断生长阶段', desc: '按种植日期和作物档案判断当前处于哪个生长阶段。' },
   get_operation_advice: { icon: '📅', label: '农事决策引擎', desc: '调用平台内置规则，给出未来 7 天适宜/不宜的农事作业。' },
   check_alerts: { icon: '⚠️', label: '检查灾害预警', desc: '检查冻害、热害、涝害、大风等风险并生成预警。' },
-  search_crop: { icon: '📚', label: '检索作物知识库', desc: '在 34 种作物的内置知识中检索品种、生育期和适宜条件。' },
+  search_crop: { icon: '📚', label: '检索作物知识库', desc: '在 64 种作物的内置知识中检索品种、生育期和适宜条件。' },
 };
