@@ -132,52 +132,60 @@ public class CropService {
             "basis", "QX/T 734—2024 播种界限温度 + 最佳播温区间"
         ));
 
-        // ── 2. 空气湿度（权重 10%，播种期采用通用适湿范围）──
-        double humScore = Math.max(20, scoreRange(humidity, 50.0, 85.0, 20.0));
+        // ── 2. 空气湿度（权重 10%，最佳 55–85%）──
+        double humScore = scoreFourPoint(humidity, 40, 55, 85, 95, 60);
         String humLabel = scoreLabel(humScore);
         report.put("humidity", Map.of(
             "score", Math.round(humScore),
             "label", humLabel,
             "current", Math.round(humidity * 10) / 10.0,
-            "range", "50% ~ 85%",
+            "range", "40% ~ 95%（最佳 55–85%）",
             "weight", 10,
             "basis", "通用播种空气湿度"
         ));
 
-        // ── 3. 当日降水（权重 25%，按日均需水折算适宜区间）──
+        // ── 3. 当日降水（权重 25%，按日均需水折算最佳区间）──
         double dailyNeed = crop.getSuitableRainfall() != null && crop.getGrowthCycleDays() != null
                 && crop.getGrowthCycleDays() > 0
                 ? crop.getSuitableRainfall() / crop.getGrowthCycleDays() : 4.0;
-        double rainLow = Math.max(0.5, dailyNeed * 0.3);
-        double rainHigh = Math.max(rainLow + 0.5, dailyNeed * 2.0);
-        double rainScore = scoreSowingRain(rainfall, rainLow, rainHigh, dailyNeed);
-        String rainLabel = rainfall < rainLow ? (rainScore < 50 ? "过少" : "偏少")
-                : rainfall > rainHigh ? (rainScore < 50 ? "过多" : "偏多") : "适宜";
+        double rainOptLow = dailyNeed * 0.5;
+        double rainOptHigh = dailyNeed * 1.5;
+        double rainAbsHigh = dailyNeed * 3.0;
+        double rainScore = scoreSowingRain(rainfall, rainOptLow, rainOptHigh, rainAbsHigh, dailyNeed);
+        String rainLabel = rainfall < rainOptLow
+                ? (rainfall < rainOptLow * 0.4 ? "过少" : "偏少")
+                : rainfall > rainOptHigh
+                    ? (rainfall > rainAbsHigh ? "过多" : "偏多")
+                    : "适宜";
         report.put("rainfall", Map.of(
             "score", Math.round(rainScore),
             "label", rainLabel,
             "current", Math.round(rainfall * 10) / 10.0 + "mm",
             "reference", String.format(java.util.Locale.ROOT,
-                "日均需水 %.1f mm（适播 %.1f~%.1f mm）", dailyNeed, rainLow, rainHigh),
+                "日均需水 %.1f mm（最佳 %.1f~%.1f mm）", dailyNeed, rainOptLow, rainOptHigh),
             "weight", 25
         ));
 
-        // ── 4. 光照（权重 15%，辅助因子）──
-        double lightScore = scoreDaylight(light, crop.getSuitableLightHours());
-        String lightLabel = lightScore >= 85 ? "非常适宜" : lightScore >= 70 ? "适宜"
-                : lightScore >= 50 ? "不足/过多" : "严重不足";
+        // ── 4. 光照（权重 15%，达到需光 80% 即进入最佳区）──
+        double lightNeed = crop.getSuitableLightHours() != null ? crop.getSuitableLightHours() : 8.0;
+        double lightOptMin = lightNeed * 0.8;
+        double lightScore = scoreLight(light, lightNeed * 0.5, lightOptMin);
+        String lightLabel = lightScore >= 85 ? "充足" : lightScore >= 70 ? "基本充足"
+                : lightScore >= 50 ? "偏少" : "不足";
         report.put("light", Map.of(
             "score", Math.round(lightScore),
             "label", lightLabel,
             "current", Math.round(light * 10) / 10.0 + "h",
-            "reference", crop.getSuitableLightHours() + "h",
+            "reference", "≥" + num(lightOptMin) + "h 充足（作物需光 " + num(lightNeed) + "h）",
             "weight", 15
         ));
 
         // ── 5. 综合分：加权 + 限制因子封顶 ──
         double moistureScore = humScore * 0.29 + rainScore * 0.71;
         double weighted = tempScore * 0.50 + moistureScore * 0.35 + lightScore * 0.15;
-        double limited = Math.min(weighted, Math.min(tempScore + 10, moistureScore + 10));
+        double limited = Math.min(
+            weighted,
+            Math.min(tempScore + 10, Math.min(moistureScore + 10, lightScore + 15)));
         int overall = (int) Math.round(Math.max(0, limited));
         report.put("overallScore", overall);
         report.put("overallGrade", gradeOf(overall));
@@ -204,11 +212,11 @@ public class CropService {
                 "日均温高于" + crop.getCropName() + "播种上限 " + tempMax + "°C，建议推迟播种"));
             overall = Math.max(0, overall - 10);
         }
-        if (crop.getWaterlogSensitive() && rainfall > rainHigh * 3) {
+        if (crop.getWaterlogSensitive() && rainfall > rainAbsHigh * 2) {
             risks.add(Map.of("type", "RAINSTORM", "level", "RED", "msg",
                 "强降水涝害风险！" + crop.getCropName() + "怕涝，当日降水 " + rainfall + " mm"));
             overall = Math.max(0, overall - 25);
-        } else if (crop.getWaterlogSensitive() && rainfall > rainHigh * 1.5) {
+        } else if (crop.getWaterlogSensitive() && rainfall > rainAbsHigh) {
             risks.add(Map.of("type", "RAINSTORM", "level", "YELLOW", "msg",
                 "降水偏多，" + crop.getCropName() + "播种后注意排水散墒"));
             overall = Math.max(0, overall - 10);
@@ -226,15 +234,15 @@ public class CropService {
         if (temp > tempMax) {
             suggestions.add("日均温高于播种上限 " + tempMax + "°C，建议推迟播种或选耐热品种");
         }
-        if (humidity < 50)
+        if (humidity < 55)
             suggestions.add("空气偏干，播前注意造墒或灌溉");
         if (humidity > 85)
             suggestions.add("空气偏湿，注意通风散墒，预防烂种和苗期病害");
-        if (rainfall < rainLow)
+        if (rainfall < rainOptLow)
             suggestions.add("当日降水偏少，播前需灌溉造墒或覆盖保墒");
-        if (rainfall > rainHigh)
+        if (rainfall > rainOptHigh)
             suggestions.add("当日降水偏多，先排水散墒，避免烂种烂芽");
-        if (light < (crop.getSuitableLightHours() != null ? crop.getSuitableLightHours() * 0.5 : 4))
+        if (light < lightOptMin)
             suggestions.add("光照偏少，注意播种深度和出苗后的光照管理");
         report.put("suggestions", suggestions);
 
@@ -244,20 +252,24 @@ public class CropService {
     // ──── 评分函数 ────
 
     /**
-     * 区间型评分：值在 [min, max] 内满分，超出用高斯衰减
-     * @param tolerance 容忍度（超出 tolerance 时降为 0 分）
+     * 四断点响应（FAO EcoCrop）：[optMin, optMax] 内 100 分；
+     * 适宜区间边缘（min/max）为 edge 分；超出适宜区间后衰减到 0。
      */
-    private double scoreRange(double value, Double min, Double max, double tolerance) {
-        if (min == null || max == null) return 50;
-        double center = (min + max) / 2.0;
-        double halfRange = (max - min) / 2.0;
-        if (halfRange <= 0) return 50;
-        double distance = Math.abs(value - center);
-        if (distance <= halfRange) return 100;
-        // 超出范围后，用余弦衰减
-        double excess = distance - halfRange;
-        double ratio = Math.min(excess / tolerance, 1.0);
-        return 100 * (1 - ratio) * (1 - ratio * 0.3); // 非线性衰减
+    private double scoreFourPoint(double value, double min, double optMin,
+                                  double optMax, double max, double edge) {
+        if (value >= optMin && value <= optMax) return 100;
+        if (value >= min && value < optMin) {
+            double span = Math.max(0.01, optMin - min);
+            return edge + (100 - edge) * (value - min) / span;
+        }
+        if (value > optMax && value <= max) {
+            double span = Math.max(0.01, max - optMax);
+            return edge + (100 - edge) * (max - value) / span;
+        }
+        double tolerance = Math.max(1.0, (max - min) * 0.3);
+        double distance = value < min ? min - value : value - max;
+        double ratio = Math.min(distance / tolerance, 1.0);
+        return edge * (1 - ratio) * (1 - ratio * 0.3);
     }
 
     /**
@@ -267,33 +279,26 @@ public class CropService {
      */
     private double scoreSowingTemp(double value, double min, double optMin,
                                    double optMax, double max) {
-        if (value >= optMin && value <= optMax) return 100;
-        if (value >= min && value < optMin) {
-            double span = Math.max(0.1, optMin - min);
-            return 60 + 40 * (value - min) / span;
-        }
-        if (value > optMax && value <= max) {
-            double span = Math.max(0.1, max - optMax);
-            return 60 + 40 * (max - value) / span;
-        }
-        double tolerance = Math.max(6.0, (max - min) * 0.3);
-        double distance = value < min ? min - value : value - max;
-        double ratio = Math.min(distance / tolerance, 1.0);
-        return 60 * (1 - ratio) * (1 - ratio * 0.3);
+        return scoreFourPoint(value, min, optMin, optMax, max, 60);
     }
 
     /**
-     * 播种降水评分：按日均需水折算的适宜区间分段。
-     * 无降水仍可通过灌溉造墒，给 55 分兜底；超过上限后快速衰减。
+     * 播种降水评分：最佳区间 [optLow, optHigh] 满分；
+     * 0 降水给 55 分兜底（可灌溉造墒）；超过 absHigh 后衰减到 0。
      */
-    private double scoreSowingRain(double value, double low, double high, double dailyNeed) {
-        if (value >= low && value <= high) return 100;
-        if (value < low) {
-            return 55 + 45 * Math.max(0, value) / low;
+    private double scoreSowingRain(double value, double optLow, double optHigh,
+                                   double absHigh, double dailyNeed) {
+        if (value >= optLow && value <= optHigh) return 100;
+        if (value < optLow) {
+            return 55 + 45 * Math.max(0, value) / Math.max(0.01, optLow);
         }
-        double limit = Math.max(high + 0.5, dailyNeed * 6.0);
-        double ratio = Math.min((value - high) / (limit - high), 1.0);
-        return 100 * (1 - ratio);
+        if (value <= absHigh) {
+            double span = Math.max(0.01, absHigh - optHigh);
+            return 60 + 40 * (absHigh - value) / span;
+        }
+        double limit = Math.max(absHigh + 0.5, dailyNeed * 6.0);
+        double ratio = Math.min((value - absHigh) / (limit - absHigh), 1.0);
+        return 60 * (1 - ratio);
     }
 
     private String scoreLabel(double score) {
@@ -309,12 +314,14 @@ public class CropService {
     }
 
     /**
-     * 日照评分：达到作物需光时数即满分，不足时线性下降。
-     * 播种期光照只作辅助，不因日照略多而扣分。
+     * 日照评分：达到最佳下限（需光 80%）即满分，低于该值按比例下降；
+     * 播种期光照只作辅助，不因日照偏多扣分。
      */
-    private double scoreDaylight(double value, Double need) {
-        if (need == null || need <= 0) return 100;
-        if (value >= need) return 100;
-        return 40 + 60 * Math.max(0, value) / need;
+    private double scoreLight(double value, double absMin, double optMin) {
+        if (value >= optMin) return 100;
+        if (value >= absMin) {
+            return 60 + 40 * (value - absMin) / Math.max(0.01, optMin - absMin);
+        }
+        return 60 * Math.max(0, value) / Math.max(0.01, absMin);
     }
 }
