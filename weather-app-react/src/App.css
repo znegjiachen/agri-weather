@@ -2296,6 +2296,209 @@ main {
 .btn-edit:hover { background: rgba(102, 126, 234, 0.06); border-color: #667eea; }
 .btn-del:hover { background: rgba(239, 68, 68, 0.06); border-color: #ef4444; }
 
+/* 地块管理：概览、搜索与卡片 */
+.fl-header { align-items: flex-start; }
+.fl-header .page-title { margin-bottom: 4px; }
+.fl-header .page-subtitle { margin: 0; }
+
+.fl-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.fl-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.fl-stats span { color: var(--text-muted); font-size: 10.5px; }
+.fl-stats b { color: var(--text-primary); font-size: 16px; }
+.fl-stats .warn b { color: #b45309; }
+
+.fl-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fl-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 340px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.fl-search > span { font-size: 12px; }
+
+.fl-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.fl-search button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fl-count { color: var(--text-muted); font-size: 11.5px; }
+
+.farmland-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.farmland-card { padding: 16px 16px 14px; border-radius: 16px; }
+
+.farmland-header {
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.farmland-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.farmland-title h3 { margin: 0; font-size: 1rem; }
+
+.farmland-card-tools { display: flex; flex: none; gap: 4px; }
+
+.fc-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(31, 41, 80, 0.05);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.fc-icon:hover { background: rgba(102, 126, 234, 0.12); }
+.fc-icon.danger:hover { background: rgba(239, 68, 68, 0.12); }
+
+.fc-stage-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.fc-stage {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.fc-days { color: var(--text-muted); font-size: 10.5px; }
+
+.fc-missing {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  font-size: 10.5px;
+}
+
+.fc-muted { color: var(--text-muted); font-size: 10.5px; }
+
+.fc-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 12px;
+  padding: 10px 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.06);
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+.fc-detail-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fc-detail-grid span { color: var(--text-muted); font-size: 9.5px; }
+
+.fc-detail-grid b {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.farmland-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.fc-action {
+  padding: 7px 4px;
+  border: 1px solid rgba(31, 41, 80, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fc-action:hover { border-color: #667eea; background: #fff; color: #4c5bd4; }
+.fc-action.warn:hover { border-color: #eab308; color: #b45309; }
+
+@media (max-width: 1200px) {
+  .farmland-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fl-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .farmland-grid { grid-template-columns: 1fr; }
+  .fl-toolbar { flex-wrap: wrap; }
+  .fl-search { max-width: none; }
+}
+
 .btn-cancel {
   padding: 10px 24px;
   border: 1px solid rgba(0, 0, 0, 0.1);

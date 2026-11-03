@@ -23,6 +23,9 @@ export default function FarmlandsPage() {
   const [listError, setListError] = useState('');
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const [stageMap, setStageMap] = useState({});
+  const [mountedAt] = useState(() => Date.now());
 
   // Modal state
   const [modal, setModal] = useState(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
@@ -58,6 +61,27 @@ export default function FarmlandsPage() {
     crops.list().then((data) => { if (alive) setCropList(data); }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // 为有作物和播种日期的地块推算当前生长阶段
+  useEffect(() => {
+    const fields = list.filter((f) => f.cropId && f.plantDate);
+    if (fields.length === 0) return undefined;
+    let alive = true;
+    Promise.allSettled(fields.map((f) => (
+      crops.currentStage(f.cropId, f.plantDate)
+        .then((stage) => ({ id: f.id, name: stage?.stageName }))
+    ))).then((results) => {
+      if (!alive) return;
+      const next = {};
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value.name) {
+          next[result.value.id] = result.value.name;
+        }
+      });
+      setStageMap(next);
+    });
+    return () => { alive = false; };
+  }, [list]);
 
   const resetForm = () => {
     setForm({ fieldName: '', lat: '', lng: '', altitude: '', areaMu: '',
@@ -205,14 +229,47 @@ export default function FarmlandsPage() {
     return c ? c.cropName : '未选择';
   };
 
+  const daysSince = (date) => {
+    if (!date) return null;
+    const start = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    return Math.max(0, Math.floor((mountedAt - start.getTime()) / 86400000));
+  };
+
+  const query = keyword.trim().toLowerCase();
+  const filteredList = query
+    ? list.filter((f) => `${f.fieldName}${getCropName(f.cropId)}`.toLowerCase().includes(query))
+    : list;
+  const totalArea = list.reduce((sum, f) => sum + (Number(f.areaMu) || 0), 0);
+  const cropCount = new Set(list.map((f) => f.cropId).filter(Boolean)).size;
+  const missingPlantDates = list.filter((f) => f.cropId && !f.plantDate).length;
+
   return (
     <div className="farmlands-page">
-      <div className="page-header">
-        <h2 className="page-title">📍 我的地块</h2>
+      <div className="page-header fl-header">
+        <div>
+          <h2 className="page-title">📍 我的地块</h2>
+          <p className="page-subtitle">
+            {list.length > 0
+              ? `${list.length} 块 · 共 ${totalArea.toFixed(1)} 亩`
+              : '管理地块、作物与农事记录'}
+          </p>
+        </div>
         <button className="btn-primary" onClick={() => { resetForm(); setShowForm(true); }}>
           + 添加地块
         </button>
       </div>
+
+      {list.length > 0 && (
+        <div className="fl-stats">
+          <div><span>地块</span><b>{list.length}</b></div>
+          <div><span>总面积</span><b>{totalArea.toFixed(1)} 亩</b></div>
+          <div><span>作物</span><b>{cropCount} 种</b></div>
+          <div className={missingPlantDates > 0 ? 'warn' : ''}>
+            <span>待补播种日期</span><b>{missingPlantDates}</b>
+          </div>
+        </div>
+      )}
 
       {error && <div className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
 
@@ -424,45 +481,106 @@ export default function FarmlandsPage() {
           <p>🌱 还没有添加地块，点击上方按钮添加你的第一个地块吧。</p>
         </div>
       ) : (
-        <div className="farmland-grid">
-          {list.map((f) => (
-            <div key={f.id} className="farmland-card glass">
-              <div className="farmland-header">
-                <h3>{f.fieldName}</h3>
-                <span className="crop-badge">{getCropName(f.cropId)}</span>
-              </div>
-              <div className="farmland-details">
-                <p>📍 {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)} {f.altitude ? `海拔${f.altitude}m` : ''}</p>
-                <p>
-                  📐 {f.areaMu != null ? `${f.areaMu} 亩` : '面积未填'}
-                  {' | '}🧱 {f.soilType || '土壤未填'}
-                  {' | '}💧 {f.irrigationType || '灌溉未填'}
-                </p>
-                {f.plantDate ? (
-                  <p>🌱 播种：{f.plantDate}</p>
-                ) : f.cropId ? (
-                  <p className="farmland-missing">🌱 未填播种日期，无法计算生长阶段</p>
-                ) : null}
-              </div>
-              <div className="farmland-actions">
-                <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>🌤️ 天气</button>
-                <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>⚠️ 预警</button>
-                <button className="btn-edit" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>📋 农事</button>
-                <button className="btn-edit" onClick={() => setRecordsField(f)}>📒 记录</button>
-                <button
-                  type="button"
-                  className="btn-edit"
-                  onClick={() => handleEdit(f)}
-                  title="编辑地块"
-                  aria-label={`编辑地块 ${f.fieldName}`}
-                >
-                  ✏️
-                </button>
-                <button className="btn-del" onClick={() => handleDelete(f.id)} title="删除地块">🗑️</button>
-              </div>
+        <>
+          <div className="fl-toolbar">
+            <div className="fl-search">
+              <span aria-hidden>🔍</span>
+              <input
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="搜索地块或作物"
+                aria-label="搜索地块"
+              />
+              {keyword && (
+                <button type="button" onClick={() => setKeyword('')} aria-label="清空搜索">×</button>
+              )}
             </div>
-          ))}
-        </div>
+            <span className="fl-count">{filteredList.length} / {list.length} 块</span>
+          </div>
+
+          {filteredList.length === 0 ? (
+            <div className="glass section-card empty-text">
+              <p>没有匹配的地块，换个关键词试试。</p>
+            </div>
+          ) : (
+            <div className="farmland-grid">
+              {filteredList.map((f) => {
+                const days = daysSince(f.plantDate);
+                return (
+                  <div key={f.id} className="farmland-card glass">
+                    <div className="farmland-header">
+                      <div className="farmland-title">
+                        <h3>{f.fieldName}</h3>
+                        <span className="crop-badge">{getCropName(f.cropId)}</span>
+                      </div>
+                      <div className="farmland-card-tools">
+                        <button
+                          type="button"
+                          className="fc-icon"
+                          onClick={() => handleEdit(f)}
+                          title="编辑地块"
+                          aria-label={`编辑地块 ${f.fieldName}`}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          className="fc-icon danger"
+                          onClick={() => handleDelete(f.id)}
+                          title="删除地块"
+                          aria-label={`删除地块 ${f.fieldName}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="fc-stage-row">
+                      {f.cropId && f.plantDate ? (
+                        <>
+                          <span className="fc-stage">{stageMap[f.id] || '阶段计算中'}</span>
+                          <span className="fc-days">已种植 {days ?? 0} 天</span>
+                        </>
+                      ) : f.cropId ? (
+                        <span className="fc-missing">未填播种日期，暂无法计算阶段</span>
+                      ) : (
+                        <span className="fc-muted">未选择作物</span>
+                      )}
+                    </div>
+
+                    <div className="fc-detail-grid">
+                      <div>
+                        <span>位置</span>
+                        <b>
+                          {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)}
+                          {f.altitude ? ` · ${f.altitude}m` : ''}
+                        </b>
+                      </div>
+                      <div><span>面积</span><b>{f.areaMu != null ? `${f.areaMu} 亩` : '未填'}</b></div>
+                      <div><span>土壤</span><b>{f.soilType || '未填'}</b></div>
+                      <div><span>灌溉</span><b>{f.irrigationType || '未填'}</b></div>
+                    </div>
+
+                    <div className="farmland-actions">
+                      <button className="fc-action" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>
+                        🌤️ 天气
+                      </button>
+                      <button className="fc-action warn" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>
+                        ⚠️ 预警
+                      </button>
+                      <button className="fc-action" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>
+                        📋 农事
+                      </button>
+                      <button className="fc-action" onClick={() => setRecordsField(f)}>
+                        📒 记录
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
