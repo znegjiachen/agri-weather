@@ -1530,6 +1530,61 @@ main {
   margin-bottom: 20px;
 }
 
+.crop-weather-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+
+.crop-weather-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.crop-weather-source select {
+  padding: 6px 10px;
+  border: 1px solid rgba(31, 41, 80, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.crop-weather-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crop-weather-chips span {
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.crop-weather-chips em {
+  font-style: normal;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.crop-weather-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
 .crop-detail {
   margin-top: 16px;
   padding-top: 16px;

@@ -1,5 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { crops } from '../api';
+import { crops, farmlands as farmlandApi } from '../api';
+import { getFieldContext } from '../utils/fieldContext';
+
+const round1 = (value) => Math.round(Number(value) * 10) / 10;
+
+/** 用日出日落估算可光照时长（小时） */
+function daylightHours(sunrise, sunset) {
+  if (!sunrise || !sunset) return null;
+  const rise = new Date(sunrise);
+  const set = new Date(sunset);
+  if (Number.isNaN(rise.getTime()) || Number.isNaN(set.getTime())) return null;
+  const hours = (set.getTime() - rise.getTime()) / 3600000;
+  return hours > 0 && hours <= 24 ? round1(hours) : null;
+}
 
 export default function CropPage() {
   const [cropList, setCropList] = useState([]);
@@ -10,6 +23,11 @@ export default function CropPage() {
   const [humidity, setHumidity] = useState(65);
   const [rainfall, setRainfall] = useState(10);
   const [light, setLight] = useState(8);
+
+  const [fieldList, setFieldList] = useState([]);
+  const [fieldId, setFieldId] = useState('');
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherInfo, setWeatherInfo] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -33,6 +51,52 @@ export default function CropPage() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [reloadKey]);
+
+  // 以首页当前选中的地块为默认数据源，没有上下文时取第一块地
+  useEffect(() => {
+    let alive = true;
+    farmlandApi.list()
+      .then((data) => {
+        if (!alive) return;
+        const list = Array.isArray(data) ? data : [];
+        setFieldList(list);
+        if (list.length === 0) return;
+        const context = getFieldContext();
+        const preferred = list.find((field) => String(field.id) === String(context?.id)) || list[0];
+        setFieldId(String(preferred.id));
+        setWeatherLoading(true);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [reloadKey]);
+
+  // 地块切换后，用该地块当前气象填充检测表单默认值
+  useEffect(() => {
+    if (!fieldId) return undefined;
+    let alive = true;
+    farmlandApi.weather(fieldId)
+      .then((data) => {
+        if (!alive) return;
+        const current = data?.current || {};
+        const daily = data?.daily || {};
+        const rain = Number(daily.precipitation_sum?.[0]);
+        const info = {
+          temp: current.temperature_2m != null ? round1(current.temperature_2m) : null,
+          humidity: current.relative_humidity_2m != null
+            ? Math.round(Number(current.relative_humidity_2m)) : null,
+          rainfall: Number.isFinite(rain) ? round1(rain) : 0,
+          light: daylightHours(daily.sunrise?.[0], daily.sunset?.[0]),
+        };
+        if (info.temp != null) setTemp(info.temp);
+        if (info.humidity != null) setHumidity(info.humidity);
+        if (info.rainfall != null) setRainfall(info.rainfall);
+        if (info.light != null) setLight(info.light);
+        setWeatherInfo(info);
+      })
+      .catch(() => { if (alive) setWeatherInfo(null); })
+      .finally(() => { if (alive) setWeatherLoading(false); });
+    return () => { alive = false; };
+  }, [fieldId]);
 
   const retryLoad = () => {
     setLoading(true);
@@ -116,6 +180,40 @@ export default function CropPage() {
   return (
     <div className="crop-page">
       <h2 className="page-title">🌱 作物气象适配</h2>
+
+      {fieldList.length > 0 && (
+        <div className="glass crop-weather-bar">
+          <div className="crop-weather-source">
+            <span>📡 数据来源地块</span>
+            <select
+              value={fieldId}
+              onChange={(e) => {
+                setFieldId(e.target.value);
+                setWeatherLoading(true);
+              }}
+              aria-label="选择用于气象适配的地块"
+            >
+              {fieldList.map((field) => (
+                <option key={field.id} value={field.id}>{field.fieldName}</option>
+              ))}
+            </select>
+          </div>
+
+          {weatherLoading ? (
+            <span className="crop-weather-hint">正在读取地块气象…</span>
+          ) : weatherInfo ? (
+            <div className="crop-weather-chips">
+              <span>🌡 {weatherInfo.temp ?? '--'}°C</span>
+              <span>💧 {weatherInfo.humidity ?? '--'}%</span>
+              <span>🌧 {weatherInfo.rainfall ?? '--'} mm</span>
+              <span>☀️ {weatherInfo.light ?? '--'} h</span>
+              <em>已作为默认值填入，可手动修改</em>
+            </div>
+          ) : (
+            <span className="crop-weather-hint">该地块暂未取到气象数据，可手动填写</span>
+          )}
+        </div>
+      )}
 
       <div className="grid-2col">
         <div className="glass section-card">
