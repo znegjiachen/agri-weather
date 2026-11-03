@@ -52,16 +52,21 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
     }
   }, []);
 
-  useEffect(() => () => {
-    cancelledRef.current = true;
-    const media = mediaRef.current;
-    if (media) {
-      try {
-        if (media.recorder.state !== 'inactive') media.recorder.stop();
-      } catch { /* ignore */ }
-      media.stream?.getTracks().forEach((track) => track.stop());
-    }
-    try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+  useEffect(() => {
+    // StrictMode 开发环境会执行一次挂载→卸载→再挂载，
+    // 这里必须重置取消标记，否则录音结束后永远不上传
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+      const media = mediaRef.current;
+      if (media) {
+        try {
+          if (media.recorder.state !== 'inactive') media.recorder.stop();
+        } catch { /* ignore */ }
+        media.stream?.getTracks().forEach((track) => track.stop());
+      }
+      try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
+    };
   }, []);
 
   const startBackend = async () => {
