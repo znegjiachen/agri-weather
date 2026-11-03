@@ -18,7 +18,7 @@ export const PRIMARY_NAV: NavItem[] = [
 
 /** 首页九宫格 / 侧边栏次级的 6 个功能页 */
 export const SUB_NAV: NavItem[] = [
-  { to: '/home/crops', label: '作物适配', icon: '🌱', desc: '多因子匹配评分' },
+  { to: '/home/crops', label: '播种适配', icon: '🌱', desc: '播期与气象匹配' },
   { to: '/home/pests', label: '病虫害库', icon: '🐛', desc: '阈值与防治方案' },
   { to: '/home/alerts', label: '预警中心', icon: '🔔', desc: '灾害预警提醒' },
   { to: '/home/farmlands', label: '地块管理', icon: '📍', desc: '地块与作物档案' },

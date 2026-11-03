@@ -159,7 +159,7 @@ export default function CropPage() {
   if (loading) {
     return (
       <div className="crop-page">
-        <h2 className="page-title">🌱 作物气象适配</h2>
+        <h2 className="page-title">🌱 播种适配</h2>
         <p className="empty-text">正在加载作物数据…</p>
       </div>
     );
@@ -168,7 +168,7 @@ export default function CropPage() {
   if (loadError) {
     return (
       <div className="crop-page">
-        <h2 className="page-title">🌱 作物气象适配</h2>
+        <h2 className="page-title">🌱 播种适配</h2>
         <div className="glass section-card">
           <p className="empty-text">作物数据加载失败：{loadError}</p>
           <button type="button" className="btn-cancel" onClick={retryLoad}>重试</button>
@@ -179,7 +179,7 @@ export default function CropPage() {
 
   return (
     <div className="crop-page">
-      <h2 className="page-title">🌱 作物气象适配</h2>
+      <h2 className="page-title">🌱 播种适配</h2>
 
       {fieldList.length > 0 && (
         <div className="glass crop-weather-bar">

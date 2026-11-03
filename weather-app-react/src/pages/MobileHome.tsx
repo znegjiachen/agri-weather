@@ -32,7 +32,7 @@ const SLIDES = [
 
 const FEATURES = [
   { to: '/community', icon: '💬', title: '社区', desc: '看看大家怎么说' },
-  { to: '/home/crops', icon: '🌱', title: '作物适配', desc: '选对作物与品种' },
+  { to: '/home/crops', icon: '🌱', title: '播种适配', desc: '选对播期与品种' },
   { to: '/home/pests', icon: '🐛', title: '病虫害库', desc: '症状与防治方案' },
 ];
 
