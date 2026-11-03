@@ -53,6 +53,14 @@ public class CropInfo {
     @Column(name = "sowing_temp_max")
     private Double sowingTempMax;
 
+    /** 最佳播种日平均气温下限（℃），区间内得满分 */
+    @Column(name = "sowing_temp_optimal_min")
+    private Double sowingTempOptimalMin;
+
+    /** 最佳播种日平均气温上限（℃） */
+    @Column(name = "sowing_temp_optimal_max")
+    private Double sowingTempOptimalMax;
+
     @Builder.Default
     private Boolean frostSensitive = false;
 

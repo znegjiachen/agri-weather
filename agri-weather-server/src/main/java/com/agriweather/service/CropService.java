@@ -113,15 +113,23 @@ public class CropService {
                 : (crop.getSuitableTempMin() != null ? crop.getSuitableTempMin() : 15);
         double tempMax = crop.getSowingTempMax() != null ? crop.getSowingTempMax()
                 : (crop.getSuitableTempMax() != null ? crop.getSuitableTempMax() : 30);
-        double tempScore = scoreSowingTemp(temp, tempMin, tempMax);
+        double tempOptMin = crop.getSowingTempOptimalMin() != null
+                ? crop.getSowingTempOptimalMin() : tempMin;
+        double tempOptMax = crop.getSowingTempOptimalMax() != null
+                ? crop.getSowingTempOptimalMax() : tempMax;
+        // 防止数据异常导致最佳区间越界
+        tempOptMin = Math.max(tempMin, Math.min(tempOptMin, tempMax));
+        tempOptMax = Math.min(tempMax, Math.max(tempOptMax, tempOptMin));
+        double tempScore = scoreSowingTemp(temp, tempMin, tempOptMin, tempOptMax, tempMax);
         String tempLabel = scoreLabel(tempScore);
         report.put("temperature", Map.of(
             "score", Math.round(tempScore),
             "label", tempLabel,
             "current", Math.round(temp * 10) / 10.0,
-            "range", tempMin + "°C ~ " + tempMax + "°C",
+            "range", num(tempMin) + "°C ~ " + num(tempMax)
+                + "°C（最佳 " + num(tempOptMin) + "–" + num(tempOptMax) + "°C）",
             "weight", 50,
-            "basis", "QX/T 734—2024 播种界限温度"
+            "basis", "QX/T 734—2024 播种界限温度 + 最佳播温区间"
         ));
 
         // ── 2. 空气湿度（权重 10%，播种期采用通用适湿范围）──
@@ -169,7 +177,7 @@ public class CropService {
         // ── 5. 综合分：加权 + 限制因子封顶 ──
         double moistureScore = humScore * 0.29 + rainScore * 0.71;
         double weighted = tempScore * 0.50 + moistureScore * 0.35 + lightScore * 0.15;
-        double limited = Math.min(weighted, Math.min(tempScore + 20, moistureScore + 20));
+        double limited = Math.min(weighted, Math.min(tempScore + 10, moistureScore + 10));
         int overall = (int) Math.round(Math.max(0, limited));
         report.put("overallScore", overall);
         report.put("overallGrade", gradeOf(overall));
@@ -253,15 +261,25 @@ public class CropService {
     }
 
     /**
-     * 播种温度评分：日平均气温落在 [min, max] 内满分，越界按余弦式衰减。
-     * min/max 取自 QX/T 734—2024 的播种界限温度。
+     * 播种温度评分：四断点折线（FAO EcoCrop 响应函数）。
+     * [optMin, optMax] 内满分；适宜区间边缘（min/max）为 60 分；
+     * 超出适宜区间后继续衰减到 0。
      */
-    private double scoreSowingTemp(double value, double min, double max) {
-        if (value >= min && value <= max) return 100;
-        double tolerance = Math.max(6.0, (max - min) * 0.5);
+    private double scoreSowingTemp(double value, double min, double optMin,
+                                   double optMax, double max) {
+        if (value >= optMin && value <= optMax) return 100;
+        if (value >= min && value < optMin) {
+            double span = Math.max(0.1, optMin - min);
+            return 60 + 40 * (value - min) / span;
+        }
+        if (value > optMax && value <= max) {
+            double span = Math.max(0.1, max - optMax);
+            return 60 + 40 * (max - value) / span;
+        }
+        double tolerance = Math.max(6.0, (max - min) * 0.3);
         double distance = value < min ? min - value : value - max;
         double ratio = Math.min(distance / tolerance, 1.0);
-        return 100 * (1 - ratio) * (1 - ratio * 0.3);
+        return 60 * (1 - ratio) * (1 - ratio * 0.3);
     }
 
     /**
@@ -280,6 +298,10 @@ public class CropService {
 
     private String scoreLabel(double score) {
         return score >= 85 ? "非常适宜" : score >= 70 ? "适宜" : score >= 50 ? "勉强" : "不适宜";
+    }
+
+    private String num(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value) : String.valueOf(value);
     }
 
     private String gradeOf(int score) {

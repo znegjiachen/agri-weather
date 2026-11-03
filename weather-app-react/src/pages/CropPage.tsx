@@ -340,6 +340,10 @@ export default function CropPage() {
                   <span>播种适温</span>
                   <b>{selected.sowingTempMin ?? '—'}–{selected.sowingTempMax ?? '—'}°C</b>
                 </div>
+                <div>
+                  <span>最佳播温</span>
+                  <b>{selected.sowingTempOptimalMin ?? '—'}–{selected.sowingTempOptimalMax ?? '—'}°C</b>
+                </div>
                 <div><span>生长适温</span><b>{selected.suitableTempMin}–{selected.suitableTempMax}°C</b></div>
                 <div>
                   <span>适宜湿度</span>
