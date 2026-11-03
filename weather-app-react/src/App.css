@@ -1539,6 +1539,16 @@ main {
 .crop-detail h4 { margin-bottom: 8px; color: var(--text-primary); }
 .crop-detail p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 4px; }
 
+.crop-detail .crop-sowing {
+  margin: 8px 0 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #166534;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
 .tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
 .tag {

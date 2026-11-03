@@ -41,6 +41,10 @@ public class CropInfo {
     @Column(name = "suitable_light_hours")
     private Double suitableLightHours;
 
+    /** 适宜播种期，按主要产区概括，如「华南 2-3 月；北方 4-5 月」 */
+    @Column(name = "sowing_period", length = 120)
+    private String sowingPeriod;
+
     @Builder.Default
     private Boolean frostSensitive = false;
 

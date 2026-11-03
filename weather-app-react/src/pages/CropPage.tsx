@@ -137,6 +137,9 @@ export default function CropPage() {
             <div className="crop-detail">
               <h4>{selected.cropName}（{selected.variety}）</h4>
               <p>生长周期：{selected.growthCycleDays} 天</p>
+              <p className="crop-sowing">
+                🌾 适宜播种：{selected.sowingPeriod || '暂无资料'}
+              </p>
               <p>适宜温度：{selected.suitableTempMin}°C ~ {selected.suitableTempMax}°C</p>
               <p>适宜湿度：{selected.suitableHumidityMin}% ~ {selected.suitableHumidityMax}%</p>
               <div className="tags">
