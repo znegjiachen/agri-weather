@@ -169,6 +169,7 @@ export const farmlands = {
     ),
     summary: (farmlandId) => request(`/api/farmlands/${farmlandId}/tasks/summary`),
     today: () => request('/api/tasks/today'),
+    upcoming: (limit = 3) => request(`/api/tasks/upcoming?limit=${limit}`),
   },
   farmOperations: {
     list: (farmlandId) => request(`/api/farmlands/${farmlandId}/operations`),

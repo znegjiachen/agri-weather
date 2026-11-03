@@ -47,6 +47,13 @@ function isToday(value) {
   return date.toDateString() === new Date().toDateString();
 }
 
+function shortDate(value) {
+  if (!value) return '';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
 function num(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -68,6 +75,7 @@ export default function DesktopHome() {
   const [stageMap, setStageMap] = useState({});
   const [advice, setAdvice] = useState([]);
   const [todayTasks, setTodayTasks] = useState([]);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [taskError, setTaskError] = useState('');
   // 渲染期间不直接读 Date.now（保持纯函数），进页面时固定一次
@@ -84,17 +92,19 @@ export default function DesktopHome() {
     let alive = true;
     (async () => {
       try {
-        const [fieldList, alertData, unreadCount, taskList] = await Promise.all([
+        const [fieldList, alertData, unreadCount, taskList, upcomingList] = await Promise.all([
           farmlands.list(),
           alertsApi.list({ status: 'active' }),
           alertsApi.unreadCount().catch(() => 0),
           farmlands.tasks.today().catch(() => []),
+          farmlands.tasks.upcoming(2).catch(() => []),
         ]);
         if (!alive) return;
         setFields(fieldList);
         setAlertList(alertData);
         setUnread(unreadCount);
         setTodayTasks(Array.isArray(taskList) ? taskList : []);
+        setUpcomingTasks(Array.isArray(upcomingList) ? upcomingList : []);
         if (fieldList.length > 0) {
           setSelectedId(fieldList[0].id);
         } else {
@@ -155,7 +165,12 @@ export default function DesktopHome() {
     setTaskError('');
     try {
       await farmlands.tasks.update(task.farmlandId, task.id, { status: 'DONE' });
-      setTodayTasks((prev) => prev.filter((item) => item.id !== task.id));
+      const remaining = todayTasks.filter((item) => item.id !== task.id);
+      setTodayTasks(remaining);
+      if (remaining.length === 0) {
+        const list = await farmlands.tasks.upcoming(2).catch(() => []);
+        setUpcomingTasks(Array.isArray(list) ? list : []);
+      }
     } catch (e) {
       setTaskError(e.message || '任务更新失败');
     } finally {
@@ -442,7 +457,27 @@ export default function DesktopHome() {
                 {taskError && <p className="dh-todo-error">{taskError}</p>}
 
                 {todayTasks.length === 0 ? (
-                  <p className="dh-empty">今天没有到期或逾期的农事任务</p>
+                  <div className="dh-todo-empty">
+                    <p className="dh-empty">今天没有到期或逾期的农事任务</p>
+                    {upcomingTasks.length > 0 && (
+                      <div className="dh-todo-upcoming">
+                        <span className="dh-todo-upcoming-label">接下来</span>
+                        {upcomingTasks.map((task) => (
+                          <div className="dh-todo-item upcoming" key={task.id}>
+                            <div className="dh-todo-main">
+                              <b>{task.title}</b>
+                              <span>
+                                {task.farmlandName}
+                                {' · '}
+                                {shortDate(task.plannedDate)}
+                                {task.daysUntil != null ? ` · 还有 ${task.daysUntil} 天` : ''}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="dh-todo-list">
                     {todayTasks.map((task) => (

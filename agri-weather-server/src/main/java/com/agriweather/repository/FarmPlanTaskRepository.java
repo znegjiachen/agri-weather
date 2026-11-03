@@ -18,5 +18,8 @@ public interface FarmPlanTaskRepository extends JpaRepository<FarmPlanTask, Long
     List<FarmPlanTask> findByFarmlandIdInAndStatusAndPlannedDateLessThanEqual(
             Collection<Long> farmlandIds, String status, LocalDate date);
 
+    List<FarmPlanTask> findByFarmlandIdInAndStatus(
+            Collection<Long> farmlandIds, String status);
+
     List<FarmPlanTask> findBySeasonIdAndStatus(Long seasonId, String status);
 }
