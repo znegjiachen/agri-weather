@@ -245,7 +245,6 @@ export default function FarmlandsPage() {
     : list;
   const totalArea = list.reduce((sum, f) => sum + (Number(f.areaMu) || 0), 0);
   const cropCount = new Set(list.map((f) => f.cropId).filter(Boolean)).size;
-  const missingPlantDates = list.filter((f) => f.cropId && !f.plantDate).length;
 
   return (
     <div className="farmlands-page">
@@ -268,9 +267,6 @@ export default function FarmlandsPage() {
           <div><span>地块</span><b>{list.length}</b></div>
           <div><span>总面积</span><b>{totalArea.toFixed(1)} 亩</b></div>
           <div><span>作物</span><b>{cropCount} 种</b></div>
-          <div className={missingPlantDates > 0 ? 'warn' : ''}>
-            <span>待补播种日期</span><b>{missingPlantDates}</b>
-          </div>
         </div>
       )}
 
