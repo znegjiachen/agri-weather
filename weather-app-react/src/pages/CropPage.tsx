@@ -17,6 +17,7 @@ function daylightHours(sunrise, sunset) {
 export default function CropPage() {
   const [cropList, setCropList] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [keyword, setKeyword] = useState('');
   const [stages, setStages] = useState([]);
   const [match, setMatch] = useState(null);
   const [temp, setTemp] = useState(25);
@@ -36,6 +37,49 @@ export default function CropPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchError, setMatchError] = useState('');
   const requestRef = useRef(0);
+  const matchRequestRef = useRef(0);
+  const selectedRef = useRef(null);
+
+  const runMatch = async (crop, values) => {
+    if (!crop) return;
+    const nums = values.map(Number);
+    if (nums.some((value) => !Number.isFinite(value))) {
+      setMatchError('请填写有效的温度、湿度、降水和光照');
+      return;
+    }
+    if (nums[1] < 0 || nums[1] > 100) {
+      setMatchError('湿度需在 0 ~ 100% 之间');
+      return;
+    }
+    if (nums[0] < -50 || nums[0] > 60) {
+      setMatchError('温度需在 -50 ~ 60°C 之间');
+      return;
+    }
+    if (nums[2] < 0 || nums[3] < 0 || nums[3] > 24) {
+      setMatchError('降水不能为负，光照需在 0 ~ 24 小时之间');
+      return;
+    }
+
+    const requestId = matchRequestRef.current + 1;
+    matchRequestRef.current = requestId;
+    setMatchLoading(true);
+    setMatchError('');
+    try {
+      const data = await crops.weatherMatch(crop.id, {
+        temp: nums[0],
+        humidity: nums[1],
+        rainfall: nums[2],
+        light: nums[3],
+      });
+      if (matchRequestRef.current === requestId) setMatch(data);
+    } catch (err) {
+      if (matchRequestRef.current === requestId) {
+        setMatchError(err.message || '检测失败，请稍后重试');
+      }
+    } finally {
+      if (matchRequestRef.current === requestId) setMatchLoading(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -103,10 +147,21 @@ export default function CropPage() {
         if (info.rainfall != null) setRainfall(info.rainfall);
         if (info.light != null) setLight(info.light);
         setWeatherInfo(info);
+        // 已选作物时，换地块/天气加载完成后自动复检一次
+        if (selectedRef.current) {
+          runMatch(selectedRef.current, [
+            info.temp ?? temp,
+            info.humidity ?? humidity,
+            info.rainfall ?? rainfall,
+            info.light ?? light,
+          ]);
+        }
       })
       .catch(() => { if (alive) setWeatherInfo(null); })
       .finally(() => { if (alive) setWeatherLoading(false); });
     return () => { alive = false; };
+    // 只在切换地块时重新取数；天气回填后的复检由 selectedRef 控制
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fieldId]);
 
   const retryLoad = () => {
@@ -119,8 +174,11 @@ export default function CropPage() {
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
     setSelected(crop);
+    selectedRef.current = crop;
     setStages([]);
     setStageError('');
+    // 选中即用当前地块气象自动检测，省掉一次点击
+    runMatch(crop, [temp, humidity, rainfall, light]);
     try {
       const data = await crops.stages(crop.id);
       if (requestRef.current === requestId) setStages(Array.isArray(data) ? data : []);
@@ -131,40 +189,9 @@ export default function CropPage() {
     }
   };
 
-  const checkMatch = async () => {
+  const checkMatch = () => {
     if (!selected) return;
-    const values = [temp, humidity, rainfall, light].map(Number);
-    if (values.some((value) => !Number.isFinite(value))) {
-      setMatchError('请填写有效的温度、湿度、降水和光照');
-      return;
-    }
-    if (values[1] < 0 || values[1] > 100) {
-      setMatchError('湿度需在 0 ~ 100% 之间');
-      return;
-    }
-    if (values[0] < -50 || values[0] > 60) {
-      setMatchError('温度需在 -50 ~ 60°C 之间');
-      return;
-    }
-    if (values[2] < 0 || values[3] < 0 || values[3] > 24) {
-      setMatchError('降水不能为负，光照需在 0 ~ 24 小时之间');
-      return;
-    }
-    setMatchLoading(true);
-    setMatchError('');
-    try {
-      const data = await crops.weatherMatch(selected.id, {
-        temp: values[0],
-        humidity: values[1],
-        rainfall: values[2],
-        light: values[3],
-      });
-      setMatch(data);
-    } catch (err) {
-      setMatchError(err.message || '检测失败，请稍后重试');
-    } finally {
-      setMatchLoading(false);
-    }
+    runMatch(selected, [temp, humidity, rainfall, light]);
   };
 
   if (loading) {
@@ -188,9 +215,38 @@ export default function CropPage() {
     );
   }
 
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  const filteredCrops = normalizedKeyword
+    ? cropList.filter((crop) => (
+      `${crop.cropName}${crop.variety || ''}`.toLowerCase().includes(normalizedKeyword)
+    ))
+    : cropList;
+
+  const factorMeta = {
+    temperature: { name: '温度', icon: '🌡️' },
+    humidity: { name: '湿度', icon: '💧' },
+    rainfall: { name: '降水', icon: '🌧️' },
+    light: { name: '光照', icon: '☀️' },
+  };
+  const riskTypeMeta = { FROST: '低温冻害', HEAT: '高温热害', RAINSTORM: '强降水/涝害' };
+  const factors = match
+    ? ['temperature', 'humidity', 'rainfall', 'light']
+      .map((key) => ({ key, ...factorMeta[key], ...match[key] }))
+      .filter((factor) => factor.score != null)
+    : [];
+  const limiting = factors.length
+    ? factors.reduce((worst, factor) => (factor.score < worst.score ? factor : worst))
+    : null;
+  const scoreTone = match
+    ? (match.finalScore >= 80 ? 'good' : match.finalScore >= 60 ? 'warn' : 'bad')
+    : '';
+  const ringColor = scoreTone === 'good' ? '#22c55e'
+    : scoreTone === 'warn' ? '#eab308' : '#ef4444';
+
   return (
     <div className="crop-page">
       <h2 className="page-title">🌱 播种适配</h2>
+      <p className="page-subtitle">按地块气象与作物播种界限温度，选择适合现在播种的作物</p>
 
       {fieldList.length > 0 && (
         <div className="glass crop-weather-bar">
@@ -227,10 +283,29 @@ export default function CropPage() {
       )}
 
       <div className="grid-2col">
-        <div className="glass section-card">
-          <h3>选择作物</h3>
-          <div className="crop-chips">
-            {cropList.map((c) => (
+        <div className="glass section-card crop-picker">
+          <div className="crop-picker-head">
+            <h3>选择作物</h3>
+            <span className="crop-picker-count">
+              {normalizedKeyword ? `${filteredCrops.length} / ${cropList.length} 种` : `${cropList.length} 种`}
+            </span>
+          </div>
+
+          <div className="crop-search">
+            <span aria-hidden>🔍</span>
+            <input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索作物或品种"
+              aria-label="搜索作物"
+            />
+            {keyword && (
+              <button type="button" onClick={() => setKeyword('')} aria-label="清空搜索">×</button>
+            )}
+          </div>
+
+          <div className="crop-chips crop-chips-scroll">
+            {filteredCrops.map((c) => (
               <button
                 type="button"
                 key={c.id}
@@ -240,36 +315,60 @@ export default function CropPage() {
                 {c.cropName}
               </button>
             ))}
+            {filteredCrops.length === 0 && (
+              <p className="crop-empty">没有匹配的作物，换个关键词试试。</p>
+            )}
           </div>
 
           {selected && (
             <div className="crop-detail">
-              <h4>{selected.cropName}（{selected.variety}）</h4>
-              <p>生长周期：{selected.growthCycleDays} 天</p>
-              <p className="crop-sowing">
-                🌾 适宜播种：{selected.sowingPeriod || '暂无资料'}
-              </p>
-              <p>播种适温（5日均温）：{selected.sowingTempMin ?? '—'}°C ~ {selected.sowingTempMax ?? '—'}°C</p>
-              <p>生长适温：{selected.suitableTempMin}°C ~ {selected.suitableTempMax}°C</p>
-              <p>适宜湿度：{selected.suitableHumidityMin}% ~ {selected.suitableHumidityMax}%</p>
-              <div className="tags">
-                {selected.frostSensitive && <span className="tag tag-danger">❄️ 怕冻</span>}
-                {selected.heatSensitive && <span className="tag tag-warning">🌡️ 怕热</span>}
-                {selected.waterlogSensitive && <span className="tag tag-info">💧 怕涝</span>}
+              <div className="crop-detail-head">
+                <div>
+                  <h4>{selected.cropName}</h4>
+                  <span>{selected.variety}</span>
+                </div>
+                <div className="tags">
+                  {selected.frostSensitive && <span className="tag tag-danger">❄️ 怕冻</span>}
+                  {selected.heatSensitive && <span className="tag tag-warning">🌡️ 怕热</span>}
+                  {selected.waterlogSensitive && <span className="tag tag-info">💧 怕涝</span>}
+                </div>
+              </div>
+
+              <div className="crop-specs">
+                <div><span>生长周期</span><b>{selected.growthCycleDays} 天</b></div>
+                <div>
+                  <span>播种适温</span>
+                  <b>{selected.sowingTempMin ?? '—'}–{selected.sowingTempMax ?? '—'}°C</b>
+                </div>
+                <div><span>生长适温</span><b>{selected.suitableTempMin}–{selected.suitableTempMax}°C</b></div>
+                <div>
+                  <span>适宜湿度</span>
+                  <b>{selected.suitableHumidityMin}%–{selected.suitableHumidityMax}%</b>
+                </div>
+              </div>
+
+              <div className="crop-sowing">
+                <span>🌾 适宜播种期</span>
+                <b>{selected.sowingPeriod || '暂无资料'}</b>
               </div>
             </div>
           )}
         </div>
 
-        <div className="glass section-card">
-          <h3>播种气象检测</h3>
+        <div className="glass section-card match-card">
+          <div className="match-card-head">
+            <h3>播种条件检测</h3>
+            <span>{selected ? '已按地块气象自动检测，可调整后复检' : '先选择一种作物'}</span>
+          </div>
           <div className="match-form">
-            <label>5日均温 (°C)<input type="number" value={temp} onChange={(e) => setTemp(+e.target.value)} /></label>
-            <label>湿度 (%)<input type="number" value={humidity} onChange={(e) => setHumidity(+e.target.value)} /></label>
-            <label>降水 (mm)<input type="number" value={rainfall} onChange={(e) => setRainfall(+e.target.value)} /></label>
-            <label>光照 (h)<input type="number" value={light} onChange={(e) => setLight(+e.target.value)} /></label>
+            <div className="match-grid">
+              <label>5日均温 (°C)<input type="number" value={temp} onChange={(e) => setTemp(+e.target.value)} /></label>
+              <label>湿度 (%)<input type="number" value={humidity} onChange={(e) => setHumidity(+e.target.value)} /></label>
+              <label>当日降水 (mm)<input type="number" value={rainfall} onChange={(e) => setRainfall(+e.target.value)} /></label>
+              <label>日照时长 (h)<input type="number" value={light} onChange={(e) => setLight(+e.target.value)} /></label>
+            </div>
             <button onClick={checkMatch} disabled={!selected || matchLoading}>
-              {matchLoading ? '检测中…' : '检测适配度'}
+              {matchLoading ? '检测中…' : '重新检测'}
             </button>
           </div>
 
@@ -277,43 +376,53 @@ export default function CropPage() {
 
           {match && (
             <div className={`match-result score-${match.finalScore >= 80 ? 'good' : match.finalScore >= 60 ? 'warn' : 'bad'}`}>
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div className="match-score" style={{ fontSize: 48 }}>
-                  {match.finalScore}
-                  <span style={{ fontSize: 16, color: '#666' }}>分</span>
+              <div className="match-summary">
+                <div
+                  className={`match-ring ${scoreTone}`}
+                  style={{ background: `conic-gradient(${ringColor} ${match.finalScore}%, rgba(0,0,0,0.08) 0)` }}
+                >
+                  <span>{match.finalScore}</span>
+                  <small>分</small>
                 </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color:
-                  match.finalGrade === '优秀' ? '#16a34a' : match.finalGrade === '良好' ? '#22c55e' : match.finalGrade === '一般' ? '#eab308' : '#ef4444'
-                }}>
-                  {match.finalGrade}
+                <div className="match-summary-text">
+                  <b className={scoreTone}>{match.finalGrade}</b>
+                  {limiting && (
+                    <span>
+                      {limiting.score < 80
+                        ? `主要限制：${limiting.name}（${limiting.score}分）`
+                        : '各因子较均衡'}
+                    </span>
+                  )}
+                  <em>{match.cropName} · 播种气象适宜度</em>
                 </div>
               </div>
 
-              {/* 各维度评分条 */}
-              {['temperature','humidity','rainfall','light'].map(key => {
-                const m = match[key];
-                if (!m) return null;
-                return (
-                  <div key={key} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 2 }}>
-                      <span>{key === 'temperature' ? '🌡️ 温度' : key === 'humidity' ? '💧 湿度' : key === 'rainfall' ? '🌧️ 降水' : '☀️ 光照'}（权重{m.weight}%）</span>
-                      <span style={{ fontWeight: 600, color: m.score >= 85 ? '#16a34a' : m.score >= 70 ? '#22c55e' : m.score >= 50 ? '#eab308' : '#ef4444' }}>
-                        {m.score}分 {m.label}
-                      </span>
+              <div className="match-factors">
+                {factors.map((factor) => {
+                  const tone = factor.score >= 85 ? 'high' : factor.score >= 70 ? 'good'
+                    : factor.score >= 50 ? 'mid' : 'low';
+                  return (
+                    <div
+                      key={factor.key}
+                      className={`match-factor ${limiting?.key === factor.key && factor.score < 80 ? 'limit' : ''}`}
+                    >
+                      <div className="match-factor-head">
+                        <span>
+                          {factor.icon} {factor.name}
+                          <i>权重 {factor.weight}%</i>
+                        </span>
+                        <b className={tone}>{factor.score}分 · {factor.label}</b>
+                      </div>
+                      <div className="match-factor-track">
+                        <div className={tone} style={{ width: `${factor.score}%` }} />
+                      </div>
+                      <div className="match-factor-meta">
+                        当前 {factor.current} · 适宜 {factor.range || factor.reference}
+                      </div>
                     </div>
-                    <div style={{ height: 6, background: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: m.score + '%', borderRadius: 3,
-                        background: m.score >= 85 ? 'linear-gradient(90deg,#22c55e,#16a34a)' :
-                                     m.score >= 70 ? 'linear-gradient(90deg,#84cc16,#22c55e)' :
-                                     m.score >= 50 ? 'linear-gradient(90deg,#eab308,#f59e0b)' :
-                                     'linear-gradient(90deg,#ef4444,#dc2626)',
-                        transition: 'width 0.6s ease'
-                      }} />
-                    </div>
-                    <div style={{ fontSize: 11, color: '#999', marginTop: 1 }}>当前{m.current} | 适宜{m.range || m.reference}</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
 
               {/* 风险警告 */}
               {match.risks && match.risks.length > 0 && (
@@ -325,7 +434,7 @@ export default function CropPage() {
                       borderLeft: '3px solid ' + (r.level === 'RED' ? '#ef4444' : '#eab308')
                     }}>
                       <span style={{ fontWeight: 600, color: r.level === 'RED' ? '#dc2626' : '#b45309' }}>
-                        {r.level === 'RED' ? '🔴' : '🟡'} {r.type}
+                        {r.level === 'RED' ? '🔴' : '🟡'} {riskTypeMeta[r.type] || r.type}
                       </span> {r.msg}
                     </div>
                   ))}
@@ -343,10 +452,11 @@ export default function CropPage() {
               )}
 
               {match.method && (
-                <div className="match-method">
-                  <div>📐 算法依据：{match.method}</div>
-                  {match.dataNote && <div>{match.dataNote}</div>}
-                </div>
+                <details className="match-method">
+                  <summary>📐 算法依据与数据说明</summary>
+                  <p>{match.method}</p>
+                  {match.dataNote && <p>{match.dataNote}</p>}
+                </details>
               )}
             </div>
           )}
