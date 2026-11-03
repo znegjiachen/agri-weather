@@ -544,7 +544,9 @@ export default function FarmlandsPage() {
                           <span className="fc-days">已种植 {days ?? 0} 天</span>
                         </>
                       ) : f.cropId ? (
-                        <span className="fc-missing">未填播种日期，暂无法计算阶段</span>
+                        <button type="button" className="fc-missing" onClick={() => handleEdit(f)}>
+                          未填播种日期 · 点击补充
+                        </button>
                       ) : (
                         <span className="fc-muted">未选择作物</span>
                       )}

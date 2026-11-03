@@ -2428,11 +2428,16 @@ main {
 
 .fc-missing {
   padding: 3px 9px;
+  border: 0;
   border-radius: 999px;
   background: rgba(245, 158, 11, 0.1);
   color: #b45309;
+  font: inherit;
   font-size: 10.5px;
+  cursor: pointer;
 }
+
+.fc-missing:hover { background: rgba(245, 158, 11, 0.18); }
 
 .fc-muted { color: var(--text-muted); font-size: 10.5px; }
 

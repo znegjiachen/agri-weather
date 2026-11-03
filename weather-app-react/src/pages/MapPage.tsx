@@ -62,6 +62,7 @@ export default function MapPage() {
   const [finishOpen, setFinishOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCropId, setNewCropId] = useState('');
+  const [newPlantDate, setNewPlantDate] = useState('');
   const [newSoilType, setNewSoilType] = useState('');
   const [newIrrigationType, setNewIrrigationType] = useState('');
   const [soilTouched, setSoilTouched] = useState(false);
@@ -202,6 +203,7 @@ export default function MapPage() {
     setSelected(null);
     setNewName('');
     setNewCropId('');
+    setNewPlantDate('');
     setNewSoilType('');
     setNewIrrigationType('');
     setSoilTouched(false);
@@ -273,6 +275,7 @@ export default function MapPage() {
         soilType: newSoilType || null,
         irrigationType: newIrrigationType || null,
         cropId: newCropId ? Number(newCropId) : null,
+        plantDate: newPlantDate || null,
         boundary: JSON.stringify(draft.map((p) => ({
           lat: roundCoord(p.lat, 6),
           lng: roundCoord(p.lng, 6),
@@ -285,6 +288,16 @@ export default function MapPage() {
           const document = await agentApi.document(planFile);
           const preview = await farmlandApi.tasks.extract(created.id, document.id);
           const sourceName = document.filename || planFile.name;
+          // 没手填播种日期时，用方案里的播种任务日期自动补齐
+          if (!created.plantDate && Array.isArray(preview)) {
+            const sowTask = preview.find((task) => task.taskType === 'SOW' && task.plannedDate);
+            if (sowTask) {
+              try {
+                await farmlandApi.update(created.id, { plantDate: sowTask.plannedDate });
+                created.plantDate = sowTask.plannedDate;
+              } catch { /* 自动补日期失败不影响任务保存 */ }
+            }
+          }
           if (Array.isArray(preview) && preview.length > 0) {
             await farmlandApi.tasks.confirm(created.id, { tasks: preview, sourceName });
             setPlanNotice(`已根据《${sourceName}》生成 ${preview.length} 条种植任务，可在「地块记录 → 计划任务」查看。`);
@@ -302,6 +315,7 @@ export default function MapPage() {
       setFinishOpen(false);
       setNewName('');
       setNewCropId('');
+      setNewPlantDate('');
       setNewSoilType('');
       setNewIrrigationType('');
       setSoilTouched(false);
@@ -487,6 +501,14 @@ export default function MapPage() {
                     <option key={c.id} value={c.id}>{c.cropName}</option>
                   ))}
                 </select>
+                <input
+                  type="date"
+                  className="community-input"
+                  value={newPlantDate}
+                  onChange={(e) => setNewPlantDate(e.target.value)}
+                  aria-label="播种日期"
+                  title="播种日期，用于计算生长阶段"
+                />
                 <select
                   className="community-input"
                   value={newSoilType}
@@ -527,7 +549,7 @@ export default function MapPage() {
                 </label>
               </div>
               <p className="map-draw-hint">
-                土壤按圈地位置估算、灌溉按作物常用方式推荐，都可以手动修改。
+                填写播种日期后可推算生长阶段；土壤按圈地位置估算、灌溉按作物常用方式推荐，都可以手动修改。
               </p>
               <div className="map-draw-actions">
                 <button
