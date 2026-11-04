@@ -34,7 +34,7 @@ const SLIDES = [
 const FEATURES = [
   { to: '/community', icon: '💬', title: '社区', desc: '看看大家怎么说' },
   { to: '/home/crops', icon: '🌱', title: '播种适配', desc: '选对播期与品种' },
-  { to: '/home/pests', icon: '🐛', title: '病虫害库', desc: '症状与防治方案' },
+  { to: '/home/weather', icon: '🌤️', title: '天气预报', desc: '实时与 7 日预报' },
 ];
 
 const AGENTS = [
@@ -45,10 +45,10 @@ const AGENTS = [
     desc: '可以回答您的农业问题，提供种植、天气与地块建议。',
   },
   {
-    to: '/home/pests',
+    to: '/agent',
     avatar: '🔍',
     title: '病虫害问诊',
-    desc: '识别作物病害、虫害、缺素等问题，提供排查与防治建议。',
+    desc: '描述症状或上传照片，助农手帮你排查病虫害。',
   },
 ];
 

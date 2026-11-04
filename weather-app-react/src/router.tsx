@@ -10,7 +10,6 @@ const AgentPage = lazy(() => import('./pages/AgentPage'));
 const AgentEntryPage = lazy(() => import('./pages/AgentEntryPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CropPage = lazy(() => import('./pages/CropPage'));
-const PestPage = lazy(() => import('./pages/PestPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const FarmlandsPage = lazy(() => import('./pages/FarmlandsPage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
@@ -32,7 +31,6 @@ export default function AppRoutes() {
 
           {/* 二级：首页九宫格进入的功能页 */}
           <Route path="home/crops" element={<CropPage />} />
-          <Route path="home/pests" element={<PestPage />} />
           <Route path="home/alerts" element={<AlertsPage />} />
           <Route path="home/farmlands" element={<FarmlandsPage />} />
           <Route path="home/map" element={<MapPage />} />
