@@ -5,10 +5,15 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import os from 'node:os';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const child = spawn(process.execPath, [path.join(dir, 'server.mjs')], {
-  env: { ...process.env, AGRI_TOKEN: 'test-token' },
+  env: {
+    ...process.env,
+    AGRI_TOKEN: 'test-token',
+    AGRI_MCP_AUDIT_LOG: path.join(os.tmpdir(), 'agri-mcp-test-audit.jsonl'),
+  },
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 
@@ -45,13 +50,24 @@ try {
 
   const tools = await request(2, 'tools/list', {});
   assert.ok(Array.isArray(tools.result.tools));
-  assert.ok(tools.result.tools.length >= 5);
+  assert.ok(tools.result.tools.length >= 8);
   const names = tools.result.tools.map((tool) => tool.name);
-  for (const name of ['list_farmlands', 'get_weather', 'search_crops']) {
+  for (const name of [
+    'list_farmlands', 'get_weather', 'search_crops',
+    'create_farm_operation', 'create_season', 'create_reminder',
+  ]) {
     assert.ok(names.includes(name), `缺少工具 ${name}`);
   }
 
-  console.log(`MCP self-test passed: ${names.length} tools`);
+  const preview = await request(3, 'tools/call', {
+    name: 'create_farm_operation',
+    arguments: { farmlandId: 1, operationType: '施肥', confirm: false },
+  });
+  assert.equal(preview.result.isError, false);
+  const previewData = JSON.parse(preview.result.content[0].text);
+  assert.equal(previewData.requiresConfirmation, true);
+
+  console.log(`MCP self-test passed: ${names.length} tools, write confirmation ok`);
 } finally {
   child.kill();
 }

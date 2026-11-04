@@ -67,7 +67,7 @@
 
 **后端** — Spring Boot 3.5.2 · Java 17 · Spring Security + JWT (jjwt 0.12.6) · Spring Data JPA · MySQL 8 · Flyway（数据库版本管理）· Lombok
 
-**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 页面层已迁移 TypeScript（`npm run typecheck`，strict 规则逐页收紧）· Playwright 冒烟测试
+**前端** — React 19 · Vite 8 · react-router-dom 7 · 原生 CSS（玻璃拟态）· PWA/Workbox · 页面层已迁移 TypeScript（`npm run typecheck`；`npm run typecheck:strict` 对 types/utils/核心组件开启 strict）· Playwright 冒烟测试
 
 **外部服务** — [Open-Meteo](https://open-meteo.com/)（天气，免费无密钥）· [DeepSeek](https://platform.deepseek.com/)（农事智能体）· 可选 OpenAI 兼容 Embedding（不配置时使用本地向量）
 
@@ -194,7 +194,7 @@ cd weather-app-react && npm install && npm run dev
 
 ### MCP 工具服务
 
-[mcp-server/](mcp-server/) 把地块、天气、农事建议、作物检索封装成标准 MCP tools（stdio），Claude Desktop / Claude Code 等客户端可直接调用；配置见 [mcp-server/README.md](mcp-server/README.md)。
+[mcp-server/](mcp-server/) 把地块、天气、农事建议、作物检索封装成标准 MCP tools（stdio），并提供创建农事记录、种植季、提醒 3 个写工具；写操作需显式 `confirm=true`，每次调用写本地审计日志。配置见 [mcp-server/README.md](mcp-server/README.md)。
 
 ### 数据库迁移
 
