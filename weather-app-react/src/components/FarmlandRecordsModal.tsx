@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { agent as agentApi, crops as cropsApi, farmlands as farmlandApi } from '../api';
+import { errorMessage } from '../utils/errorMessage';
 
 const SEASON_STATUS = { PLANTED: '在种', HARVESTED: '已收获', FALLOW: '休耕' };
 const OPERATION_TYPES = ['施肥', '打药', '灌溉', '播种', '除草', '其他'];
@@ -128,7 +129,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
         setTaskSummary(summary);
       }
     } catch (e) {
-      setError(e.message || '加载失败');
+      setError(errorMessage(e, '加载失败'));
     }
   };
 
@@ -171,7 +172,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       });
       await load();
     } catch (e) {
-      setError(e.message || '保存失败');
+      setError(errorMessage(e, '保存失败'));
     } finally {
       setSaving(false);
     }
@@ -194,7 +195,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       });
       await load();
     } catch (e) {
-      setError(e.message || '保存失败');
+      setError(errorMessage(e, '保存失败'));
     } finally {
       setSaving(false);
     }
@@ -206,7 +207,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await farmlandApi.seasons.remove(farmland.id, id);
       await load();
     } catch (e) {
-      setError(e.message || '删除失败');
+      setError(errorMessage(e, '删除失败'));
     }
   };
 
@@ -216,7 +217,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await farmlandApi.farmOperations.remove(farmland.id, id);
       await load();
     } catch (e) {
-      setError(e.message || '删除失败');
+      setError(errorMessage(e, '删除失败'));
     }
   };
 
@@ -228,7 +229,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await farmlandApi.tasks.update(farmland.id, task.id, { status: 'DONE' });
       await load();
     } catch (e) {
-      setError(e.message || '任务更新失败');
+      setError(errorMessage(e, '任务更新失败'));
     } finally {
       setSaving(false);
     }
@@ -281,7 +282,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
         planName: document.filename || file.name,
       }));
     } catch (e) {
-      setError(e.message || '方案上传失败');
+      setError(errorMessage(e, '方案上传失败'));
     } finally {
       setCompletePlanLoading(false);
     }
@@ -312,7 +313,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       setCompletingSeason(null);
       await load();
     } catch (e) {
-      setError(e.message || '完成本季失败');
+      setError(errorMessage(e, '完成本季失败'));
     } finally {
       setSaving(false);
     }
@@ -338,7 +339,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       setPlanPreview(preview);
       setPlanSourceName(document.filename || file.name);
     } catch (e) {
-      setError(e.message || '方案解析失败');
+      setError(errorMessage(e, '方案解析失败'));
     } finally {
       setPlanLoading(false);
     }
@@ -357,7 +358,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       setPlanSourceName('');
       await load();
     } catch (e) {
-      setError(e.message || '任务保存失败');
+      setError(errorMessage(e, '任务保存失败'));
     } finally {
       setSaving(false);
     }
@@ -370,7 +371,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await farmlandApi.tasks.update(farmland.id, task.id, { status });
       await load();
     } catch (e) {
-      setError(e.message || '任务更新失败');
+      setError(errorMessage(e, '任务更新失败'));
     } finally {
       setSaving(false);
     }
@@ -382,7 +383,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
       await farmlandApi.tasks.remove(farmland.id, taskId);
       await load();
     } catch (e) {
-      setError(e.message || '删除失败');
+      setError(errorMessage(e, '删除失败'));
     }
   };
 

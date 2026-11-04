@@ -4,6 +4,7 @@ import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
 import { formatCommunityTime } from '../utils/date';
+import { errorMessage } from '../utils/errorMessage';
 
 const CATEGORY_LABEL = { TECH: '农技', CHAT: '闲聊', ALERT: '预警' };
 const TABS = [
@@ -143,7 +144,7 @@ export default function CommunityPage() {
       setHasMore(items.length === PAGE_SIZE);
       setError('');
     } catch (e) {
-      setError(e.message);
+      setError(errorMessage(e));
       if (!reset) setHasMore(true);
     } finally {
       setLoading(false);
@@ -183,7 +184,7 @@ export default function CommunityPage() {
       setComposing(false);
       setError('');
     } catch (e) {
-      setError(e.message);
+      setError(errorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +205,7 @@ export default function CommunityPage() {
         : p)));
     } catch (e) {
       setPosts((prev) => prev.map((p) => (p.id === post.id ? post : p)));
-      setError(e.message);
+      setError(errorMessage(e));
     }
   };
 
@@ -214,7 +215,7 @@ export default function CommunityPage() {
       await community.remove(post.id);
       setPosts((prev) => prev.filter((x) => x.id !== post.id));
     } catch (e) {
-      setError(e.message);
+      setError(errorMessage(e));
     }
   };
 

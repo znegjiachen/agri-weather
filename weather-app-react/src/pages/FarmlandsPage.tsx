@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { farmlands, crops } from '../api';
+import FarmlandCard from '../components/FarmlandCard';
 import FarmlandRecordsModal from '../components/FarmlandRecordsModal';
+import type { Farmland } from '../types/farmland';
 import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
+import { errorMessage } from '../utils/errorMessage';
 const WEATHER_ICONS = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
   51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
@@ -17,7 +20,7 @@ const roundCoord = (value) => Math.round(Number(value) * 100) / 100;
 
 export default function FarmlandsPage() {
   const navigate = useNavigate();
-  const [list, setList] = useState([]);
+  const [list, setList] = useState<Farmland[]>([]);
   const [cropList, setCropList] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -26,12 +29,12 @@ export default function FarmlandsPage() {
   const [loading, setLoading] = useState(false);
   const [listLoading, setListLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
-  const [stageMap, setStageMap] = useState({});
+  const [stageMap, setStageMap] = useState<Record<number, string>>({});
   const [mountedAt] = useState(() => Date.now());
 
   // Modal state
   const [modal, setModal] = useState(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
-  const [recordsField, setRecordsField] = useState(null);
+  const [recordsField, setRecordsField] = useState<Farmland | null>(null);
 
   // 未填写就保持空：不要用默认土壤/灌溉或 0 代替用户没填的数据
   const [form, setForm] = useState({
@@ -49,7 +52,7 @@ export default function FarmlandsPage() {
     setListError('');
     farmlands.list()
       .then((data) => { setList(data); setListLoading(false); })
-      .catch((err) => { setListError(err.message || '加载失败'); setListLoading(false); });
+      .catch((err) => { setListError(errorMessage(err, '加载失败')); setListLoading(false); });
   };
 
   useEffect(() => {
@@ -58,7 +61,7 @@ export default function FarmlandsPage() {
     farmlands.list()
       .then((data) => { if (alive) { setList(data); setListLoading(false); } })
       .catch((err) => {
-        if (alive) { setListError(err.message || '加载失败'); setListLoading(false); }
+        if (alive) { setListError(errorMessage(err, '加载失败')); setListLoading(false); }
       });
     crops.list().then((data) => { if (alive) setCropList(data); }).catch(() => {});
     return () => { alive = false; };
@@ -179,7 +182,7 @@ export default function FarmlandsPage() {
       loadList();
       resetForm();
     } catch (err) {
-      setError(err.message || '操作失败');
+      setError(errorMessage(err, '操作失败'));
     } finally {
       setLoading(false);
     }
@@ -210,7 +213,7 @@ export default function FarmlandsPage() {
       await farmlands.delete(id);
       loadList();
     } catch (err) {
-      setError(err.message || '删除失败');
+      setError(errorMessage(err, '删除失败'));
     }
   };
 
@@ -223,7 +226,7 @@ export default function FarmlandsPage() {
       else data = await farmlands.advice(id);
       setModal({ type: action, data, farmlandName: name, loading: false });
     } catch (err) {
-      setModal({ type: action, data: { error: err.message }, farmlandName: name, loading: false });
+      setModal({ type: action, data: { error: errorMessage(err) }, farmlandName: name, loading: false });
     }
   };
 
@@ -506,82 +509,19 @@ export default function FarmlandsPage() {
             </div>
           ) : (
             <div className="farmland-grid">
-              {filteredList.map((f) => {
-                const days = daysSince(f.plantDate);
-                return (
-                  <div key={f.id} className="farmland-card glass">
-                    <div className="farmland-header">
-                      <div className="farmland-title">
-                        <h3>{f.fieldName}</h3>
-                        <span className="crop-badge">{getCropName(f.cropId)}</span>
-                      </div>
-                      <div className="farmland-card-tools">
-                        <button
-                          type="button"
-                          className="fc-icon"
-                          onClick={() => handleEdit(f)}
-                          title="编辑地块"
-                          aria-label={`编辑地块 ${f.fieldName}`}
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          type="button"
-                          className="fc-icon danger"
-                          onClick={() => handleDelete(f.id)}
-                          title="删除地块"
-                          aria-label={`删除地块 ${f.fieldName}`}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="fc-stage-row">
-                      {f.cropId && f.plantDate ? (
-                        <>
-                          <span className="fc-stage">{stageMap[f.id] || '阶段计算中'}</span>
-                          <span className="fc-days">已种植 {days ?? 0} 天</span>
-                        </>
-                      ) : f.cropId ? (
-                        <button type="button" className="fc-missing" onClick={() => handleEdit(f)}>
-                          未填播种日期 · 点击补充
-                        </button>
-                      ) : (
-                        <span className="fc-muted">未选择作物</span>
-                      )}
-                    </div>
-
-                    <div className="fc-detail-grid">
-                      <div>
-                        <span>位置</span>
-                        <b>
-                          {f.lat?.toFixed(2)}, {f.lng?.toFixed(2)}
-                          {f.altitude ? ` · ${f.altitude}m` : ''}
-                        </b>
-                      </div>
-                      <div><span>面积</span><b>{f.areaMu != null ? `${f.areaMu} 亩` : '未填'}</b></div>
-                      <div><span>土壤</span><b>{f.soilType || '未填'}</b></div>
-                      <div><span>灌溉</span><b>{f.irrigationType || '未填'}</b></div>
-                    </div>
-
-                    <div className="farmland-actions">
-                      <button className="fc-action" onClick={() => handleAction(f.id, f.fieldName, 'weather')}>
-                        🌤️ 天气
-                      </button>
-                      <button className="fc-action warn" onClick={() => handleAction(f.id, f.fieldName, 'alerts')}>
-                        ⚠️ 预警
-                      </button>
-                      <button className="fc-action" onClick={() => handleAction(f.id, f.fieldName, 'advice')}>
-                        📋 农事
-                      </button>
-                      <button className="fc-action" onClick={() => setRecordsField(f)}>
-                        📒 记录
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredList.map((field) => (
+                <FarmlandCard
+                  key={field.id}
+                  field={field}
+                  cropName={getCropName(field.cropId)}
+                  stage={stageMap[field.id]}
+                  days={daysSince(field.plantDate)}
+                  onAction={(action) => handleAction(field.id, field.fieldName, action)}
+                  onRecords={() => setRecordsField(field)}
+                  onEdit={() => handleEdit(field)}
+                  onDelete={() => handleDelete(field.id)}
+                />
+              ))}
             </div>
           )}
         </>

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/hooks/useMediaQuery.ts",
+    "src/components/FarmlandCard.tsx"
+  ]
+}

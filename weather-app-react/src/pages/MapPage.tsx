@@ -6,6 +6,7 @@ import { polygonAreaMu, polygonCenter, roundCoord } from '../utils/geo';
 import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
+import { errorMessage } from '../utils/errorMessage';
 
 interface RegionOption {
   name: string;
@@ -96,7 +97,7 @@ export default function MapPage() {
   useEffect(() => {
     farmlandApi.list()
       .then(setList)
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
 
     crops.list()
@@ -305,7 +306,7 @@ export default function MapPage() {
             setPlanNotice('种植计划已上传，但没有识别到可执行任务，可在「地块记录 → 计划任务」补充。');
           }
         } catch (e) {
-          setPlanNotice(`地块已保存，但种植计划解析失败：${e.message || '请稍后在地块记录里重试'}`);
+          setPlanNotice(`地块已保存，但种植计划解析失败：${errorMessage(e, '请稍后在地块记录里重试')}`);
         }
       }
 
@@ -324,7 +325,7 @@ export default function MapPage() {
       setSelected(created);
       handleSelect(created);
     } catch (e) {
-      setError(e.message || '保存失败');
+      setError(errorMessage(e, '保存失败'));
     } finally {
       setSaving(false);
     }

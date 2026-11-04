@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { alerts, farmlands } from '../api';
 import HomeWeather from '../components/HomeWeather';
+import { errorMessage } from '../utils/errorMessage';
 
 const SLIDES = [
   {
@@ -92,7 +93,7 @@ export default function MobileHome() {
       await farmlands.tasks.update(task.farmlandId, task.id, { status: 'DONE' });
       setTodayTasks((prev) => prev.filter((item) => item.id !== task.id));
     } catch (e) {
-      setTaskError(e.message || '任务更新失败');
+      setTaskError(errorMessage(e, '任务更新失败'));
     } finally {
       setCompletingTaskId(null);
     }

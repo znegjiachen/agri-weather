@@ -4,6 +4,7 @@ import { agent as agentApi, agents as agentsApi } from '../api';
 import { TOOL_LABELS } from '../utils/agentTools';
 import { formatCommunityTime } from '../utils/date';
 import { publishFieldContext } from '../utils/fieldContext';
+import { errorMessage } from '../utils/errorMessage';
 
 const ALL_TOOLS = Object.entries(TOOL_LABELS).map(([name, meta]) => ({ name, ...meta }));
 
@@ -94,7 +95,7 @@ export default function AgentStudioPage() {
         setAgents(list);
         setSelectedId((prev) => prev ?? list[0]?.id ?? null);
       })
-      .catch((e) => { if (alive) setListError(e.message || '加载失败'); })
+      .catch((e) => { if (alive) setListError(errorMessage(e, '加载失败')); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -125,7 +126,7 @@ export default function AgentStudioPage() {
             : ALL_TOOLS.map((tool) => tool.name),
         });
       })
-      .catch((e) => { if (alive) setDetailError(e.message || '加载智能体失败'); });
+      .catch((e) => { if (alive) setDetailError(errorMessage(e, '加载智能体失败')); });
     return () => { alive = false; };
   }, [selectedId]);
 
@@ -135,7 +136,7 @@ export default function AgentStudioPage() {
     let alive = true;
     agentsApi.knowledge.list(selectedId)
       .then((data) => { if (alive) setDocs(Array.isArray(data) ? data : []); })
-      .catch((e) => { if (alive) setKbError(e.message || '加载知识库失败'); });
+      .catch((e) => { if (alive) setKbError(errorMessage(e, '加载知识库失败')); });
     return () => { alive = false; };
   }, [selectedId, tab, docsVersion]);
 
@@ -207,7 +208,7 @@ export default function AgentStudioPage() {
       setAgents(Array.isArray(data) ? data : []);
       if (!selectedId && data?.length) setSelectedId(data[0].id);
     } catch (e) {
-      setListError(e.message || '同步失败');
+      setListError(errorMessage(e, '同步失败'));
     } finally {
       setSyncing(false);
     }
@@ -232,7 +233,7 @@ export default function AgentStudioPage() {
       setSaveMsg('已保存');
       await reloadList();
     } catch (e) {
-      setDetailError(e.message || '保存失败');
+      setDetailError(errorMessage(e, '保存失败'));
     } finally {
       setSaving(false);
     }
@@ -258,7 +259,7 @@ export default function AgentStudioPage() {
       setSaveMsg('已恢复默认');
       await reloadList();
     } catch (e) {
-      setDetailError(e.message || '恢复失败');
+      setDetailError(errorMessage(e, '恢复失败'));
     } finally {
       setSaving(false);
     }
@@ -284,7 +285,7 @@ export default function AgentStudioPage() {
       setTextContent('');
       refreshDocs();
     } catch (e) {
-      setKbError(e.message || '添加失败');
+      setKbError(errorMessage(e, '添加失败'));
     } finally {
       setAdding(false);
     }
@@ -306,7 +307,7 @@ export default function AgentStudioPage() {
       await agentsApi.knowledge.uploadFile(selectedId, file);
       refreshDocs();
     } catch (e) {
-      setKbError(e.message || '上传失败');
+      setKbError(errorMessage(e, '上传失败'));
     } finally {
       setUploading(false);
     }
@@ -350,7 +351,7 @@ export default function AgentStudioPage() {
       await agentsApi.knowledge.reindex(selectedId);
       setReindexMsg('向量索引已重建');
     } catch (e) {
-      setKbError(e.message || '重建向量失败');
+      setKbError(errorMessage(e, '重建向量失败'));
     } finally {
       setReindexing(false);
     }
@@ -364,7 +365,7 @@ export default function AgentStudioPage() {
       await agentsApi.knowledge.remove(selectedId, doc.id);
       refreshDocs();
     } catch (e) {
-      setKbError(e.message || '删除失败');
+      setKbError(errorMessage(e, '删除失败'));
     }
   };
 
@@ -376,7 +377,7 @@ export default function AgentStudioPage() {
       const data = await agentsApi.knowledge.search(selectedId, searchQuery.trim());
       setSearchResults(Array.isArray(data) ? data : []);
     } catch (e) {
-      setKbError(e.message || '检索失败');
+      setKbError(errorMessage(e, '检索失败'));
     } finally {
       setSearching(false);
     }

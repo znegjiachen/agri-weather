@@ -38,6 +38,8 @@ jobs:
       - run: npm ci
       - name: TypeScript
         run: npm run typecheck
+      - name: Strict TypeScript (new modules)
+        run: npm run typecheck:strict
       - name: ESLint
         run: npm run lint
       - name: Build

@@ -7,6 +7,7 @@ import { useVoiceInput } from '../hooks/useVoiceInput';
 import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
+import { errorMessage } from '../utils/errorMessage';
 
 const SUGGESTIONS = [
   '我那块地明天适合打药吗？',
@@ -323,7 +324,7 @@ export default function AgentPage() {
         return next;
       });
     } catch (e) {
-      const aborted = e.name === 'AbortError' || controller.signal.aborted;
+      const aborted = (e instanceof Error && e.name === 'AbortError') || controller.signal.aborted;
       const partial = liveRef.current.content;
       clearLiveBuffer();
 
@@ -349,7 +350,7 @@ export default function AgentPage() {
           return next;
         });
       } else {
-        setError(e.message || '调用失败');
+        setError(errorMessage(e, '调用失败'));
         // 失败时移除占位消息和本轮用户消息，保留输入与照片方便重试
         setMessages((prev) => {
           const next = [...prev];
@@ -393,7 +394,7 @@ export default function AgentPage() {
         const compressed = await compressImage(file);
         prepared.push({ file: compressed, preview: URL.createObjectURL(compressed) });
       } catch (e) {
-        setError(e.message);
+        setError(errorMessage(e));
       }
     }
     if (prepared.length > 0) {
@@ -435,7 +436,7 @@ export default function AgentPage() {
         ].slice(-3));
       }
     } catch (e) {
-      setError(e.message || '文档解析失败');
+      setError(errorMessage(e, '文档解析失败'));
     } finally {
       setDocLoading(false);
     }
@@ -464,7 +465,7 @@ export default function AgentPage() {
         i === index ? { ...message, feedback: rating } : message
       )));
     } catch (e) {
-      setError(e.message || '反馈提交失败');
+      setError(errorMessage(e, '反馈提交失败'));
     }
   };
 

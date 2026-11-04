@@ -8,6 +8,7 @@ import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
 import { getFieldContext } from '../utils/fieldContext';
+import { errorMessage } from '../utils/errorMessage';
 
 const SUGGESTIONS = [
   '明天适合打药吗？',
@@ -352,7 +353,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
         return next;
       });
     } catch (e) {
-      const aborted = e.name === 'AbortError' || controller.signal.aborted;
+      const aborted = (e instanceof Error && e.name === 'AbortError') || controller.signal.aborted;
       const partial = liveRef.current.content;
       clearLive();
 
@@ -377,7 +378,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
           return next;
         });
       } else {
-        setError(e.message || '调用失败');
+        setError(errorMessage(e, '调用失败'));
         setMessages((prev) => {
           const next = [...prev];
           if (next.length > 0 && next[next.length - 1].role === 'assistant'
@@ -417,7 +418,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
         const compressed = await compressImage(file);
         prepared.push({ file: compressed, preview: URL.createObjectURL(compressed) });
       } catch (e) {
-        setError(e.message);
+        setError(errorMessage(e));
       }
     }
     if (prepared.length > 0) {
@@ -459,7 +460,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
         ].slice(-3));
       }
     } catch (e) {
-      setError(e.message || '文档解析失败');
+      setError(errorMessage(e, '文档解析失败'));
     } finally {
       setDocLoading(false);
     }

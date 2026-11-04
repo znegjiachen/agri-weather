@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { auth } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getPushStatus, enablePush, disablePush } from '../utils/push';
+import { errorMessage } from '../utils/errorMessage';
 
 function pushLabel(state) {
   if (state === 'subscribed') return '已开启 · 新预警会推送到浏览器';
@@ -79,7 +80,7 @@ export default function ProfilePage() {
       closeSheet();
       showNotice('资料已保存');
     } catch (e) {
-      setProfileState({ saving: false, message: '', error: e.message || '保存失败' });
+      setProfileState({ saving: false, message: '', error: errorMessage(e, '保存失败') });
     }
   };
 
@@ -104,7 +105,7 @@ export default function ProfilePage() {
       closeSheet();
       showNotice('密码已修改');
     } catch (e) {
-      setPasswordState({ saving: false, message: '', error: e.message || '修改失败' });
+      setPasswordState({ saving: false, message: '', error: errorMessage(e, '修改失败') });
     }
   };
 
@@ -142,7 +143,7 @@ export default function ProfilePage() {
       }
     } catch (e) {
       setPushStatus({ state: 'error' });
-      showNotice(e.message || '推送设置失败');
+      showNotice(errorMessage(e, '推送设置失败'));
     }
   };
 
@@ -155,7 +156,7 @@ export default function ProfilePage() {
     try {
       await logoutAll();
     } catch (e) {
-      showNotice(e.message || '操作失败');
+      showNotice(errorMessage(e, '操作失败'));
     }
   };
 
@@ -166,7 +167,7 @@ export default function ProfilePage() {
     try {
       await deleteAccount(password);
     } catch (e) {
-      showNotice(e.message || '注销失败');
+      showNotice(errorMessage(e, '注销失败'));
     }
   };
 

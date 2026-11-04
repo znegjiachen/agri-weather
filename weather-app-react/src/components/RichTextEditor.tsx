@@ -10,6 +10,7 @@ import {
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import { community } from '../api';
+import { errorMessage } from '../utils/errorMessage';
 
 const MAX_TEXT = 2000;
 const MAX_IMAGES = 9;
@@ -100,7 +101,7 @@ const RichTextEditor = forwardRef<any, RichTextEditorProps>(function RichTextEdi
       replaceToken(token, url);
     } catch (e) {
       replaceToken(token, null);
-      onErrorRef.current?.(e.message);
+      onErrorRef.current?.(errorMessage(e));
     } finally {
       setUploading(-1);
       emitChange();

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function Login({ onSwitch, notice }) {
   const { login } = useAuth();
@@ -15,7 +16,7 @@ export default function Login({ onSwitch, notice }) {
     try {
       await login(form.username.trim(), form.password);
     } catch (err) {
-      setError(err.message || '登录失败');
+      setError(errorMessage(err, '登录失败'));
     } finally {
       setLoading(false);
     }

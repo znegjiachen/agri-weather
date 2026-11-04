@@ -4,6 +4,7 @@ import { community } from '../api';
 import { formatCommunityTime } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 import PostContent from '../components/PostContent';
+import { errorMessage } from '../utils/errorMessage';
 
 const CATEGORY_LABEL = { CHAT: '闲聊', TECH: '农技', ALERT: '预警' };
 
@@ -28,7 +29,7 @@ export default function CommunityPostPage() {
       setComments(d.comments || []);
       setError('');
     } catch (e) {
-      setError(e.message);
+      setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -63,7 +64,7 @@ export default function CommunityPostPage() {
       setInput('');
       setError('');
     } catch (e) {
-      setError(e.message);
+      setError(errorMessage(e));
     } finally {
       setSending(false);
     }
@@ -80,7 +81,7 @@ export default function CommunityPostPage() {
       setPost(updated);
     } catch (e) {
       setPost(prev);
-      setError(e.message);
+      setError(errorMessage(e));
     }
   };
 

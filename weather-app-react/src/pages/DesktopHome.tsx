@@ -6,6 +6,7 @@ import { getWeatherInfo, getDayName } from '../utils/weatherCodes';
 import { publishFieldContext, clearFieldContext } from '../utils/fieldContext';
 import ForecastTrend from '../components/ForecastTrend';
 import { alertLevelMeta, alertTypeMeta } from '../utils/alertMeta';
+import { errorMessage } from '../utils/errorMessage';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -111,7 +112,7 @@ export default function DesktopHome() {
           clearFieldContext();
         }
       } catch (e) {
-        if (alive) setError(e.message || '加载失败');
+        if (alive) setError(errorMessage(e, '加载失败'));
       } finally {
         if (alive) setLoading(false);
       }
@@ -172,7 +173,7 @@ export default function DesktopHome() {
         setUpcomingTasks(Array.isArray(list) ? list : []);
       }
     } catch (e) {
-      setTaskError(e.message || '任务更新失败');
+      setTaskError(errorMessage(e, '任务更新失败'));
     } finally {
       setCompletingTaskId(null);
     }

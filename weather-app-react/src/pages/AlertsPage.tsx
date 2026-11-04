@@ -3,6 +3,7 @@ import { alerts } from '../api';
 import { formatCommunityTime } from '../utils/date';
 import { alertLevelMeta, alertTypeMeta } from '../utils/alertMeta';
 import { getPushStatus, enablePush } from '../utils/push';
+import { errorMessage } from '../utils/errorMessage';
 
 const FILTERS = [
   { key: 'ALL', label: '全部' },
@@ -52,7 +53,7 @@ export default function AlertsPage() {
       await enablePush();
       setPushState('subscribed');
     } catch (e) {
-      setError(e.message || '开启推送失败');
+      setError(errorMessage(e, '开启推送失败'));
     }
   };
 
@@ -72,7 +73,7 @@ export default function AlertsPage() {
       before = Array.isArray(data) ? data : [];
       setList(before);
     } catch (err) {
-      setError(err.message || '加载失败，请确认已登录');
+      setError(errorMessage(err, '加载失败，请确认已登录'));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -90,7 +91,7 @@ export default function AlertsPage() {
       setError('');
       notifyNewAlerts(before, after);
     } catch (err) {
-      setRefreshError(err.message || '本次检查失败，以下为上次结果');
+      setRefreshError(errorMessage(err, '本次检查失败，以下为上次结果'));
     } finally {
       setRefreshing(false);
     }
@@ -112,7 +113,7 @@ export default function AlertsPage() {
       await alerts.markRead(id);
       setList((prev) => prev.map((a) => (a.id === id ? { ...a, isRead: true } : a)));
     } catch (e) {
-      setError(e.message || '标记失败');
+      setError(errorMessage(e, '标记失败'));
     } finally {
       setMarkingId(null);
     }
@@ -126,7 +127,7 @@ export default function AlertsPage() {
         a.id === id ? { ...a, isRead: true, isHandled: true } : a
       )));
     } catch (e) {
-      setError(e.message || '标记失败');
+      setError(errorMessage(e, '标记失败'));
     } finally {
       setMarkingId(null);
     }
@@ -139,7 +140,7 @@ export default function AlertsPage() {
       await alerts.markAllRead();
       await loadAlerts({ silent: true });
     } catch (e) {
-      setError(e.message || '标记失败');
+      setError(errorMessage(e, '标记失败'));
       setRefreshing(false);
     }
   };

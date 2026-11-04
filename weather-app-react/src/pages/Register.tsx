@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { errorMessage } from '../utils/errorMessage';
 
 export default function Register({ onSwitch, notice }) {
   const { register } = useAuth();
@@ -30,7 +31,7 @@ export default function Register({ onSwitch, notice }) {
         form.region.trim(),
       );
     } catch (err) {
-      setError(err.message || '注册失败');
+      setError(errorMessage(err, '注册失败'));
     } finally {
       setLoading(false);
     }

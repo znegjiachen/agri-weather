@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { pests } from '../api';
+import { errorMessage } from '../utils/errorMessage';
 
 const TYPE_NAMES = { INSECT: '🐛 虫害', FUNGUS: '🍄 病害' };
 
@@ -19,7 +20,7 @@ export default function PestPage() {
         setError('');
       })
       .catch((err) => {
-        if (alive) setError(err.message || '病虫害数据加载失败');
+        if (alive) setError(errorMessage(err, '病虫害数据加载失败'));
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { crops, farmlands as farmlandApi } from '../api';
 import { getFieldContext } from '../utils/fieldContext';
+import { errorMessage } from '../utils/errorMessage';
 
 const round1 = (value) => Math.round(Number(value) * 10) / 10;
 
@@ -74,7 +75,7 @@ export default function CropPage() {
       if (matchRequestRef.current === requestId) setMatch(data);
     } catch (err) {
       if (matchRequestRef.current === requestId) {
-        setMatchError(err.message || '检测失败，请稍后重试');
+        setMatchError(errorMessage(err, '检测失败，请稍后重试'));
       }
     } finally {
       if (matchRequestRef.current === requestId) setMatchLoading(false);
@@ -90,7 +91,7 @@ export default function CropPage() {
         setLoadError('');
       })
       .catch((err) => {
-        if (alive) setLoadError(err.message || '作物列表加载失败');
+        if (alive) setLoadError(errorMessage(err, '作物列表加载失败'));
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -184,7 +185,7 @@ export default function CropPage() {
       if (requestRef.current === requestId) setStages(Array.isArray(data) ? data : []);
     } catch (err) {
       if (requestRef.current === requestId) {
-        setStageError(err.message || '生长阶段加载失败');
+        setStageError(errorMessage(err, '生长阶段加载失败'));
       }
     }
   };
