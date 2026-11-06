@@ -410,7 +410,7 @@ CREATE TABLE IF NOT EXISTS community_like (
 -- 社区图片：二进制存库，多实例共享，无需文件挂载
 CREATE TABLE IF NOT EXISTS community_image (
   id         BIGINT        NOT NULL AUTO_INCREMENT,
-  public_id  CHAR(32)      NOT NULL COMMENT '对外 URL 标识（随机，避免枚举）',
+  public_id  VARCHAR(32)   NOT NULL COMMENT '对外 URL 标识（随机，避免枚举）',
   user_id    BIGINT        NOT NULL COMMENT '上传者',
   post_id    BIGINT        DEFAULT NULL COMMENT '挂接的帖子，NULL 表示尚未发布',
   mime_type  VARCHAR(40)   NOT NULL,
@@ -517,7 +517,7 @@ CREATE TABLE IF NOT EXISTS agent_document (
     expires_at DATETIME,
     KEY idx_doc_user (user_id),
     KEY idx_doc_expires (expires_at),
-    CONSTRAINT fk_doc_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
+    CONSTRAINT fk_agent_document_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='对话内上传的文档';
 
 CREATE TABLE IF NOT EXISTS agent_document_chunk (
@@ -567,7 +567,7 @@ CREATE TABLE IF NOT EXISTS agent_feedback (
 CREATE TABLE IF NOT EXISTS refresh_token (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    token_hash CHAR(64) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
     expires_at DATETIME NOT NULL,
     revoked BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

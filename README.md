@@ -82,7 +82,7 @@
 # 1. 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入数据库密码和 JWT 密钥
-#   JWT 密钥生成：openssl rand -base64 64
+#   JWT 密钥生成：openssl rand -hex 32
 
 # 2. 构建前端静态文件
 cd weather-app-react && npm install && npm run build && cd ..
@@ -91,7 +91,7 @@ cd weather-app-react && npm install && npm run build && cd ..
 docker-compose up -d
 ```
 
-访问 http://localhost 即可。`sql/schema.sql` 会在容器首次启动时自动建表。
+访问 http://localhost 即可。MySQL 容器首次启动会自动执行 `sql/schema.sql` 和 `sql/seed-current.sql` 建表并补齐播种/作物数据，后端以 Flyway V9 为基线继续后续迁移。
 
 ```bash
 docker-compose logs -f    # 查看日志

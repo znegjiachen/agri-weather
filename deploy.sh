@@ -60,6 +60,9 @@ setup() {
         mysql -u root -p < "$PROJECT_DIR/agri-weather-server/sql/schema.sql" 2>/dev/null && \
             log "数据库初始化完成" || \
             warn "数据库可能已存在，跳过建库"
+        mysql -u root -p agri_weather < "$PROJECT_DIR/agri-weather-server/sql/seed-current.sql" 2>/dev/null && \
+            log "作物播种数据初始化完成" || \
+            warn "播种数据可能已存在，跳过"
     fi
 
     # 6. 配置 systemd 服务
