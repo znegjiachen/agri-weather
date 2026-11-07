@@ -1,20 +1,96 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useWeather, { defaultWeatherCity } from '../hooks/useWeather';
 import { useAuth } from '../context/AuthContext';
 import { getBackgroundClass, getWeatherInfo, getDayName } from '../utils/weatherCodes';
 
-function formatDate(dateStr) {
+interface AuthUser {
+  region?: string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+}
+
+interface MobileCurrentWeather {
+  time?: string;
+  temperature_2m: number;
+  weather_code: number;
+}
+
+interface MobileDailyWeather {
+  time: string[];
+  sunrise: string[];
+  sunset: string[];
+  weather_code: number[];
+  temperature_2m_max: number[];
+  temperature_2m_min: number[];
+}
+
+interface MobileWeatherData {
+  current?: MobileCurrentWeather;
+  daily?: MobileDailyWeather;
+}
+
+interface AirQuality {
+  aqi: number | null;
+}
+
+interface WeatherInfo {
+  icon: string;
+  desc: string;
+  bg: string;
+}
+
+/** useWeather 是 JS 模块，这里声明移动端实际消费的返回形状 */
+interface WeatherHookResult {
+  cityName: string;
+  regionName: string;
+  weatherData: MobileWeatherData | null;
+  airQuality: AirQuality | null;
+  loading: boolean;
+  error: boolean;
+  history: string[];
+  updatedAt: number | null;
+  locateMessage: string;
+  searchCity: (city: string) => void | Promise<void>;
+  locateUser: () => void | Promise<void>;
+}
+
+interface TodayRange {
+  high: number;
+  low: number;
+}
+
+interface DayItem {
+  time: string;
+  day: string;
+  weekday: string;
+  date: string;
+  icon: string;
+  desc: string;
+  high: number;
+  low: number;
+}
+
+interface ChartData {
+  lines: number[];
+  highPoints: string;
+  lowPoints: string;
+  yOf: (temp: number) => number;
+}
+
+function formatDate(dateStr: string): string {
   const [, month, day] = dateStr.split('-');
   return `${Number(month)}/${Number(day)}`;
 }
 
-function weekdayOf(dateStr) {
+function weekdayOf(dateStr: string): string {
   const date = new Date(`${dateStr}T00:00:00`);
   return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
 }
 
-function aqiInfo(value) {
+function aqiInfo(value: number | null): { label: string; pct: number; color: string } {
   if (value == null) return { label: '', pct: 0, color: '#4ade80' };
   const pct = Math.min(100, Math.max(0, (value / 300) * 100));
   if (value <= 50) return { label: '优', pct, color: '#4ade80' };
@@ -28,7 +104,7 @@ function aqiInfo(value) {
 /** 移动端天气页：参照深色天气卡片布局，数据与桌面端一致 */
 export default function MobileWeather() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuth() as AuthContextValue;
   const {
     cityName,
     regionName,
@@ -41,7 +117,7 @@ export default function MobileWeather() {
     locateMessage,
     searchCity,
     locateUser,
-  } = useWeather();
+  } = useWeather() as WeatherHookResult;
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [term, setTerm] = useState('');
@@ -64,7 +140,7 @@ export default function MobileWeather() {
     return () => { document.body.className = ''; };
   }, [bgClass]);
 
-  const today = useMemo(() => {
+  const today = useMemo<TodayRange | null>(() => {
     if (!daily) return null;
     return {
       high: Math.round(daily.temperature_2m_max[0]),
@@ -72,7 +148,7 @@ export default function MobileWeather() {
     };
   }, [daily]);
 
-  const days = useMemo(() => {
+  const days = useMemo<DayItem[]>(() => {
     if (!daily) return [];
     return daily.time.slice(1, 7).map((time, idx) => {
       const i = idx + 1;
@@ -90,7 +166,7 @@ export default function MobileWeather() {
     });
   }, [daily]);
 
-  const chart = useMemo(() => {
+  const chart = useMemo<ChartData | null>(() => {
     if (days.length === 0) return null;
     const highs = days.map((d) => d.high);
     const lows = days.map((d) => d.low);
@@ -98,8 +174,8 @@ export default function MobileWeather() {
     const min = Math.min(...lows);
     const span = Math.max(1, max - min);
     const n = days.length;
-    const xOf = (index) => ((index + 0.5) / n) * 100;
-    const yOf = (temp) => 20 + ((max - temp) / span) * 60;
+    const xOf = (index: number) => ((index + 0.5) / n) * 100;
+    const yOf = (temp: number) => 20 + ((max - temp) / span) * 60;
     return {
       lines: days.map((_, index) => xOf(index)),
       highPoints: days.map((d, index) => `${xOf(index)},${yOf(d.high)}`).join(' '),
@@ -108,7 +184,7 @@ export default function MobileWeather() {
     };
   }, [days]);
 
-  const info = current ? getWeatherInfo(current.weather_code) : null;
+  const info = current ? (getWeatherInfo(current.weather_code) as WeatherInfo) : null;
   const aqi = airQuality?.aqi ?? null;
   const air = aqiInfo(aqi);
   const observedAt = current?.time ? new Date(current.time) : (updatedAt ? new Date(updatedAt) : null);
@@ -116,7 +192,7 @@ export default function MobileWeather() {
     ? observedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const submitSearch = (value = undefined) => {
+  const submitSearch = (value: string | undefined = undefined) => {
     const city = (value ?? term).trim();
     if (!city) return;
     searchCity(city);
@@ -124,7 +200,7 @@ export default function MobileWeather() {
     setTerm('');
   };
 
-  const handleKeyDown = (event) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') submitSearch();
   };
 
@@ -195,15 +271,15 @@ export default function MobileWeather() {
                 <h1 className="wd-region">{regionName || cityName}</h1>
                 <div className="wd-temp">{Math.round(current.temperature_2m)}<span>°</span></div>
                 <div className="wd-range">
-                  最高 {today.high}° / 最低 {today.low}°
+                  最高 {today!.high}° / 最低 {today!.low}°
                 </div>
                 {observedLabel && (
                   <div className="wd-updated">{observedLabel} 观测</div>
                 )}
               </div>
               <div className="wd-hero-side">
-                <div className="wd-icon">{info.icon}</div>
-                <div className="wd-cond">{info.desc}</div>
+                <div className="wd-icon">{info!.icon}</div>
+                <div className="wd-cond">{info!.desc}</div>
               </div>
             </section>
 

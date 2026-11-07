@@ -27,7 +27,7 @@ export default function AppStatusBanner() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return undefined;
     let alive = true;
-    let timer = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
     const markWaiting = () => {
       waitingRef.current = true;

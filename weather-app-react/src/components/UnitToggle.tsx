@@ -1,4 +1,9 @@
-export default function UnitToggle({ isCelsius, onChange }) {
+interface UnitToggleProps {
+  isCelsius: boolean;
+  onChange: (isCelsius: boolean) => void;
+}
+
+export default function UnitToggle({ isCelsius, onChange }: UnitToggleProps) {
   return (
     <div className="top-bar">
       <div className="unit-toggle">

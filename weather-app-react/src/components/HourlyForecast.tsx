@@ -1,9 +1,27 @@
 import { getWeatherInfo, getHourLabel, displayTemp } from '../utils/weatherCodes';
 
-export default function HourlyForecast({ hourlyData, isCelsius }) {
+interface HourlyWeatherData {
+  time: string[];
+  weather_code: number[];
+  temperature_2m: number[];
+}
+
+interface HourlyForecastProps {
+  hourlyData: HourlyWeatherData;
+  isCelsius: boolean;
+}
+
+interface HourlyItem {
+  i: number;
+  timeStr: string;
+  icon: string;
+  temp: number;
+}
+
+export default function HourlyForecast({ hourlyData, isCelsius }: HourlyForecastProps) {
   const now = new Date();
   const currentHour = now.getHours();
-  const items = [];
+  const items: HourlyItem[] = [];
 
   for (let i = 0; i < 24; i++) {
     const hourIndex = currentHour + i;

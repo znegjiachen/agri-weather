@@ -11,18 +11,32 @@ const FILTERS = [
   { key: 'UNHANDLED', label: '未处理' },
 ];
 
+/** 预警列表项（后端字段可能缺失） */
+interface AlertItem {
+  id: number;
+  alertLevel: string;
+  alertType: string;
+  alertContent?: string | null;
+  alertTime?: string | null;
+  suggestion?: string | null;
+  farmlandName?: string | null;
+  cropName?: string | null;
+  isRead?: boolean;
+  isHandled?: boolean;
+}
+
 export default function AlertsPage() {
-  const [list, setList] = useState([]);
+  const [list, setList] = useState<AlertItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const [error, setError] = useState('');
   // 检查失败与加载失败分开：失败时不能把旧结果说成「状态正常」
   const [refreshError, setRefreshError] = useState('');
-  const [markingId, setMarkingId] = useState(null);
+  const [markingId, setMarkingId] = useState<number | null>(null);
   const [pushState, setPushState] = useState('loading');
 
-  const notifyNewAlerts = (before, after) => {
+  const notifyNewAlerts = (before: AlertItem[], after: AlertItem[]) => {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
     const beforeIds = new Set(before.map((a) => a.id));
     const fresh = after.filter((a) => !a.isRead && !beforeIds.has(a.id));
@@ -61,13 +75,15 @@ export default function AlertsPage() {
    * 先展示已有预警，再尝试重新检查。
    * 检查失败时保留旧数据并提示「以下为上次结果」，绝不显示「暂无预警，状态正常」。
    */
-  const loadAlerts = useCallback(async ({ refresh = false, silent = false } = {}) => {
+  const loadAlerts = useCallback(async (
+    { refresh = false, silent = false }: { refresh?: boolean; silent?: boolean } = {},
+  ) => {
     if (!silent) setLoading(true);
     if (refresh) setRefreshing(true);
     setError('');
     setRefreshError('');
 
-    let before = [];
+    let before: AlertItem[] = [];
     try {
       const data = await alerts.list();
       before = Array.isArray(data) ? data : [];
@@ -107,7 +123,7 @@ export default function AlertsPage() {
     return () => { alive = false; };
   }, [loadAlerts]);
 
-  const handleMarkRead = async (id) => {
+  const handleMarkRead = async (id: number) => {
     setMarkingId(id);
     try {
       await alerts.markRead(id);
@@ -119,7 +135,7 @@ export default function AlertsPage() {
     }
   };
 
-  const handleMarkHandled = async (id) => {
+  const handleMarkHandled = async (id: number) => {
     setMarkingId(id);
     try {
       await alerts.handle(id);

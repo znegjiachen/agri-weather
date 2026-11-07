@@ -2,16 +2,41 @@ import { useState, useEffect } from 'react';
 import { crops, alerts, farmlands } from '../api';
 import { useAuth } from '../context/AuthContext';
 
+interface AuthUser {
+  username?: string;
+  region?: string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+}
+
+interface CropItem {
+  id: number;
+  cropName: string;
+}
+
+interface AlertItem {
+  id: number;
+  alertLevel?: string;
+  alertType?: string;
+  alertContent?: string;
+}
+
+interface FarmlandItem {
+  id: number;
+}
+
 export default function Dashboard() {
-  const { user } = useAuth();
-  const [cropList, setCropList] = useState([]);
-  const [alertList, setAlertList] = useState([]);
-  const [farmlandList, setFarmlandList] = useState([]);
+  const { user } = useAuth() as AuthContextValue;
+  const [cropList, setCropList] = useState<CropItem[]>([]);
+  const [alertList, setAlertList] = useState<AlertItem[]>([]);
+  const [farmlandList, setFarmlandList] = useState<FarmlandItem[]>([]);
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     crops.list().then(setCropList).catch(() => {});
-    alerts.list().then((d) => { setAlertList(d.slice(0, 5)); }).catch(() => {});
+    alerts.list().then((d: AlertItem[]) => { setAlertList(d.slice(0, 5)); }).catch(() => {});
     alerts.unreadCount().then(setUnread).catch(() => {});
     farmlands.list().then(setFarmlandList).catch(() => {});
   }, []);

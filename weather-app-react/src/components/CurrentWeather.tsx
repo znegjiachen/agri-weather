@@ -1,6 +1,27 @@
 import { getWeatherInfo, formatTime, displayTemp } from '../utils/weatherCodes';
 
-export default function CurrentWeather({ data, cityName, isCelsius, updatedAt }) {
+interface CurrentWeatherData {
+  current: {
+    time?: string;
+    temperature_2m: number;
+    weather_code: number;
+  };
+  daily: {
+    sunrise: string[];
+    sunset: string[];
+  };
+}
+
+interface CurrentWeatherProps {
+  data: CurrentWeatherData;
+  cityName: string;
+  isCelsius: boolean;
+  updatedAt: number | null;
+}
+
+export default function CurrentWeather({
+  data, cityName, isCelsius, updatedAt,
+}: CurrentWeatherProps) {
   const current = data.current;
   const daily = data.daily;
   const weatherInfo = getWeatherInfo(current.weather_code);

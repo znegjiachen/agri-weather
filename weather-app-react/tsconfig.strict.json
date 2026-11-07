@@ -5,10 +5,5 @@
     "noImplicitAny": true,
     "strictNullChecks": true
   },
-  "include": [
-    "src/types/**/*.ts",
-    "src/utils/**/*.ts",
-    "src/hooks/useMediaQuery.ts",
-    "src/components/FarmlandCard.tsx"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

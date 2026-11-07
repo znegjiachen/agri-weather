@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { agent as agentApi, agents as agentsApi } from '../api';
@@ -8,6 +9,20 @@ import { MAX_IMAGES, compressImage } from '../utils/image';
 import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
 import { errorMessage } from '../utils/errorMessage';
+import type {
+  AgentHistory,
+  AgentStatus,
+  AgentSummary,
+  ChatDocument,
+  ChatDone,
+  ChatMessage,
+  ChatStreamHandlers,
+  PhotoAttachment,
+  ThoughtTrace,
+  ToolCallTrace,
+  VisionResult,
+  VoiceInput,
+} from '../types/agent';
 
 const SUGGESTIONS = [
   '我那块地明天适合打药吗？',
@@ -26,8 +41,8 @@ export default function AgentPage() {
   const [searchParams] = useSearchParams();
   const queryAgentId = Number(searchParams.get('agentId')) || null;
 
-  const [agents, setAgents] = useState([]);
-  const [manualAgentId, setSelectedId] = useState(null);
+  const [agents, setAgents] = useState<AgentSummary[]>([]);
+  const [manualAgentId, setSelectedId] = useState<number | null>(null);
   const selectedId = useMemo(() => {
     if (manualAgentId && agents.some((item) => item.id === manualAgentId)) return manualAgentId;
     if (queryAgentId && agents.some((item) => item.id === queryAgentId)) return queryAgentId;
@@ -46,32 +61,37 @@ export default function AgentPage() {
     loading: historyLoading,
     error: historyError,
     retry: retryHistory,
-  } = useAgentHistory(selectedId);
+  } = useAgentHistory(selectedId) as AgentHistory;
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState<AgentStatus | null>(null);
   const [statusError, setStatusError] = useState(false);
-  const [attachments, setAttachments] = useState([]);
-  const [docAttachments, setDocAttachments] = useState([]);
+  const [attachments, setAttachments] = useState<PhotoAttachment[]>([]);
+  const [docAttachments, setDocAttachments] = useState<ChatDocument[]>([]);
   const [docLoading, setDocLoading] = useState(false);
 
-  const listRef = useRef(null);
-  const inputRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const docInputRef = useRef(null);
-  const attachmentsRef = useRef(attachments);
-  const abortRef = useRef(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const docInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentsRef = useRef<PhotoAttachment[]>(attachments);
+  const abortRef = useRef<AbortController | null>(null);
 
   const voice = useVoiceInput({
     asrConfigured: status?.asrConfigured,
-    onText: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
+    onText: (text: string) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
     onError: setError,
-  });
+  }) as VoiceInput;
 
-  const liveRef = useRef({ thought: '', content: '', round: null, timer: null });
+  const liveRef = useRef<{
+    thought: string;
+    content: string;
+    round: number | null;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ thought: '', content: '', round: null, timer: null });
 
   useEffect(() => {
     attachmentsRef.current = attachments;
@@ -87,11 +107,11 @@ export default function AgentPage() {
   useEffect(() => {
     let alive = true;
     agentApi.status()
-      .then((data) => { if (alive) { setStatus(data); setStatusError(false); } })
+      .then((data) => { if (alive) { setStatus(data as AgentStatus); setStatusError(false); } })
       .catch(() => { if (alive) setStatusError(true); });
 
     agentsApi.list()
-      .then((data) => { if (alive) setAgents(Array.isArray(data) ? data : []); })
+      .then((data) => { if (alive) setAgents(Array.isArray(data) ? data as AgentSummary[] : []); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -99,7 +119,7 @@ export default function AgentPage() {
   const retryStatus = () => {
     setStatusError(false);
     agentApi.status()
-      .then((data) => { setStatus(data); setStatusError(false); })
+      .then((data) => { setStatus(data as AgentStatus); setStatusError(false); })
       .catch(() => setStatusError(true));
   };
 
@@ -121,7 +141,7 @@ export default function AgentPage() {
     };
   }, [messages, loading, analyzing]);
 
-  const updateStreamingMessage = (updater) => {
+  const updateStreamingMessage = (updater: (message: ChatMessage) => ChatMessage) => {
     setMessages((prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i -= 1) {
@@ -158,7 +178,7 @@ export default function AgentPage() {
     liveRef.current.timer = setTimeout(flushLive, 50);
   };
 
-  const send = async (text = undefined) => {
+  const send = async (text?: string) => {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
@@ -175,7 +195,7 @@ export default function AgentPage() {
 
     // 历史里只保留文档名；当前引用的文档通过 documentIds 走后端检索
     const history = messages.map((m) => {
-      const parts = [];
+      const parts: string[] = [];
       const docs = m.documents || (m.document ? [m.document] : []);
       if (m.role === 'user' && docs.length > 0) {
         parts.push(`【用户上传了文档：${docs.map((doc) => doc.filename).join('、')}】`);
@@ -201,7 +221,7 @@ export default function AgentPage() {
     abortRef.current = controller;
 
     try {
-      let vision = null;
+      let vision: VisionResult | null = null;
       let visionContext = '';
 
       if (files.length > 0) {
@@ -227,7 +247,15 @@ export default function AgentPage() {
         streaming: true,
       }]);
 
-      const done = await agentApi.chatStream(question, history, visionContext, {
+      const chatStream = agentApi.chatStream as (
+        message: string,
+        history: Array<{ role: string; content: string }>,
+        visionContext: string,
+        handlers: ChatStreamHandlers,
+        context: Record<string, unknown>,
+      ) => Promise<ChatDone>;
+
+      const done = await chatStream(question, history, visionContext, {
         signal: controller.signal,
         onRound: ({ round }) => {
           clearLiveBuffer();
@@ -254,7 +282,7 @@ export default function AgentPage() {
           clearLiveBuffer();
           updateStreamingMessage((m) => ({
             ...m,
-            thoughts: [...m.thoughts, { round, content: thought }],
+            thoughts: [...(m.thoughts ?? []), { round, content: thought }],
             liveThought: '',
             liveThoughtRound: null,
           }));
@@ -262,7 +290,7 @@ export default function AgentPage() {
         onToolStarted: ({ round, tool, arguments: args }) => {
           updateStreamingMessage((m) => ({
             ...m,
-            toolCalls: [...m.toolCalls, {
+            toolCalls: [...(m.toolCalls ?? []), {
               round,
               tool,
               arguments: args,
@@ -273,7 +301,7 @@ export default function AgentPage() {
         },
         onToolFinished: ({ round, tool, arguments: args, resultSummary, elapsedMs }) => {
           updateStreamingMessage((m) => {
-            const calls = [...m.toolCalls];
+            const calls: ToolCallTrace[] = [...(m.toolCalls ?? [])];
             let index = -1;
             for (let i = calls.length - 1; i >= 0; i -= 1) {
               if (calls[i].round === round && calls[i].tool === tool && calls[i].elapsedMs == null) {
@@ -377,7 +405,7 @@ export default function AgentPage() {
     }
   };
 
-  const handleFiles = async (event) => {
+  const handleFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files || []);
     event.target.value = '';
     if (picked.length === 0) return;
@@ -388,7 +416,7 @@ export default function AgentPage() {
     }
 
     setError('');
-    const prepared = [];
+    const prepared: PhotoAttachment[] = [];
     for (const file of picked) {
       try {
         const compressed = await compressImage(file);
@@ -402,7 +430,7 @@ export default function AgentPage() {
     }
   };
 
-  const handleDocument = async (event) => {
+  const handleDocument = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -418,7 +446,7 @@ export default function AgentPage() {
     setError('');
     try {
       const data = await agentApi.document(file);
-      const attachment = {
+      const attachment: ChatDocument = {
         documentId: data.id,
         filename: data.filename || file.name,
         preview: data.preview || '',
@@ -442,7 +470,7 @@ export default function AgentPage() {
     }
   };
 
-  const removeAttachment = (index) => {
+  const removeAttachment = (index: number) => {
     setAttachments((prev) => {
       const target = prev[index];
       if (target) URL.revokeObjectURL(target.preview);
@@ -450,14 +478,14 @@ export default function AgentPage() {
     });
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
     }
   };
 
-  const rateMessage = async (index, rating) => {
+  const rateMessage = async (index: number, rating: 'UP' | 'DOWN') => {
     if (!selectedId) return;
     try {
       await agentsApi.feedback(selectedId, { rating });
@@ -469,9 +497,9 @@ export default function AgentPage() {
     }
   };
 
-  const restoreDocument = (doc) => {
+  const restoreDocument = (doc: ChatDocument) => {
     if (!doc?.documentId) return;
-    const attachment = {
+    const attachment: ChatDocument = {
       documentId: doc.documentId,
       filename: doc.filename,
       charCount: doc.charCount || 0,
@@ -485,7 +513,7 @@ export default function AgentPage() {
     ].slice(-3));
   };
 
-  const removeDocument = (documentId) => {
+  const removeDocument = (documentId?: number) => {
     setDocAttachments((prev) => prev.filter((doc) => doc.documentId !== documentId));
   };
 
@@ -499,7 +527,7 @@ export default function AgentPage() {
     setError('');
   };
 
-  const notConfigured = !statusError && status && status.configured === false;
+  const notConfigured = !statusError && status?.configured === false;
   const canSend = !loading && !historyLoading && !notConfigured
     && (input.trim().length > 0 || attachments.length > 0 || docAttachments.length > 0);
 
@@ -604,13 +632,13 @@ export default function AgentPage() {
             <div key={i} className={`agent-msg agent-msg-${m.role}`}>
               <div className="agent-avatar">{m.role === 'user' ? '👨‍🌾' : '🤖'}</div>
               <div className="agent-bubble-wrap">
-                {m.images?.length > 0 && (
+                {m.images?.length ? (
                   <div className="agent-msg-images">
-                    {m.images.map((src) => (
+                    {m.images!.map((src) => (
                       <img key={src} src={src} alt="上传的作物照片" />
                     ))}
                   </div>
-                )}
+                ) : null}
 
                 {(m.documents?.length ? m.documents : m.document ? [m.document] : []).map((doc, docIndex) => (
                   doc.documentId ? (
@@ -629,7 +657,7 @@ export default function AgentPage() {
                 ))}
 
                 {m.role === 'assistant' && m.streaming
-                  && !(m.thoughts?.length > 0) && !(m.toolCalls?.length > 0)
+                  && !(m.thoughts?.length) && !(m.toolCalls?.length)
                   && !m.liveThought && !m.liveContent && (
                     <div className="agent-bubble agent-thinking">
                       <span className="agent-dot" />
@@ -642,7 +670,7 @@ export default function AgentPage() {
                   )}
 
                 {m.role === 'assistant' && (
-                  m.thoughts?.length > 0 || m.toolCalls?.length > 0 || m.liveThought
+                  Boolean(m.thoughts?.length) || Boolean(m.toolCalls?.length) || Boolean(m.liveThought)
                 ) && (
                   <AgentWorkTrace
                     thoughts={m.thoughts || []}
@@ -693,11 +721,11 @@ export default function AgentPage() {
                   </div>
                 )}
 
-                {!m.streaming && m.knowledgeUsed?.length > 0 && (
+                {!m.streaming && m.knowledgeUsed?.length ? (
                   <div className="agent-knowledge-refs">
-                    📚 参考知识：{m.knowledgeUsed.map((ref) => ref.title).join('、')}
+                    📚 参考知识：{m.knowledgeUsed!.map((ref) => ref.title).join('、')}
                   </div>
-                )}
+                ) : null}
 
                 {m.truncated && (
                   <div className="agent-note">
@@ -860,7 +888,7 @@ export default function AgentPage() {
 }
 
 /** 图片识别结果卡片 */
-function VisionCard({ vision }) {
+function VisionCard({ vision }: { vision: VisionResult }) {
   const [open, setOpen] = useState(false);
   const healthClass = vision.healthStatus?.includes('异常')
     ? 'warn'
@@ -880,9 +908,9 @@ function VisionCard({ vision }) {
         </span>
       </div>
 
-      {vision.issues?.length > 0 ? (
+      {vision.issues?.length ? (
         <div className="agent-vision-issues">
-          {vision.issues.map((issue, index) => (
+          {vision.issues!.map((issue, index) => (
             <div key={index} className="agent-vision-issue">
               <div className="agent-vision-issue-head">
                 <strong>{issue.name || '未知问题'}</strong>
@@ -905,7 +933,7 @@ function VisionCard({ vision }) {
         <p className="agent-vision-summary">{vision.overallAssessment}</p>
       )}
 
-      {vision.careAdvice?.length > 0 && (
+      {vision.careAdvice?.length ? (
         <>
           <button
             type="button"
@@ -916,18 +944,29 @@ function VisionCard({ vision }) {
           </button>
           {open && (
             <ul className="agent-vision-advice">
-              {vision.careAdvice.map((advice, index) => (
+              {vision.careAdvice!.map((advice, index) => (
                 <li key={index}>{advice}</li>
               ))}
             </ul>
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }
 
 /** 工作轨迹：每轮思考 + 工具调用，按时间顺序展示 */
+interface AgentWorkTraceProps {
+  thoughts?: ThoughtTrace[];
+  calls?: ToolCallTrace[];
+  liveThought?: string;
+  liveThoughtRound?: number | null;
+  liveContent?: string;
+  streaming?: boolean;
+  currentRound?: number | null;
+  defaultOpen?: boolean;
+}
+
 function AgentWorkTrace({
   thoughts = [],
   calls = [],
@@ -937,7 +976,7 @@ function AgentWorkTrace({
   streaming = false,
   currentRound = null,
   defaultOpen = false,
-}) {
+}: AgentWorkTraceProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   const rounds = [...new Set([
@@ -987,7 +1026,8 @@ function AgentWorkTrace({
               ))}
 
               {calls.filter((c) => (c.round ?? 1) === round).map((call, index) => {
-                const meta = TOOL_LABELS[call.tool] || { icon: '🔧', label: call.tool };
+                const labels = TOOL_LABELS as Record<string, { icon: string; label: string }>;
+                const meta = labels[call.tool] || { icon: '🔧', label: call.tool };
                 return (
                   <details className="agent-toolcall" key={`c-${index}`}>
                     <summary>

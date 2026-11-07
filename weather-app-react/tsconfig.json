@@ -5,8 +5,8 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    // 存量页面仍有较多隐式 any / null 问题，先按模块逐步收紧；
-    // 新模块与核心组件用 tsconfig.strict.json 做严格检查
+    // 默认构建配置保留宽松选项，兼容 allowJs 的少量工具文件；
+    // 全部 TS/TSX 页面与组件由 tsconfig.strict.json 做 strict 检查（CI 必过）
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,

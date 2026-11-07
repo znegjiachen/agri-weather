@@ -1,6 +1,30 @@
 import { displayTemp } from '../utils/weatherCodes';
 
-const details = [
+interface DetailsCurrent {
+  relative_humidity_2m?: number | null;
+  wind_speed_10m?: number | null;
+  apparent_temperature?: number | null;
+  visibility?: number | null;
+  surface_pressure?: number | null;
+  uv_index?: number | null;
+}
+
+type DetailKey = keyof DetailsCurrent;
+
+interface DetailConfig {
+  key: DetailKey;
+  label: string;
+  suffix?: string;
+  isTemp?: boolean;
+  format?: (v: number) => string;
+}
+
+interface WeatherDetailsProps {
+  current: DetailsCurrent;
+  isCelsius: boolean;
+}
+
+const details: DetailConfig[] = [
   { key: 'relative_humidity_2m', label: '💧 湿度', suffix: '%' },
   { key: 'wind_speed_10m', label: '💨 风速', suffix: ' km/h' },
   { key: 'apparent_temperature', label: '🌡️ 体感', suffix: '°', isTemp: true },
@@ -21,15 +45,15 @@ const details = [
   },
 ];
 
-export default function WeatherDetails({ current, isCelsius }) {
+export default function WeatherDetails({ current, isCelsius }: WeatherDetailsProps) {
   return (
     <div className="weather-details">
       {details.map((d) => {
         let value;
         if (d.format) {
-          value = d.format(current[d.key]);
+          value = d.format(current[d.key]!);
         } else if (d.isTemp) {
-          value = `${displayTemp(current[d.key], isCelsius)}${d.suffix}`;
+          value = `${displayTemp(current[d.key]!, isCelsius)}${d.suffix}`;
         } else {
           value = `${current[d.key]}${d.suffix}`;
         }

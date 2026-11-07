@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import type { ChangeEvent, KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { agent as agentApi } from '../api';
@@ -9,6 +10,18 @@ import { formatVision } from '../utils/agentVision';
 import { TOOL_LABELS } from '../utils/agentTools';
 import { getFieldContext } from '../utils/fieldContext';
 import { errorMessage } from '../utils/errorMessage';
+import type {
+  AgentHistory,
+  AgentStatus,
+  ChatDocument,
+  ChatDone,
+  ChatMessage,
+  ChatStreamHandlers,
+  FieldContext,
+  PhotoAttachment,
+  VisionResult,
+  VoiceInput,
+} from '../types/agent';
 
 const SUGGESTIONS = [
   '明天适合打药吗？',
@@ -21,7 +34,7 @@ const DOCK_DEFAULT_WIDTH = 360;
 const DOCK_MIN_WIDTH = 300;
 const DOCK_MAX_WIDTH = 600;
 
-function clampDockWidth(value) {
+function clampDockWidth(value: number): number {
   // 给左侧主内容至少留 400px，避免在 1200 附近把驾驶舱挤扁
   const available = typeof window !== 'undefined' ? window.innerWidth - 240 - 400 : DOCK_MAX_WIDTH;
   const max = Math.min(DOCK_MAX_WIDTH, Math.max(DOCK_MIN_WIDTH, available));
@@ -34,7 +47,7 @@ function clampDockWidth(value) {
  * 与 /agent 共用 AgentContext 里的 messages，所以两边看到的是同一段对话；
  * 这里做紧凑版渲染（工具轨迹 + 回答），照片识别结果用一行摘要展示。
  */
-export default function AgentDock({ defaultCollapsed = false }) {
+export default function AgentDock({ defaultCollapsed = false }: { defaultCollapsed?: boolean }) {
   const navigate = useNavigate();
 
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -47,13 +60,13 @@ export default function AgentDock({ defaultCollapsed = false }) {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState(null);
-  const [toolCount, setToolCount] = useState(null);
-  const [attachments, setAttachments] = useState([]);
-  const [docAttachments, setDocAttachments] = useState([]);
+  const [status, setStatus] = useState<AgentStatus | null>(null);
+  const [toolCount, setToolCount] = useState<number | null>(null);
+  const [attachments, setAttachments] = useState<PhotoAttachment[]>([]);
+  const [docAttachments, setDocAttachments] = useState<ChatDocument[]>([]);
   const [docLoading, setDocLoading] = useState(false);
   // 首页可能先于浮窗挂载，初始化时补读一次共享上下文
-  const [field, setField] = useState(() => getFieldContext());
+  const [field, setField] = useState<FieldContext | null>(() => getFieldContext() as FieldContext | null);
 
   // 一块地一个智能体 → 一个独立会话，并从后端恢复历史
   const {
@@ -63,26 +76,29 @@ export default function AgentDock({ defaultCollapsed = false }) {
     loading: historyLoading,
     error: historyError,
     retry: retryHistory,
-  } = useAgentHistory(field?.agentId);
+  } = useAgentHistory(field?.agentId) as AgentHistory;
 
-  const listRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const docInputRef = useRef(null);
-  const attachmentsRef = useRef(attachments);
-  const liveRef = useRef({ content: '', timer: null });
-  const abortRef = useRef(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const docInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentsRef = useRef<PhotoAttachment[]>(attachments);
+  const liveRef = useRef<{ content: string; timer: ReturnType<typeof setTimeout> | null }>({
+    content: '',
+    timer: null,
+  });
+  const abortRef = useRef<AbortController | null>(null);
   const [statusError, setStatusError] = useState(false);
 
   const voice = useVoiceInput({
     asrConfigured: status?.asrConfigured,
-    onText: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
+    onText: (text: string) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
     onError: setError,
-  });
+  }) as VoiceInput;
 
   // 窗口缩到窄屏时自动收起，避免浮窗把主内容挤扁；放大后不强制展开
   useEffect(() => {
     const query = window.matchMedia('(max-width: 1599px)');
-    const onChange = (event) => {
+    const onChange = (event: MediaQueryListEvent) => {
       if (event.matches) setCollapsed(true);
     };
     query.addEventListener('change', onChange);
@@ -102,16 +118,16 @@ export default function AgentDock({ defaultCollapsed = false }) {
   useEffect(() => {
     let alive = true;
     agentApi.status()
-      .then((data) => { if (alive) { setStatus(data); setStatusError(false); } })
+      .then((data) => { if (alive) { setStatus(data as AgentStatus); setStatusError(false); } })
       .catch(() => { if (alive) setStatusError(true); });
-    agentApi.tools().then((tools) => { if (alive) setToolCount(tools.length); }).catch(() => {});
+    agentApi.tools().then((tools: unknown[]) => { if (alive) setToolCount(tools.length); }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
   const retryStatus = () => {
     setStatusError(false);
     agentApi.status()
-      .then((data) => { setStatus(data); setStatusError(false); })
+      .then((data) => { setStatus(data as AgentStatus); setStatusError(false); })
       .catch(() => setStatusError(true));
   };
 
@@ -119,7 +135,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
 
   // 首页选中的地块作为对话上下文（仅本地，不上报）
   useEffect(() => {
-    const onField = (event) => setField(event.detail);
+    const onField = (event: Event) => setField((event as CustomEvent<FieldContext | null>).detail);
     window.addEventListener('wentin:field', onField);
     return () => window.removeEventListener('wentin:field', onField);
   }, []);
@@ -136,7 +152,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const startResize = (event) => {
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = width;
@@ -145,7 +161,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
 
-    const onMove = (moveEvent) => {
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
       // 面板贴在右侧：向左拖变宽，向右拖变窄
       setWidth(clampDockWidth(startWidth + (startX - moveEvent.clientX)));
     };
@@ -161,7 +177,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     window.addEventListener('pointerup', onUp);
   };
 
-  const handleResizeKeyDown = (event) => {
+  const handleResizeKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
       setWidth((w) => clampDockWidth(w + 24));
@@ -184,7 +200,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     };
   }, [messages, loading, analyzing, collapsed]);
 
-  const updateStreaming = (updater) => {
+  const updateStreaming = (updater: (message: ChatMessage) => ChatMessage) => {
     setMessages((prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i -= 1) {
@@ -215,12 +231,12 @@ export default function AgentDock({ defaultCollapsed = false }) {
     live.content = '';
   };
 
-  const send = async (text = undefined) => {
+  const send = async (text?: string) => {
     const content = (text ?? input).trim();
     const files = attachments.map((item) => item.file);
     const previews = attachments.map((item) => item.preview);
     const docsForTurn = docAttachments;
-    const notConfigured = !statusError && status && status.configured === false;
+    const notConfigured = !statusError && status?.configured === false;
     if ((!content && files.length === 0 && docsForTurn.length === 0)
       || loading || historyLoading || notConfigured) return;
 
@@ -259,7 +275,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     abortRef.current = controller;
 
     try {
-      let vision = null;
+      let vision: VisionResult | null = null;
       let visionContext = '';
 
       if (files.length > 0) {
@@ -283,7 +299,15 @@ export default function AgentDock({ defaultCollapsed = false }) {
         streaming: true,
       }]);
 
-      const done = await agentApi.chatStream(question, history, visionContext, {
+      const chatStream = agentApi.chatStream as (
+        message: string,
+        history: Array<{ role: string; content: string }>,
+        visionContext: string,
+        handlers: ChatStreamHandlers,
+        context: Record<string, unknown>,
+      ) => Promise<ChatDone>;
+
+      const done = await chatStream(question, history, visionContext, {
         signal: controller.signal,
         onContentDelta: ({ delta }) => {
           liveRef.current.content += delta;
@@ -403,7 +427,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     }
   };
 
-  const handleFiles = async (event) => {
+  const handleFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files || []);
     event.target.value = '';
     if (picked.length === 0) return;
@@ -412,7 +436,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
       return;
     }
     setError('');
-    const prepared = [];
+    const prepared: PhotoAttachment[] = [];
     for (const file of picked) {
       try {
         const compressed = await compressImage(file);
@@ -426,7 +450,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     }
   };
 
-  const handleDocument = async (event) => {
+  const handleDocument = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -442,7 +466,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     setError('');
     try {
       const data = await agentApi.document(file);
-      const attachment = {
+      const attachment: ChatDocument = {
         documentId: data.id,
         filename: data.filename || file.name,
         preview: data.preview || '',
@@ -466,7 +490,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     }
   };
 
-  const removeAttachment = (index) => {
+  const removeAttachment = (index: number) => {
     setAttachments((prev) => {
       const target = prev[index];
       if (target) URL.revokeObjectURL(target.preview);
@@ -474,9 +498,9 @@ export default function AgentDock({ defaultCollapsed = false }) {
     });
   };
 
-  const restoreDocument = (doc) => {
+  const restoreDocument = (doc: ChatDocument) => {
     if (!doc?.documentId) return;
-    const attachment = {
+    const attachment: ChatDocument = {
       documentId: doc.documentId,
       filename: doc.filename,
       charCount: doc.charCount || 0,
@@ -490,7 +514,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     ].slice(-3));
   };
 
-  const removeDocument = (documentId) => {
+  const removeDocument = (documentId?: number) => {
     setDocAttachments((prev) => prev.filter((doc) => doc.documentId !== documentId));
   };
 
@@ -503,7 +527,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
     setError('');
   };
 
-  const notConfigured = !statusError && status && status.configured === false;
+  const notConfigured = !statusError && status?.configured === false;
   const canSend = !loading && !historyLoading && !notConfigured
     && (input.trim().length > 0 || attachments.length > 0 || docAttachments.length > 0);
 
@@ -624,13 +648,13 @@ export default function AgentDock({ defaultCollapsed = false }) {
 
         {messages.map((m, i) => (
           <div key={i} className={`agent-dock-msg ${m.role}`}>
-            {m.images?.length > 0 && (
+            {m.images?.length ? (
               <div className="agent-dock-images">
-                {m.images.map((src) => (
+                {m.images!.map((src) => (
                   <img key={src} src={src} alt="上传的作物照片" />
                 ))}
               </div>
-            )}
+            ) : null}
 
             {m.role === 'user' && (
               <>
@@ -662,10 +686,11 @@ export default function AgentDock({ defaultCollapsed = false }) {
 
             {m.role === 'assistant' && (
               <>
-                {m.toolCalls?.length > 0 && (
+                {m.toolCalls?.length ? (
                   <div className="agent-dock-tools">
-                    {m.toolCalls.map((call, index) => {
-                      const meta = TOOL_LABELS[call.tool] || { icon: '🔧', label: call.tool };
+                    {m.toolCalls!.map((call, index) => {
+                      const labels = TOOL_LABELS as Record<string, { icon: string; label: string }>;
+                      const meta = labels[call.tool] || { icon: '🔧', label: call.tool };
                       return (
                         <span
                           className={`agent-dock-tool ${call.elapsedMs == null ? 'running' : ''}`}
@@ -681,7 +706,7 @@ export default function AgentDock({ defaultCollapsed = false }) {
                       );
                     })}
                   </div>
-                )}
+                ) : null}
 
                 {m.streaming && !m.liveContent && (
                   <div className="agent-dock-thinking">
@@ -702,11 +727,11 @@ export default function AgentDock({ defaultCollapsed = false }) {
                   </div>
                 )}
 
-                {!m.streaming && m.knowledgeUsed?.length > 0 && (
+                {!m.streaming && m.knowledgeUsed?.length ? (
                   <div className="agent-dock-refs">
-                    📚 参考知识：{m.knowledgeUsed.map((ref) => ref.title).join('、')}
+                    📚 参考知识：{m.knowledgeUsed!.map((ref) => ref.title).join('、')}
                   </div>
-                )}
+                ) : null}
 
                 {m.truncated && (
                   <div className="agent-dock-note">

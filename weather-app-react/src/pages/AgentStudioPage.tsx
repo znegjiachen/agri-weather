@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { agent as agentApi, agents as agentsApi } from '../api';
 import { TOOL_LABELS } from '../utils/agentTools';
@@ -6,9 +6,78 @@ import { formatCommunityTime } from '../utils/date';
 import { publishFieldContext } from '../utils/fieldContext';
 import { errorMessage } from '../utils/errorMessage';
 
+/** 智能体列表项（与后端 AgentSummary 对齐） */
+interface AgentListItem {
+  id: number;
+  name?: string;
+  farmlandId?: number;
+  farmlandName?: string;
+  cropName?: string;
+  avatar?: string;
+  docCount?: number;
+  chunkCount?: number;
+  personaCustom?: boolean;
+}
+
+/** 智能体详情（与后端 AgentDetail 对齐） */
+interface AgentDetail extends AgentListItem {
+  welcome?: string;
+  persona?: string;
+  builtinKnowledge?: string;
+  enabledTools?: string[];
+}
+
+/** 人设编辑表单 */
+interface AgentForm {
+  name: string;
+  welcome: string;
+  persona: string;
+  avatar: string;
+  enabledTools: string[];
+}
+
+/** AI 运行指标（/api/agent/metrics） */
+interface AgentMetrics {
+  chatRequests?: number;
+  successRate?: number | null;
+  avgLatencyMs?: number | null;
+  toolCalls?: number;
+  knowledgeHits?: number;
+  documentTurns?: number;
+  feedbackUp?: number;
+  feedbackDown?: number;
+  push?: { sent?: number; failed?: number } | null;
+}
+
+/** 智能体运行状态（/api/agent/status） */
+interface RuntimeStatus {
+  embeddingMode?: string;
+  embeddingModel?: string;
+}
+
+/** 知识库文档（与后端 KnowledgeDocView 对齐） */
+interface KnowledgeDoc {
+  id: number;
+  title?: string;
+  sourceType?: string;
+  originalFilename?: string;
+  byteSize?: number;
+  charCount?: number;
+  chunkCount?: number;
+  createdAt?: string;
+}
+
+/** 检索测试命中片段（与后端 KnowledgeSearchHit 对齐） */
+interface KnowledgeHit {
+  docId: number;
+  title?: string;
+  snippet?: string;
+  score: number;
+}
+
 const ALL_TOOLS = Object.entries(TOOL_LABELS).map(([name, meta]) => ({ name, ...meta }));
 
-function fileIcon(doc) {
+function fileIcon(doc: { originalFilename?: string | null }) {
   const name = (doc.originalFilename || '').toLowerCase();
   if (name.endsWith('.pdf')) return '📕';
   if (name.endsWith('.doc') || name.endsWith('.docx')) return '📘';
@@ -24,19 +93,19 @@ function fileIcon(doc) {
  */
 export default function AgentStudioPage() {
   const navigate = useNavigate();
-  const [agents, setAgents] = useState([]);
+  const [agents, setAgents] = useState<AgentListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [agentQuery, setAgentQuery] = useState('');
   const [dragActive, setDragActive] = useState(false);
 
-  const [selectedId, setSelectedId] = useState(null);
-  const [detail, setDetail] = useState(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<AgentDetail | null>(null);
   const [detailError, setDetailError] = useState('');
   const [tab, setTab] = useState('persona');
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<AgentForm>({
     name: '',
     welcome: '',
     persona: '',
@@ -46,16 +115,16 @@ export default function AgentStudioPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
 
-  const [runtimeStatus, setRuntimeStatus] = useState(null);
-  const [metrics, setMetrics] = useState(null);
+  const [runtimeStatus, setRuntimeStatus] = useState<RuntimeStatus | null>(null);
+  const [metrics, setMetrics] = useState<AgentMetrics | null>(null);
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState('');
 
-  const [docs, setDocs] = useState(null);
+  const [docs, setDocs] = useState<KnowledgeDoc[] | null>(null);
   const [docsVersion, setDocsVersion] = useState(0);
   const [kbError, setKbError] = useState('');
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [showTextForm, setShowTextForm] = useState(false);
   const [textTitle, setTextTitle] = useState('');
@@ -63,7 +132,7 @@ export default function AgentStudioPage() {
   const [adding, setAdding] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState(null);
+  const [searchResults, setSearchResults] = useState<KnowledgeHit[] | null>(null);
   const [searching, setSearching] = useState(false);
 
   const reloadList = useCallback(async () => {
@@ -91,7 +160,7 @@ export default function AgentStudioPage() {
     agentsApi.list()
       .then((data) => {
         if (!alive) return;
-        const list = Array.isArray(data) ? data : [];
+        const list: AgentListItem[] = Array.isArray(data) ? data : [];
         setAgents(list);
         setSelectedId((prev) => prev ?? list[0]?.id ?? null);
       })
@@ -140,7 +209,7 @@ export default function AgentStudioPage() {
     return () => { alive = false; };
   }, [selectedId, tab, docsVersion]);
 
-  const selectAgent = (id) => {
+  const selectAgent = (id: number) => {
     if (id === selectedId) return;
     setSelectedId(id);
     setDetail(null);
@@ -156,7 +225,7 @@ export default function AgentStudioPage() {
 
   const dirty = useMemo(() => {
     if (!detail) return false;
-    const normalize = (value) => (value || '').trim();
+    const normalize = (value: string | undefined) => (value || '').trim();
     const detailTools = Array.isArray(detail.enabledTools)
       ? [...detail.enabledTools].sort()
       : ALL_TOOLS.map((tool) => tool.name).sort();
@@ -205,7 +274,8 @@ export default function AgentStudioPage() {
     setListError('');
     try {
       const data = await agentsApi.sync();
-      setAgents(Array.isArray(data) ? data : []);
+      const list: AgentListItem[] = Array.isArray(data) ? data : [];
+      setAgents(list);
       if (!selectedId && data?.length) setSelectedId(data[0].id);
     } catch (e) {
       setListError(errorMessage(e, '同步失败'));
@@ -291,7 +361,7 @@ export default function AgentStudioPage() {
     }
   };
 
-  const uploadFile = async (file) => {
+  const uploadFile = async (file: File) => {
     if (!file || !selectedId) return;
     if (!/\.(txt|md|markdown|pdf|doc|docx)$/i.test(file.name)) {
       setKbError('目前支持 TXT、Markdown、PDF、Word（doc/docx）');
@@ -313,20 +383,20 @@ export default function AgentStudioPage() {
     }
   };
 
-  const handleFile = (event) => {
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (file) uploadFile(file);
   };
 
-  const handleDrop = (event) => {
+  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setDragActive(false);
     const file = event.dataTransfer.files?.[0];
     if (file) uploadFile(file);
   };
 
-  const toggleTool = (name) => {
+  const toggleTool = (name: string) => {
     setForm((prev) => ({
       ...prev,
       enabledTools: prev.enabledTools.includes(name)
@@ -335,7 +405,7 @@ export default function AgentStudioPage() {
     }));
   };
 
-  const setAllTools = (on) => {
+  const setAllTools = (on: boolean) => {
     setForm((prev) => ({
       ...prev,
       enabledTools: on ? ALL_TOOLS.map((tool) => tool.name) : [],
@@ -357,7 +427,7 @@ export default function AgentStudioPage() {
     }
   };
 
-  const handleDeleteDoc = async (doc) => {
+  const handleDeleteDoc = async (doc: KnowledgeDoc) => {
     if (!selectedId) return;
     if (!window.confirm(`删除知识《${doc.title}》？`)) return;
     setKbError('');

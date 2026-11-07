@@ -1,19 +1,121 @@
 import { useEffect, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { agent as agentApi, crops as cropsApi, farmlands as farmlandApi } from '../api';
 import { errorMessage } from '../utils/errorMessage';
+import type { Farmland } from '../types/farmland';
 
-const SEASON_STATUS = { PLANTED: '在种', HARVESTED: '已收获', FALLOW: '休耕' };
+const SEASON_STATUS: Record<string, string> = { PLANTED: '在种', HARVESTED: '已收获', FALLOW: '休耕' };
 const OPERATION_TYPES = ['施肥', '打药', '灌溉', '播种', '除草', '其他'];
-const TASK_TYPES = {
+const TASK_TYPES: Record<string, string> = {
   SOW: '播种', FERTILIZE: '施肥', SPRAY: '打药',
   IRRIGATE: '灌溉', HARVEST: '收获', OTHER: '其他',
 };
+
+/** 作物下拉项 */
+interface CropOption {
+  id: number;
+  cropName: string;
+}
+
+/** 当前生育阶段接口返回 */
+interface CropStage {
+  stageName?: string;
+}
+
+/** 地块上的一个种植季 */
+interface Season {
+  id: number;
+  cropId: number | null;
+  seasonName?: string | null;
+  plantDate?: string | null;
+  expectedHarvestDate?: string | null;
+  harvestDate?: string | null;
+  status: string;
+  notes?: string | null;
+}
+
+/** 一条农事操作记录 */
+interface FarmOperation {
+  id: number;
+  operationType: string;
+  operationDate: string;
+  detail?: string | null;
+  fertilizer?: string | null;
+  pesticide?: string | null;
+  operator?: string | null;
+  notes?: string | null;
+}
+
+/** 计划任务（含方案解析出的临时任务） */
+interface PlanTask {
+  id: number;
+  title: string;
+  taskType: string;
+  plannedDate?: string | null;
+  actualDate?: string | null;
+  status?: string;
+  sourceName?: string | null;
+  sourceQuote?: string | null;
+}
+
+interface TaskSummary {
+  completionRate: number;
+  onTimeRate: number;
+  pending: number;
+  overdue: number;
+}
+
+interface TaskGroup {
+  date: string;
+  items: PlanTask[];
+}
+
+/** 完成本季后返回的新季任务信息 */
+interface CompleteSeasonResult {
+  newSeason?: { seasonName?: string | null } | null;
+  tasksCreated: number;
+  warning?: string | null;
+}
+
+interface SeasonFormState {
+  seasonName: string;
+  cropId: string;
+  plantDate: string;
+  expectedHarvestDate: string;
+  harvestDate: string;
+  status: string;
+  notes: string;
+}
+
+interface OperationFormState {
+  operationType: string;
+  operationDate: string;
+  detail: string;
+  fertilizer: string;
+  pesticide: string;
+  operator: string;
+  notes: string;
+}
+
+interface CompleteFormState {
+  cropId: string;
+  plantDate: string;
+  seasonName: string;
+  planDocumentId: number | null;
+  planName: string;
+}
+
+interface FarmlandRecordsModalProps {
+  farmland: Farmland;
+  cropList?: CropOption[];
+  onClose: () => void;
+}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function planDateLabel(value) {
+function planDateLabel(value: string | null | undefined) {
   if (!value) return '日期待定';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
@@ -28,14 +130,14 @@ function planDateLabel(value) {
   return `${base} · 已逾期 ${-diff} 天`;
 }
 
-function groupTasksByDate(tasks) {
+function groupTasksByDate(tasks: PlanTask[]): TaskGroup[] {
   const sorted = [...tasks].sort((a, b) => {
     if (!a.plannedDate && !b.plannedDate) return a.id - b.id;
     if (!a.plannedDate) return 1;
     if (!b.plannedDate) return -1;
     return a.plannedDate.localeCompare(b.plannedDate) || a.id - b.id;
   });
-  const groups = [];
+  const groups: TaskGroup[] = [];
   sorted.forEach((task) => {
     const key = task.plannedDate || '';
     let group = groups[groups.length - 1];
@@ -49,16 +151,20 @@ function groupTasksByDate(tasks) {
 }
 
 /** 地块季节历史 + 农事记录 */
-export default function FarmlandRecordsModal({ farmland, cropList = [], onClose }) {
+export default function FarmlandRecordsModal({
+  farmland,
+  cropList = [],
+  onClose,
+}: FarmlandRecordsModalProps) {
   const [tab, setTab] = useState('seasons');
-  const [seasons, setSeasons] = useState(null);
-  const [seasonStage, setSeasonStage] = useState({});
-  const [operations, setOperations] = useState(null);
-  const [pendingTasks, setPendingTasks] = useState([]);
-  const [tasks, setTasks] = useState(null);
-  const [taskSummary, setTaskSummary] = useState(null);
-  const [completingSeason, setCompletingSeason] = useState(null);
-  const [completeForm, setCompleteForm] = useState({
+  const [seasons, setSeasons] = useState<Season[] | null>(null);
+  const [seasonStage, setSeasonStage] = useState<Record<number, string>>({});
+  const [operations, setOperations] = useState<FarmOperation[] | null>(null);
+  const [pendingTasks, setPendingTasks] = useState<PlanTask[]>([]);
+  const [tasks, setTasks] = useState<PlanTask[] | null>(null);
+  const [taskSummary, setTaskSummary] = useState<TaskSummary | null>(null);
+  const [completingSeason, setCompletingSeason] = useState<Season | null>(null);
+  const [completeForm, setCompleteForm] = useState<CompleteFormState>({
     cropId: '',
     plantDate: today(),
     seasonName: '',
@@ -66,14 +172,14 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     planName: '',
   });
   const [completePlanLoading, setCompletePlanLoading] = useState(false);
-  const [completeResult, setCompleteResult] = useState(null);
-  const [planPreview, setPlanPreview] = useState(null);
+  const [completeResult, setCompleteResult] = useState<CompleteSeasonResult | null>(null);
+  const [planPreview, setPlanPreview] = useState<PlanTask[] | null>(null);
   const [planSourceName, setPlanSourceName] = useState('');
   const [planLoading, setPlanLoading] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const [seasonForm, setSeasonForm] = useState({
+  const [seasonForm, setSeasonForm] = useState<SeasonFormState>({
     seasonName: '',
     cropId: farmland?.cropId ? String(farmland.cropId) : '',
     plantDate: '',
@@ -82,7 +188,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     status: 'PLANTED',
     notes: '',
   });
-  const [opForm, setOpForm] = useState({
+  const [opForm, setOpForm] = useState<OperationFormState>({
     operationType: '施肥',
     operationDate: today(),
     detail: '',
@@ -92,29 +198,32 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     notes: '',
   });
 
-  const cropName = (id) => cropList.find((crop) => crop.id === id)?.cropName || '未选择作物';
+  const cropName = (id: number | null) =>
+    cropList.find((crop) => crop.id === id)?.cropName || '未选择作物';
 
   const load = async () => {
     setError('');
     try {
       if (tab === 'seasons') {
-        const list = await farmlandApi.seasons.list(farmland.id);
+        const list = (await farmlandApi.seasons.list(farmland.id)) as Season[];
         setSeasons(list);
         // 按播种日期推算每个在种季节当前所处的生育阶段
-        const entries = await Promise.all(list.map(async (season) => {
+        const entries = await Promise.all(list.map(async (season): Promise<[number, string] | null> => {
           if (!season.cropId || !season.plantDate || season.status !== 'PLANTED') return null;
           try {
-            const stage = await cropsApi.currentStage(season.cropId, season.plantDate);
+            const stage = (await cropsApi.currentStage(season.cropId, season.plantDate)) as CropStage | null;
             return stage?.stageName ? [season.id, stage.stageName] : null;
           } catch {
             return null;
           }
         }));
-        setSeasonStage(Object.fromEntries(entries.filter(Boolean)));
+        setSeasonStage(Object.fromEntries(
+          entries.filter((entry): entry is [number, string] => entry !== null),
+        ));
       } else if (tab === 'operations') {
         const [operationList, taskList] = await Promise.all([
-          farmlandApi.farmOperations.list(farmland.id),
-          farmlandApi.tasks.list(farmland.id).catch(() => []),
+          farmlandApi.farmOperations.list(farmland.id) as Promise<FarmOperation[]>,
+          farmlandApi.tasks.list(farmland.id).catch(() => [] as PlanTask[]) as Promise<PlanTask[]>,
         ]);
         setOperations(operationList);
         setPendingTasks(
@@ -122,8 +231,8 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
         );
       } else {
         const [taskList, summary] = await Promise.all([
-          farmlandApi.tasks.list(farmland.id),
-          farmlandApi.tasks.summary(farmland.id),
+          farmlandApi.tasks.list(farmland.id) as Promise<PlanTask[]>,
+          farmlandApi.tasks.summary(farmland.id) as Promise<TaskSummary>,
         ]);
         setTasks(taskList);
         setTaskSummary(summary);
@@ -144,12 +253,12 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   }, [tab, farmland.id]);
 
   useEffect(() => {
-    const onKey = (event) => { if (event.key === 'Escape') onClose(); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const submitSeason = async (event) => {
+  const submitSeason = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError('');
@@ -178,7 +287,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const submitOperation = async (event) => {
+  const submitOperation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     setError('');
@@ -201,7 +310,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const removeSeason = async (id) => {
+  const removeSeason = async (id: number) => {
     if (!window.confirm('删除这条季节记录？')) return;
     try {
       await farmlandApi.seasons.remove(farmland.id, id);
@@ -211,7 +320,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const removeOperation = async (id) => {
+  const removeOperation = async (id: number) => {
     if (!window.confirm('删除这条农事记录？')) return;
     try {
       await farmlandApi.farmOperations.remove(farmland.id, id);
@@ -222,7 +331,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   };
 
   // 农事记录里直接完成计划任务，后台会同时生成一条农事操作
-  const completePendingTask = async (task) => {
+  const completePendingTask = async (task: PlanTask) => {
     setSaving(true);
     setError('');
     try {
@@ -235,7 +344,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const startCompleteSeason = (season) => {
+  const startCompleteSeason = (season: Season) => {
     setCompletingSeason(season);
     setCompleteResult(null);
     setError('');
@@ -260,7 +369,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   };
 
   // 新一季计划文档：这里只上传拿 documentId，解析在完成本季接口里做
-  const handleCompletePlanFile = async (event) => {
+  const handleCompletePlanFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -288,7 +397,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const submitCompleteSeason = async (event) => {
+  const submitCompleteSeason = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!completingSeason) return;
     if (!completeForm.cropId) {
@@ -319,7 +428,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const handlePlanFile = async (event) => {
+  const handlePlanFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -346,7 +455,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
   };
 
   const savePlanTasks = async () => {
-    if (!planPreview?.length) return;
+    if (!planPreview || planPreview.length === 0) return;
     setSaving(true);
     setError('');
     try {
@@ -364,7 +473,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const updateTask = async (task, status) => {
+  const updateTask = async (task: PlanTask, status: string) => {
     setSaving(true);
     setError('');
     try {
@@ -377,7 +486,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
     }
   };
 
-  const removeTask = async (taskId) => {
+  const removeTask = async (taskId: number) => {
     if (!window.confirm('删除这条计划任务？')) return;
     try {
       await farmlandApi.tasks.remove(farmland.id, taskId);
@@ -462,7 +571,7 @@ export default function FarmlandRecordsModal({ farmland, cropList = [], onClose 
                     <button
                       type="button"
                       className="records-danger"
-                      onClick={() => setPlanPreview((prev) => prev.filter((_, i) => i !== index))}
+                      onClick={() => setPlanPreview((prev) => (prev || []).filter((_, i) => i !== index))}
                     >
                       移除
                     </button>

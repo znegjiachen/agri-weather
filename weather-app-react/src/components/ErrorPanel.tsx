@@ -1,4 +1,8 @@
-export default function ErrorPanel({ onRetry }) {
+interface ErrorPanelProps {
+  onRetry: () => void;
+}
+
+export default function ErrorPanel({ onRetry }: ErrorPanelProps) {
   return (
     <div className="error glass">
       <p>无法获取天气数据，请检查城市名称或网络连接。</p>

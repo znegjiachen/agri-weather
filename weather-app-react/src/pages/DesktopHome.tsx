@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { farmlands, alerts as alertsApi, crops } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +8,14 @@ import { publishFieldContext, clearFieldContext } from '../utils/fieldContext';
 import ForecastTrend from '../components/ForecastTrend';
 import { alertLevelMeta, alertTypeMeta } from '../utils/alertMeta';
 import { errorMessage } from '../utils/errorMessage';
+import type { Farmland } from '../types/farmland';
+import type {
+  DailyWeather,
+  FarmlandAlert,
+  FarmTask,
+  FarmingAdvice,
+  WeatherData,
+} from '../types/weather';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -23,14 +32,14 @@ function todayLabel() {
   return `${now.getMonth() + 1}月${now.getDate()}日 ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`;
 }
 
-function clockLabel(value) {
+function clockLabel(value: string | number | Date | null | undefined) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
-function alertTimeLabel(value) {
+function alertTimeLabel(value: string | number | Date | null | undefined) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -41,21 +50,21 @@ function alertTimeLabel(value) {
     : date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 }
 
-function isToday(value) {
+function isToday(value: string | null | undefined) {
   if (!value) return false;
   const date = new Date(String(value).replace(' ', 'T'));
   if (Number.isNaN(date.getTime())) return false;
   return date.toDateString() === new Date().toDateString();
 }
 
-function shortDate(value) {
+function shortDate(value: string | null | undefined) {
   if (!value) return '';
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function num(value) {
+function num(value: unknown): number | null {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -63,21 +72,21 @@ function num(value) {
 /** 桌面端首页驾驶舱：地块天气 + 7 日趋势 + 预警 / 农事 / 地块概况 */
 export default function DesktopHome() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuth() as { user?: { username?: string } | null };
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [fields, setFields] = useState([]);
-  const [alertList, setAlertList] = useState([]);
+  const [fields, setFields] = useState<Farmland[]>([]);
+  const [alertList, setAlertList] = useState<FarmlandAlert[]>([]);
   const [unread, setUnread] = useState(0);
-  const [alertsCheckedAt, setAlertsCheckedAt] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [weatherMap, setWeatherMap] = useState({});
-  const [stageMap, setStageMap] = useState({});
-  const [advice, setAdvice] = useState([]);
-  const [todayTasks, setTodayTasks] = useState([]);
-  const [upcomingTasks, setUpcomingTasks] = useState([]);
-  const [completingTaskId, setCompletingTaskId] = useState(null);
+  const [alertsCheckedAt, setAlertsCheckedAt] = useState<Date | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [weatherMap, setWeatherMap] = useState<Record<number, WeatherData>>({});
+  const [stageMap, setStageMap] = useState<Record<number, string>>({});
+  const [advice, setAdvice] = useState<FarmingAdvice[]>([]);
+  const [todayTasks, setTodayTasks] = useState<FarmTask[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<FarmTask[]>([]);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [taskError, setTaskError] = useState('');
   // 渲染期间不直接读 Date.now（保持纯函数），进页面时固定一次
   const [mountedAt] = useState(() => Date.now());
@@ -101,13 +110,14 @@ export default function DesktopHome() {
           farmlands.tasks.upcoming(2).catch(() => []),
         ]);
         if (!alive) return;
-        setFields(fieldList);
-        setAlertList(alertData);
-        setUnread(unreadCount);
-        setTodayTasks(Array.isArray(taskList) ? taskList : []);
-        setUpcomingTasks(Array.isArray(upcomingList) ? upcomingList : []);
-        if (fieldList.length > 0) {
-          setSelectedId(fieldList[0].id);
+        const ownedFields = Array.isArray(fieldList) ? fieldList as Farmland[] : [];
+        setFields(ownedFields);
+        setAlertList(Array.isArray(alertData) ? alertData as FarmlandAlert[] : []);
+        setUnread(Number(unreadCount) || 0);
+        setTodayTasks(Array.isArray(taskList) ? taskList as FarmTask[] : []);
+        setUpcomingTasks(Array.isArray(upcomingList) ? upcomingList as FarmTask[] : []);
+        if (ownedFields.length > 0) {
+          setSelectedId(ownedFields[0].id);
         } else {
           clearFieldContext();
         }
@@ -127,18 +137,18 @@ export default function DesktopHome() {
 
     Promise.allSettled(fields.map((f) => farmlands.weather(f.id))).then((results) => {
       if (!alive) return;
-      const next = {};
+      const next: Record<number, WeatherData> = {};
       results.forEach((result, index) => {
-        if (result.status === 'fulfilled') next[fields[index].id] = result.value;
+        if (result.status === 'fulfilled') next[fields[index].id] = result.value as WeatherData;
       });
       setWeatherMap(next);
     });
 
     const withCrop = fields.filter((f) => f.cropId && f.plantDate);
-    Promise.allSettled(withCrop.map((f) => crops.currentStage(f.cropId, f.plantDate)))
+    Promise.allSettled(withCrop.map((f) => crops.currentStage(f.cropId!, f.plantDate!)))
       .then((results) => {
         if (!alive) return;
-        const next = {};
+        const next: Record<number, string> = {};
         results.forEach((result, index) => {
           if (result.status === 'fulfilled' && result.value?.stageName) {
             next[withCrop[index].id] = result.value.stageName;
@@ -155,13 +165,13 @@ export default function DesktopHome() {
     if (!selectedId) return undefined;
     let alive = true;
     farmlands.advice(selectedId)
-      .then((data) => { if (alive) setAdvice(Array.isArray(data) ? data : []); })
+      .then((data) => { if (alive) setAdvice(Array.isArray(data) ? data as FarmingAdvice[] : []); })
       .catch(() => { if (alive) setAdvice([]); });
     return () => { alive = false; };
   }, [selectedId]);
 
   // 完成今日待办：后台会同时写一条农事记录
-  const completeTodayTask = async (task) => {
+  const completeTodayTask = async (task: FarmTask) => {
     setCompletingTaskId(task.id);
     setTaskError('');
     try {
@@ -169,8 +179,8 @@ export default function DesktopHome() {
       const remaining = todayTasks.filter((item) => item.id !== task.id);
       setTodayTasks(remaining);
       if (remaining.length === 0) {
-        const list = await farmlands.tasks.upcoming(2).catch(() => []);
-        setUpcomingTasks(Array.isArray(list) ? list : []);
+        const list = await farmlands.tasks.upcoming(2).catch(() => [] as FarmTask[]);
+        setUpcomingTasks(Array.isArray(list) ? list as FarmTask[] : []);
       }
     } catch (e) {
       setTaskError(errorMessage(e, '任务更新失败'));
@@ -180,9 +190,9 @@ export default function DesktopHome() {
   };
 
   const selectedField = fields.find((f) => f.id === selectedId) || fields[0] || null;
-  const selectedWeather = selectedField ? weatherMap[selectedField.id] : null;
+  const selectedWeather: WeatherData | null = selectedField ? weatherMap[selectedField.id] ?? null : null;
   const current = selectedWeather?.current;
-  const daily = selectedWeather?.daily;
+  const daily: DailyWeather | undefined = selectedWeather?.daily;
   const currentInfo = current ? getWeatherInfo(current.weather_code) : null;
   const selectedCrop = selectedWeather?.cropName || '';
   const selectedStage = selectedField ? stageMap[selectedField.id] : '';
@@ -213,8 +223,8 @@ export default function DesktopHome() {
           alertsApi.unreadCount(),
         ]);
         if (alive) {
-          setAlertList(Array.isArray(data) ? data : []);
-          setUnread(count);
+          setAlertList(Array.isArray(data) ? data as FarmlandAlert[] : []);
+          setUnread(Number(count) || 0);
           setAlertsCheckedAt(new Date());
         }
       } catch {
@@ -231,7 +241,7 @@ export default function DesktopHome() {
   );
 
   const alertCounts = useMemo(() => {
-    const map = {};
+    const map: Record<number, number> = {};
     todayAlerts.forEach((a) => {
       if (!a.isHandled && a.farmlandId != null) {
         map[a.farmlandId] = (map[a.farmlandId] || 0) + 1;
@@ -257,10 +267,12 @@ export default function DesktopHome() {
       high: num(daily.temperature_2m_max?.[i]),
       low: num(daily.temperature_2m_min?.[i]),
       rain: num(daily.precipitation_sum?.[i]) ?? 0,
-    })).filter((d) => d.high != null && d.low != null);
+    })).filter((d): d is { date: string; high: number; low: number; rain: number } => (
+      d.high != null && d.low != null
+    ));
     if (days.length === 0) return [];
 
-    const notes = [];
+    const notes: Array<{ tone: string; label: string; text: string }> = [];
     const rainy = days.find((d) => d.rain >= 1);
     if (rainy) {
       notes.push({ tone: 'blue', label: getDayName(rainy.date), text: `降水 ${rainy.rain.toFixed(1)} mm` });
@@ -288,7 +300,14 @@ export default function DesktopHome() {
 
   // 按地块聚合：一块地的多条预警只占一张卡，避免同一时间刷屏
   const alertGroups = useMemo(() => {
-    const groups = new Map();
+    interface AlertGroup {
+      key: number | string;
+      farmlandName: string;
+      alerts: FarmlandAlert[];
+      top: FarmlandAlert;
+      latest: string | null | undefined;
+    }
+    const groups = new Map<number | string, AlertGroup>();
     todayAlerts.forEach((a) => {
       const key = a.farmlandId ?? a.farmlandName ?? a.id;
       let group = groups.get(key);
@@ -386,9 +405,9 @@ export default function DesktopHome() {
               <div className="dh-metrics">
                 <div className="dh-metric">
                   <span className="dh-metric-label">💨 风速</span>
-                  <b className={current?.wind_speed_10m > 8 ? 'warn' : ''}>
+                  <b className={(current?.wind_speed_10m ?? 0) > 8 ? 'warn' : ''}>
                     {current ? Number(current.wind_speed_10m).toFixed(1) : '--'}
-                    <small>km/h{current?.wind_speed_10m > 8 ? ' · 偏大' : ''}</small>
+                    <small>km/h{(current?.wind_speed_10m ?? 0) > 8 ? ' · 偏大' : ''}</small>
                   </b>
                 </div>
                 <div className="dh-metric">
@@ -425,12 +444,12 @@ export default function DesktopHome() {
                 </span>
               ) : (
                 <>
-                  {todayAdvice?.tasks?.length > 0 && (
+                  {todayAdvice?.tasks?.length ? (
                     <span className="dh-hero-foot-chip ok">适宜 {todayAdvice.tasks.join(' · ')}</span>
-                  )}
-                  {todayAdvice?.bans?.length > 0 && (
+                  ) : null}
+                  {todayAdvice?.bans?.length ? (
                     <span className="dh-hero-foot-chip warn">不宜 {todayAdvice.bans.join(' · ')}</span>
-                  )}
+                  ) : null}
                   {!todayAdvice?.tasks?.length && !todayAdvice?.bans?.length && (
                     <span className="dh-hero-foot-chip ok">今日无特殊限制，按计划作业即可</span>
                   )}
@@ -703,21 +722,28 @@ export default function DesktopHome() {
  * 地块切换下拉：自定义浮层替代原生 select，避免系统默认的蓝色高亮样式。
  * 支持点击外部 / Esc 关闭，方向键在选项间移动。
  */
-function FieldSelect({ fields, value, weatherMap, onChange }) {
+interface FieldSelectProps {
+  fields: Farmland[];
+  value: number;
+  weatherMap: Record<number, WeatherData>;
+  onChange: (id: number) => void;
+}
+
+function FieldSelect({ fields, value, weatherMap, onChange }: FieldSelectProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
-  const menuRef = useRef(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const current = fields.find((f) => f.id === value) || fields[0];
-  const labelOf = (field) => {
+  const labelOf = (field: Farmland) => {
     const crop = weatherMap[field.id]?.cropName;
     return `${field.fieldName}${crop ? ` · ${crop}` : ''}`;
   };
 
   useEffect(() => {
     if (!open) return undefined;
-    const onPointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    const onPointerDown = (event: globalThis.PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
@@ -728,12 +754,12 @@ function FieldSelect({ fields, value, weatherMap, onChange }) {
     requestAnimationFrame(() => menuRef.current?.querySelector('button')?.focus());
   };
 
-  const moveFocus = (event, step) => {
-    const options = Array.from(menuRef.current?.querySelectorAll('button') || []);
+  const moveFocus = (event: KeyboardEvent<HTMLDivElement>, step: number) => {
+    const options = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button') || []);
     if (options.length === 0) return;
-    const index = options.indexOf(document.activeElement);
+    const index = options.indexOf(document.activeElement as HTMLButtonElement);
     const next = index < 0 ? 0 : (index + step + options.length) % options.length;
-    (options[next] as HTMLElement).focus();
+    options[next].focus();
     event.preventDefault();
   };
 
@@ -767,7 +793,7 @@ function FieldSelect({ fields, value, weatherMap, onChange }) {
             if (event.key === 'ArrowUp') moveFocus(event, -1);
             if (event.key === 'Escape') {
               setOpen(false);
-              rootRef.current?.querySelector('.dh-field-trigger')?.focus();
+              rootRef.current?.querySelector<HTMLButtonElement>('.dh-field-trigger')?.focus();
             }
           }}
         >

@@ -3,10 +3,105 @@ import { crops, farmlands as farmlandApi } from '../api';
 import { getFieldContext } from '../utils/fieldContext';
 import { errorMessage } from '../utils/errorMessage';
 
-const round1 = (value) => Math.round(Number(value) * 10) / 10;
+/** 作物档案（与后端 CropInfo 对齐） */
+interface CropInfoItem {
+  id: number;
+  cropName?: string;
+  variety?: string;
+  growthCycleDays?: number | null;
+  suitableTempMin?: number | null;
+  suitableTempMax?: number | null;
+  suitableHumidityMin?: number | null;
+  suitableHumidityMax?: number | null;
+  sowingPeriod?: string | null;
+  sowingTempMin?: number | null;
+  sowingTempMax?: number | null;
+  sowingTempOptimalMin?: number | null;
+  sowingTempOptimalMax?: number | null;
+  frostSensitive?: boolean;
+  heatSensitive?: boolean;
+  waterlogSensitive?: boolean;
+}
+
+/** 地块列表项（与后端地块接口对齐） */
+interface FieldItem {
+  id: number;
+  fieldName?: string;
+}
+
+/** 地块当前气象回填值 */
+interface WeatherInfo {
+  temp: number | null;
+  humidity: number | null;
+  rainfall: number;
+  light: number | null;
+}
+
+/** 单个气象因子评分（后端 report 内各因子字段） */
+interface MatchFactorPayload {
+  score: number;
+  label?: string;
+  current?: number | string;
+  range?: string;
+  reference?: string;
+  weight?: number;
+  basis?: string;
+}
+
+/** 气象适配报告中的风险项 */
+interface MatchRisk {
+  type: string;
+  level: string;
+  msg: string;
+}
+
+/** 播种气象适宜度报告（与后端 CropService.getWeatherMatch 对齐） */
+interface WeatherMatchResult {
+  cropName?: string;
+  variety?: string;
+  method?: string;
+  dataNote?: string;
+  temperature?: MatchFactorPayload;
+  humidity?: MatchFactorPayload;
+  rainfall?: MatchFactorPayload;
+  light?: MatchFactorPayload;
+  overallScore?: number;
+  overallGrade?: string;
+  finalScore: number;
+  finalGrade: string;
+  risks?: MatchRisk[];
+  suggestions?: string[];
+  hasRisk?: boolean;
+}
+
+/** 生长阶段（与后端 CropGrowthStage 对齐） */
+interface GrowthStage {
+  id?: number;
+  stageOrder?: number;
+  stageName?: string;
+  stageDays?: number;
+  tempMin?: number | null;
+  tempMax?: number | null;
+  pestRiskLevel?: string;
+  keyWarnings?: string;
+}
+
+type FactorKey = 'temperature' | 'humidity' | 'rainfall' | 'light';
+
+/** 参与展示的气象因子（分值必有） */
+interface FactorView extends MatchFactorPayload {
+  key: FactorKey;
+  name: string;
+  icon: string;
+}
+
+const round1 = (value: number | string | null | undefined) => Math.round(Number(value) * 10) / 10;
 
 /** 用日出日落估算可光照时长（小时） */
-function daylightHours(sunrise, sunset) {
+function daylightHours(
+  sunrise: string | null | undefined,
+  sunset: string | null | undefined,
+): number | null {
   if (!sunrise || !sunset) return null;
   const rise = new Date(sunrise);
   const set = new Date(sunset);
@@ -16,20 +111,20 @@ function daylightHours(sunrise, sunset) {
 }
 
 export default function CropPage() {
-  const [cropList, setCropList] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [cropList, setCropList] = useState<CropInfoItem[]>([]);
+  const [selected, setSelected] = useState<CropInfoItem | null>(null);
   const [keyword, setKeyword] = useState('');
-  const [stages, setStages] = useState([]);
-  const [match, setMatch] = useState(null);
+  const [stages, setStages] = useState<GrowthStage[]>([]);
+  const [match, setMatch] = useState<WeatherMatchResult | null>(null);
   const [temp, setTemp] = useState(25);
   const [humidity, setHumidity] = useState(65);
   const [rainfall, setRainfall] = useState(10);
   const [light, setLight] = useState(8);
 
-  const [fieldList, setFieldList] = useState([]);
+  const [fieldList, setFieldList] = useState<FieldItem[]>([]);
   const [fieldId, setFieldId] = useState('');
   const [weatherLoading, setWeatherLoading] = useState(false);
-  const [weatherInfo, setWeatherInfo] = useState(null);
+  const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -39,9 +134,9 @@ export default function CropPage() {
   const [matchError, setMatchError] = useState('');
   const requestRef = useRef(0);
   const matchRequestRef = useRef(0);
-  const selectedRef = useRef(null);
+  const selectedRef = useRef<CropInfoItem | null>(null);
 
-  const runMatch = async (crop, values) => {
+  const runMatch = async (crop: CropInfoItem, values: Array<number | string>) => {
     if (!crop) return;
     const nums = values.map(Number);
     if (nums.some((value) => !Number.isFinite(value))) {
@@ -103,7 +198,7 @@ export default function CropPage() {
     farmlandApi.list()
       .then((data) => {
         if (!alive) return;
-        const list = Array.isArray(data) ? data : [];
+        const list: FieldItem[] = Array.isArray(data) ? data : [];
         setFieldList(list);
         if (list.length === 0) return;
         const context = getFieldContext();
@@ -126,7 +221,7 @@ export default function CropPage() {
         const daily = data?.daily || {};
         const rain = Number(daily.precipitation_sum?.[0]);
         // QX/T 734 用「稳定通过」界限温度：这里用未来 5 天日均温均值近似
-        const means = [];
+        const means: number[] = [];
         const days = Math.min(5, daily.time?.length || 0);
         for (let i = 0; i < days; i += 1) {
           const hi = Number(daily.temperature_2m_max?.[i]);
@@ -136,7 +231,7 @@ export default function CropPage() {
         const fiveDayMean = means.length >= 3
           ? round1(means.reduce((sum, value) => sum + value, 0) / means.length)
           : (current.temperature_2m != null ? round1(current.temperature_2m) : null);
-        const info = {
+        const info: WeatherInfo = {
           temp: fiveDayMean,
           humidity: current.relative_humidity_2m != null
             ? Math.round(Number(current.relative_humidity_2m)) : null,
@@ -171,7 +266,7 @@ export default function CropPage() {
     setReloadKey((value) => value + 1);
   };
 
-  const selectCrop = async (crop) => {
+  const selectCrop = async (crop: CropInfoItem) => {
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
     setSelected(crop);
@@ -182,7 +277,9 @@ export default function CropPage() {
     runMatch(crop, [temp, humidity, rainfall, light]);
     try {
       const data = await crops.stages(crop.id);
-      if (requestRef.current === requestId) setStages(Array.isArray(data) ? data : []);
+      if (requestRef.current === requestId) {
+        setStages(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
       if (requestRef.current === requestId) {
         setStageError(errorMessage(err, '生长阶段加载失败'));
@@ -223,17 +320,25 @@ export default function CropPage() {
     ))
     : cropList;
 
-  const factorMeta = {
+  const factorMeta: Record<FactorKey, { name: string; icon: string }> = {
     temperature: { name: '温度', icon: '🌡️' },
     humidity: { name: '湿度', icon: '💧' },
     rainfall: { name: '降水', icon: '🌧️' },
     light: { name: '光照', icon: '☀️' },
   };
-  const riskTypeMeta = { FROST: '低温冻害', HEAT: '高温热害', RAINSTORM: '强降水/涝害' };
-  const factors = match
-    ? ['temperature', 'humidity', 'rainfall', 'light']
-      .map((key) => ({ key, ...factorMeta[key], ...match[key] }))
-      .filter((factor) => factor.score != null)
+  const riskTypeMeta: Record<string, string> = {
+    FROST: '低温冻害',
+    HEAT: '高温热害',
+    RAINSTORM: '强降水/涝害',
+  };
+  const factorKeys: FactorKey[] = ['temperature', 'humidity', 'rainfall', 'light'];
+  const factors: FactorView[] = match
+    ? factorKeys
+      .map((key) => {
+        const data = match[key];
+        return data ? { key, ...factorMeta[key], ...data } : null;
+      })
+      .filter((factor): factor is FactorView => factor != null && factor.score != null)
     : [];
   const limiting = factors.length
     ? factors.reduce((worst, factor) => (factor.score < worst.score ? factor : worst))

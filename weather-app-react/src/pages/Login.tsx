@@ -1,15 +1,24 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/errorMessage';
 
-export default function Login({ onSwitch, notice }) {
-  const { login } = useAuth();
+interface LoginProps {
+  onSwitch: () => void;
+  notice?: string;
+}
+
+interface AuthContextValue {
+  login: (username: string, password: string) => Promise<unknown>;
+}
+
+export default function Login({ onSwitch, notice }: LoginProps) {
+  const { login } = useAuth() as AuthContextValue;
   const [form, setForm] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setLoading(true);

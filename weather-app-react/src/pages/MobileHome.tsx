@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { alerts, farmlands } from '../api';
 import HomeWeather from '../components/HomeWeather';
 import { errorMessage } from '../utils/errorMessage';
+import type { FarmTask } from '../types/weather';
 
 const SLIDES = [
   {
@@ -55,11 +56,11 @@ const AGENTS = [
 export default function MobileHome() {
   const [index, setIndex] = useState(0);
   const [unread, setUnread] = useState(0);
-  const [todayTasks, setTodayTasks] = useState([]);
-  const [completingTaskId, setCompletingTaskId] = useState(null);
+  const [todayTasks, setTodayTasks] = useState<FarmTask[]>([]);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [taskError, setTaskError] = useState('');
   const [paused, setPaused] = useState(false);
-  const touchX = useRef(null);
+  const touchX = useRef<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -86,7 +87,7 @@ export default function MobileHome() {
     };
   }, []);
 
-  const completeTask = async (task) => {
+  const completeTask = async (task: FarmTask) => {
     setCompletingTaskId(task.id);
     setTaskError('');
     try {
@@ -107,11 +108,11 @@ export default function MobileHome() {
     return () => clearInterval(timer);
   }, [paused]);
 
-  const onTouchStart = (event) => {
+  const onTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     touchX.current = event.touches[0]?.clientX ?? null;
   };
 
-  const onTouchEnd = (event) => {
+  const onTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
     if (touchX.current == null) return;
     const dx = (event.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
     if (Math.abs(dx) > 40) {

@@ -1,7 +1,26 @@
 import { getWeatherInfo, getDayName, displayTemp } from '../utils/weatherCodes';
 
-export default function DailyForecast({ dailyData, isCelsius }) {
-  const items = [];
+interface DailyWeatherData {
+  time: string[];
+  weather_code: number[];
+  temperature_2m_max: Array<number | null>;
+  temperature_2m_min: Array<number | null>;
+}
+
+interface DailyForecastProps {
+  dailyData: DailyWeatherData;
+  isCelsius: boolean;
+}
+
+interface DailyItem {
+  day: string;
+  icon: string;
+  high: number | null;
+  low: number | null;
+}
+
+export default function DailyForecast({ dailyData, isCelsius }: DailyForecastProps) {
+  const items: DailyItem[] = [];
 
   for (let i = 0; i < dailyData.time.length; i++) {
     const dayInfo = getWeatherInfo(dailyData.weather_code[i]);

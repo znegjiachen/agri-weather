@@ -4,6 +4,31 @@ import useWeather, { defaultWeatherCity } from '../hooks/useWeather';
 import { useAuth } from '../context/AuthContext';
 import { getWeatherInfo } from '../utils/weatherCodes';
 
+interface AuthUser {
+  region?: string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+}
+
+interface HomeCurrentWeather {
+  weather_code: number;
+  temperature_2m: number;
+}
+
+interface HomeWeatherData {
+  current?: HomeCurrentWeather;
+}
+
+interface HomeWeatherHook {
+  cityName: string;
+  weatherData: HomeWeatherData | null;
+  loading: boolean;
+  error: boolean;
+  searchCity: (city: string) => void;
+}
+
 /**
  * 首页左上角的天气入口。
  *
@@ -12,8 +37,8 @@ import { getWeatherInfo } from '../utils/weatherCodes';
  */
 export default function HomeWeather() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { cityName, weatherData, loading, error, searchCity } = useWeather();
+  const { user } = useAuth() as AuthContextValue;
+  const { cityName, weatherData, loading, error, searchCity } = useWeather() as HomeWeatherHook;
 
   useEffect(() => {
     searchCity(defaultWeatherCity(user?.region));

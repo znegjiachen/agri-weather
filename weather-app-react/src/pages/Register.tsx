@@ -1,9 +1,23 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage } from '../utils/errorMessage';
 
-export default function Register({ onSwitch, notice }) {
-  const { register } = useAuth();
+interface RegisterProps {
+  onSwitch: () => void;
+  notice?: string;
+}
+
+interface AuthContextValue {
+  register: (
+    username: string,
+    password: string,
+    phone: string,
+    region: string,
+  ) => Promise<unknown>;
+}
+
+export default function Register({ onSwitch, notice }: RegisterProps) {
+  const { register } = useAuth() as AuthContextValue;
   const [form, setForm] = useState({
     username: '', password: '', confirm: '', phone: '', region: '',
   });
@@ -11,7 +25,7 @@ export default function Register({ onSwitch, notice }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     if (form.password.length < 6) {

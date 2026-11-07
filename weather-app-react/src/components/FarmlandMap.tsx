@@ -1,5 +1,14 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import L from 'leaflet';
+import L, {
+  type Map as LeafletMap,
+  type TileLayer,
+  type LayerGroup,
+  type Marker,
+  type Polygon,
+  type PathOptions,
+  type LeafletMouseEvent,
+  type LocationEvent,
+} from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   gcj02ToWgs84,
@@ -7,6 +16,7 @@ import {
   parseBoundary,
   polygonAreaMu,
   polygonCenter,
+  type LatLng,
 } from '../utils/geo';
 
 /**
@@ -23,20 +33,37 @@ const SAT_TILE =
 const LABEL_TILE =
   'https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}';
 
-const CHINA_CENTER = [35.0, 105.0];
+const CHINA_CENTER: [number, number] = [35.0, 105.0];
+
+/** 地图组件消费的地块字段（与后端 Farmland 结构兼容） */
+interface FarmlandLike {
+  id: number | string;
+  fieldName?: string;
+  lat?: number | null;
+  lng?: number | null;
+  boundary?: string | null;
+  areaMu?: number | null;
+}
 
 interface FarmlandMapProps {
-  farmlands?: any[];
+  farmlands?: FarmlandLike[];
   selectedId?: number | null;
-  onSelect?: (farmland: any) => void;
+  onSelect?: (farmland: FarmlandLike) => void;
   drawing?: boolean;
-  draftPoints?: Array<{ lat: number; lng: number }>;
-  onAddPoint?: (point: { lat: number; lng: number }) => void;
+  draftPoints?: LatLng[];
+  onAddPoint?: (point: LatLng) => void;
   onLocateError?: (message: string) => void;
   satellite?: boolean;
 }
 
-function pinIcon(active) {
+/** 通过 ref 暴露给页面调用的地图方法 */
+interface FarmlandMapHandle {
+  locate(): void;
+  flyTo(lat: number, lng: number, zoom?: number): void;
+  fitAll(): void;
+}
+
+function pinIcon(active: boolean) {
   return L.divIcon({
     className: 'farm-marker',
     html: `<div class="farm-marker-pin${active ? ' active' : ''}">📍</div>`,
@@ -45,7 +72,7 @@ function pinIcon(active) {
   });
 }
 
-function polygonStyle(active) {
+function polygonStyle(active: boolean): PathOptions {
   return {
     color: active ? '#2563eb' : '#16a34a',
     weight: active ? 3 : 2,
@@ -54,7 +81,7 @@ function polygonStyle(active) {
   };
 }
 
-const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
+const FarmlandMap = forwardRef<FarmlandMapHandle, FarmlandMapProps>(function FarmlandMap({
   farmlands = [],
   selectedId,
   onSelect,
@@ -64,15 +91,15 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
   onLocateError,
   satellite = true,
 }, ref) {
-  const containerRef = useRef(null);
-  const mapRef = useRef(null);
-  const roadLayerRef = useRef(null);
-  const satLayerRef = useRef(null);
-  const labelLayerRef = useRef(null);
-  const markersRef = useRef(new Map());
-  const polygonsRef = useRef(new Map());
-  const draftLayerRef = useRef(null);
-  const userMarkerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const roadLayerRef = useRef<TileLayer | null>(null);
+  const satLayerRef = useRef<TileLayer | null>(null);
+  const labelLayerRef = useRef<TileLayer | null>(null);
+  const markersRef = useRef(new Map<string, Marker>());
+  const polygonsRef = useRef(new Map<string, Polygon>());
+  const draftLayerRef = useRef<LayerGroup | null>(null);
+  const userMarkerRef = useRef<LayerGroup | null>(null);
   const locatedOnceRef = useRef(false);
   const hasFitRef = useRef(false);
 
@@ -111,19 +138,19 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
       maxZoom: 18,
     });
 
-    (satellite ? satLayerRef.current : roadLayerRef.current).addTo(map);
-    if (satellite) labelLayerRef.current.addTo(map);
+    (satellite ? satLayerRef.current! : roadLayerRef.current!).addTo(map);
+    if (satellite) labelLayerRef.current!.addTo(map);
 
     L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
     draftLayerRef.current = L.layerGroup().addTo(map);
 
-    map.on('click', (event) => {
+    map.on('click', (event: LeafletMouseEvent) => {
       if (!drawingRef.current) return;
       const [lat, lng] = gcj02ToWgs84(event.latlng.lat, event.latlng.lng);
       addPointRef.current?.({ lat, lng });
     });
 
-    map.on('locationfound', (event) => {
+    map.on('locationfound', (event: LocationEvent) => {
       // 浏览器定位返回 WGS84，高德瓦片是 GCJ-02，不转换会偏几百米
       const [lat, lng] = wgs84ToGcj02(event.latlng.lat, event.latlng.lng);
       const accuracy = Math.max(10, Math.round(event.accuracy || 0));
@@ -189,11 +216,11 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
     if (!map || !roadLayerRef.current) return;
     if (satellite) {
       map.removeLayer(roadLayerRef.current);
-      satLayerRef.current.addTo(map);
-      labelLayerRef.current.addTo(map);
+      satLayerRef.current!.addTo(map);
+      labelLayerRef.current!.addTo(map);
     } else {
-      map.removeLayer(satLayerRef.current);
-      map.removeLayer(labelLayerRef.current);
+      map.removeLayer(satLayerRef.current!);
+      map.removeLayer(labelLayerRef.current!);
       roadLayerRef.current.addTo(map);
     }
   }, [satellite]);
@@ -204,7 +231,8 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
     if (!map) return;
 
     const valid = (farmlands || []).filter(
-      (f) => typeof f.lat === 'number' && typeof f.lng === 'number',
+      (f): f is FarmlandLike & { lat: number; lng: number } =>
+        typeof f.lat === 'number' && typeof f.lng === 'number',
     );
     const validIds = new Set(valid.map((f) => String(f.id)));
 
@@ -221,7 +249,7 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
       }
     });
 
-    const drawn = [];
+    const drawn: [number, number][] = [];
     valid.forEach((f) => {
       const id = String(f.id);
       const boundary = parseBoundary(f.boundary);
@@ -247,7 +275,7 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
             direction: 'center',
             className: 'field-area-label',
           })
-          .on('click', (event) => {
+          .on('click', (event: LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(event.originalEvent);
             if (!drawingRef.current) selectRef.current?.(f);
           });
@@ -374,7 +402,7 @@ const FarmlandMap = forwardRef<any, FarmlandMapProps>(function FarmlandMap({
   const fitAll = () => {
     const map = mapRef.current;
     if (!map) return;
-    const points = [];
+    const points: [number, number][] = [];
     (farmlands || []).forEach((f) => {
       const boundary = parseBoundary(f.boundary);
       if (boundary) {

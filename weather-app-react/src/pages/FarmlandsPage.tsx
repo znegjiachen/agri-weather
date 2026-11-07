@@ -1,29 +1,110 @@
 import { useState, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { farmlands, crops } from '../api';
 import FarmlandCard from '../components/FarmlandCard';
 import FarmlandRecordsModal from '../components/FarmlandRecordsModal';
-import type { Farmland } from '../types/farmland';
+import type { Farmland, FarmlandAction } from '../types/farmland';
+import type { CurrentWeather } from '../types/weather';
 import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
 import { errorMessage } from '../utils/errorMessage';
-const WEATHER_ICONS = {
+const WEATHER_ICONS: Record<number, string> = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
   51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
   71: '🌨️', 73: '🌨️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '🌧️',
   95: '⛈️', 96: '⛈️', 99: '⛈️',
 };
 
+/** 作物下拉项 */
+interface CropOption {
+  id: number;
+  cropName: string;
+}
+
+/** 编辑表单字段（全部以字符串保存输入） */
+interface FarmlandFormState {
+  fieldName: string;
+  lat: string;
+  lng: string;
+  altitude: string;
+  areaMu: string;
+  soilType: string;
+  cropId: string;
+  plantDate: string;
+  irrigationType: string;
+}
+
+/** 更新地块的请求体 */
+interface FarmlandUpdateBody {
+  fieldName: string;
+  lat: number;
+  lng: number;
+  altitude: number | null;
+  soilType: string | null;
+  cropId: number | null;
+  plantDate: string | null;
+  irrigationType: string | null;
+  areaMu?: number | null;
+}
+
+/** 天气弹窗中的逐日数据 */
+interface WeatherDailyPayload {
+  time: string[];
+  weather_code: number[];
+  temperature_2m_max: number[];
+  temperature_2m_min: number[];
+}
+
+interface WeatherModalPayload {
+  error?: string;
+  current?: CurrentWeather;
+  daily?: WeatherDailyPayload;
+}
+
+interface AlertModalItem {
+  level: string;
+  type: string;
+  content: string;
+  suggestion?: string;
+}
+
+interface AdviceDay {
+  date: string;
+  weatherCode: number;
+  high: number;
+  low: number;
+  rain: number;
+  wind: number;
+  tasks: string[];
+  bans: string[];
+}
+
+/** 数组形态的弹窗数据也允许携带 error，便于统一展示接口错误 */
+interface AlertModalList extends Array<AlertModalItem> {
+  error?: string;
+}
+
+interface AdviceModalList extends Array<AdviceDay> {
+  error?: string;
+}
+
+/** 弹窗按 type 区分数据类型，渲染时可直接收窄 */
+type ModalState =
+  | { type: 'weather'; data: WeatherModalPayload | null; farmlandName: string; loading: boolean }
+  | { type: 'alerts'; data: AlertModalList | null; farmlandName: string; loading: boolean }
+  | { type: 'advice'; data: AdviceModalList | null; farmlandName: string; loading: boolean };
+
 /** 经纬度统一保留两位小数：两位小数约 1 公里的精度，足够定位地块 */
-const roundCoord = (value) => Math.round(Number(value) * 100) / 100;
+const roundCoord = (value: number | string) => Math.round(Number(value) * 100) / 100;
 
 export default function FarmlandsPage() {
   const navigate = useNavigate();
   const [list, setList] = useState<Farmland[]>([]);
-  const [cropList, setCropList] = useState([]);
+  const [cropList, setCropList] = useState<CropOption[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [listError, setListError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,11 +114,11 @@ export default function FarmlandsPage() {
   const [mountedAt] = useState(() => Date.now());
 
   // Modal state
-  const [modal, setModal] = useState(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
+  const [modal, setModal] = useState<ModalState | null>(null); // null / {type:'weather'|'alerts'|'advice', data, farmlandName}
   const [recordsField, setRecordsField] = useState<Farmland | null>(null);
 
   // 未填写就保持空：不要用默认土壤/灌溉或 0 代替用户没填的数据
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FarmlandFormState>({
     fieldName: '', lat: '', lng: '', altitude: '', areaMu: '',
     soilType: '', cropId: '', plantDate: '', irrigationType: '',
   });
@@ -77,7 +158,7 @@ export default function FarmlandsPage() {
         .then((stage) => ({ id: f.id, name: stage?.stageName }))
     ))).then((results) => {
       if (!alive) return;
-      const next = {};
+      const next: Record<number, string> = {};
       results.forEach((result) => {
         if (result.status === 'fulfilled' && result.value.name) {
           next[result.value.id] = result.value.name;
@@ -102,7 +183,7 @@ export default function FarmlandsPage() {
   // 弹窗打开时支持 Esc 关闭，并锁住背景滚动
   useEffect(() => {
     if (!showForm) return undefined;
-    const onKeyDown = (event) => {
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowForm(false);
         setEditId(null);
@@ -120,9 +201,10 @@ export default function FarmlandsPage() {
   }, [showForm]);
 
   /** 录入经纬度时按位置推荐土壤；用户手动选过就不再覆盖 */
-  const updateCoordinate = (key, value) => {
+  const updateCoordinate = (key: 'lat' | 'lng', value: string) => {
     setForm((prev) => {
-      const next = { ...prev, [key]: value };
+      const next = { ...prev };
+      next[key] = value;
       const hasLat = key === 'lat' ? value !== '' : prev.lat !== '';
       const hasLng = key === 'lng' ? value !== '' : prev.lng !== '';
       if (!soilTouched && hasLat && hasLng) {
@@ -133,7 +215,7 @@ export default function FarmlandsPage() {
   };
 
   /** 选作物时按作物推荐灌溉方式；用户手动选过就不再覆盖 */
-  const updateCrop = (value) => {
+  const updateCrop = (value: string) => {
     setForm((prev) => {
       const next = { ...prev, cropId: value };
       if (!irrigationTouched) {
@@ -144,7 +226,7 @@ export default function FarmlandsPage() {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // 新增地块统一走地图圈地，这里只处理编辑
     if (!editId) return;
@@ -162,8 +244,8 @@ export default function FarmlandsPage() {
     }
 
     setLoading(true);
-    const numberOrNull = (value) => (String(value).trim() === '' ? null : Number(value));
-    const body: Record<string, any> = {
+    const numberOrNull = (value: string) => (String(value).trim() === '' ? null : Number(value));
+    const body: FarmlandUpdateBody = {
       fieldName: form.fieldName.trim(),
       lat,
       lng,
@@ -188,7 +270,7 @@ export default function FarmlandsPage() {
     }
   };
 
-  const handleEdit = (f) => {
+  const handleEdit = (f: Farmland) => {
     setForm({
       fieldName: f.fieldName || '',
       lat: f.lat != null ? Number(f.lat).toFixed(2) : '',
@@ -207,7 +289,7 @@ export default function FarmlandsPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     if (!window.confirm('确定删除该地块吗？')) return;
     try {
       await farmlands.delete(id);
@@ -217,25 +299,31 @@ export default function FarmlandsPage() {
     }
   };
 
-  const handleAction = async (id, name, action) => {
-    setModal({ type: action, data: null, farmlandName: name, loading: true });
+  const handleAction = async (id: number, name: string, action: FarmlandAction) => {
+    // action 来自已类型化的卡片回调，这里按分支构造联合类型状态
+    setModal({ type: action, data: null, farmlandName: name, loading: true } as ModalState);
     try {
-      let data;
+      let data: WeatherModalPayload | AlertModalList | AdviceModalList | null = null;
       if (action === 'weather') data = await farmlands.weather(id);
       else if (action === 'alerts') data = await farmlands.alerts(id);
       else data = await farmlands.advice(id);
-      setModal({ type: action, data, farmlandName: name, loading: false });
+      setModal({ type: action, data, farmlandName: name, loading: false } as ModalState);
     } catch (err) {
-      setModal({ type: action, data: { error: errorMessage(err) }, farmlandName: name, loading: false });
+      setModal({
+        type: action,
+        data: { error: errorMessage(err) },
+        farmlandName: name,
+        loading: false,
+      } as ModalState);
     }
   };
 
-  const getCropName = (cropId) => {
+  const getCropName = (cropId: number | null) => {
     const c = cropList.find((x) => x.id === cropId);
     return c ? c.cropName : '未选择';
   };
 
-  const daysSince = (date) => {
+  const daysSince = (date: string | null | undefined) => {
     if (!date) return null;
     const start = new Date(`${date}T00:00:00`);
     if (Number.isNaN(start.getTime())) return null;
@@ -403,9 +491,9 @@ export default function FarmlandsPage() {
                       {modal.data.daily.time.map((t, i) => (
                         <div key={i} style={{ textAlign: 'center', padding: 8, background: 'rgba(255,255,255,0.5)', borderRadius: 8 }}>
                           <div style={{ fontSize: 12 }}>{t.substring(5)}</div>
-                          <div style={{ fontSize: 24 }}>{WEATHER_ICONS[modal.data.daily.weather_code[i]] || '🌡️'}</div>
-                          <div style={{ fontWeight: 600 }}>{modal.data.daily.temperature_2m_max[i]}°</div>
-                          <div style={{ fontSize: 12, color: '#999' }}>{modal.data.daily.temperature_2m_min[i]}°</div>
+                          <div style={{ fontSize: 24 }}>{WEATHER_ICONS[modal.data!.daily!.weather_code[i]] || '🌡️'}</div>
+                          <div style={{ fontWeight: 600 }}>{modal.data!.daily!.temperature_2m_max[i]}°</div>
+                          <div style={{ fontSize: 12, color: '#999' }}>{modal.data!.daily!.temperature_2m_min[i]}°</div>
                         </div>
                       ))}
                     </div>

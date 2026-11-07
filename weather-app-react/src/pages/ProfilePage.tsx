@@ -1,10 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { auth } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getPushStatus, enablePush, disablePush } from '../utils/push';
 import { errorMessage } from '../utils/errorMessage';
 
-function pushLabel(state) {
+interface AuthUser {
+  username?: string;
+  phone?: string;
+  region?: string;
+}
+
+/** AuthContext 是 JS 模块，这里声明个人中心实际使用的上下文形状 */
+interface AuthContextValue {
+  user: AuthUser | null;
+  logout: () => void;
+  logoutAll: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
+  updateUser: (patch: Partial<AuthUser>) => void;
+}
+
+interface ProfileForm {
+  phone: string;
+  region: string;
+}
+
+interface PasswordForm {
+  oldPassword: string;
+  newPassword: string;
+  confirm: string;
+}
+
+interface FormState {
+  saving: boolean;
+  message: string;
+  error: string;
+}
+
+interface PushStatus {
+  state: string;
+}
+
+function pushLabel(state: string): string {
   if (state === 'subscribed') return '已开启 · 新预警会推送到浏览器';
   if (state === 'denied') return '已被浏览器禁用，请在浏览器设置中开启';
   if (state === 'unsupported') return '当前浏览器不支持 Web Push';
@@ -16,27 +52,27 @@ function pushLabel(state) {
 }
 
 export default function ProfilePage() {
-  const { user, logout, logoutAll, deleteAccount, updateUser } = useAuth();
+  const { user, logout, logoutAll, deleteAccount, updateUser } = useAuth() as AuthContextValue;
 
-  const [sheet, setSheet] = useState(null); // profile | password
+  const [sheet, setSheet] = useState<'profile' | 'password' | null>(null); // profile | password
   const [pageNotice, setPageNotice] = useState('');
-  const [pushStatus, setPushStatus] = useState({ state: 'loading' });
+  const [pushStatus, setPushStatus] = useState<PushStatus>({ state: 'loading' });
 
-  const [profile, setProfile] = useState({
+  const [profile, setProfile] = useState<ProfileForm>({
     phone: user?.phone || '',
     region: user?.region || '',
   });
-  const [profileState, setProfileState] = useState({ saving: false, message: '', error: '' });
+  const [profileState, setProfileState] = useState<FormState>({ saving: false, message: '', error: '' });
 
-  const [password, setPassword] = useState({ oldPassword: '', newPassword: '', confirm: '' });
-  const [passwordState, setPasswordState] = useState({ saving: false, message: '', error: '' });
+  const [password, setPassword] = useState<PasswordForm>({ oldPassword: '', newPassword: '', confirm: '' });
+  const [passwordState, setPasswordState] = useState<FormState>({ saving: false, message: '', error: '' });
 
-  const showNotice = (text) => {
+  const showNotice = (text: string) => {
     setPageNotice(text);
     window.setTimeout(() => setPageNotice(''), 2500);
   };
 
-  const openSheet = (name) => {
+  const openSheet = (name: 'profile' | 'password') => {
     setSheet(name);
     if (name === 'profile') {
       setProfile({ phone: user?.phone || '', region: user?.region || '' });
@@ -58,12 +94,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!sheet) return undefined;
-    const onKey = (event) => { if (event.key === 'Escape') setSheet(null); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setSheet(null); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [sheet]);
 
-  const saveProfile = async (event) => {
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setProfileState({ saving: true, message: '', error: '' });
     try {
@@ -84,7 +120,7 @@ export default function ProfilePage() {
     }
   };
 
-  const savePassword = async (event) => {
+  const savePassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (password.newPassword.length < 6) {
       setPasswordState({ saving: false, message: '', error: '新密码至少 6 位' });

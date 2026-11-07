@@ -1,10 +1,69 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  type ComponentRef,
+  type RefObject,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
 import { formatCommunityTime } from '../utils/date';
 import { errorMessage } from '../utils/errorMessage';
+
+/** 社区列表项（与后端 PostSummary 对齐） */
+interface CommunityPostSummary {
+  id: number;
+  title?: string;
+  excerpt?: string;
+  coverImage?: string | null;
+  coverWidth?: number | null;
+  coverHeight?: number | null;
+  contentFormat?: string;
+  category?: string;
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  author?: string;
+  authorId?: number;
+  createdAt?: string;
+}
+
+/** 帖子完整视图（与后端 PostView 对齐，发帖接口返回） */
+interface CommunityPostView {
+  id: number;
+  title?: string;
+  content?: string;
+  contentFormat?: string;
+  category?: string;
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  author?: string;
+  authorId?: number;
+  createdAt?: string;
+}
+
+/** 富文本编辑器状态 */
+interface EditorState {
+  textLength: number;
+  imageCount: number;
+}
+
+/** 当前登录用户（AuthContext 为 JS，这里补最小字段约束） */
+interface CommunityUser {
+  userId?: number;
+  username?: string;
+}
+
+/** 瀑布流单列 */
+interface CommunityColumn {
+  items: CommunityPostSummary[];
+  score: number;
+}
 
 const CATEGORY_LABEL = { TECH: '农技', CHAT: '闲聊', ALERT: '预警' };
 const TABS = [
@@ -16,18 +75,18 @@ const TABS = [
 const MAX_TEXT = 2000;
 const PAGE_SIZE = 20;
 
-function plainText(html) {
+function plainText(html?: string | null) {
   const doc = new DOMParser().parseFromString(html || '', 'text/html');
   return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function firstImage(html) {
+function firstImage(html?: string | null) {
   const doc = new DOMParser().parseFromString(html || '', 'text/html');
   return doc.querySelector('img')?.getAttribute('src') || null;
 }
 
 /** 发帖接口返回完整帖子；转成列表项，避免为了刷新再拉一次接口 */
-function toSummary(post) {
+function toSummary(post: CommunityPostView): CommunityPostSummary {
   const text = plainText(post.content);
   return {
     id: post.id,
@@ -48,13 +107,13 @@ function toSummary(post) {
 }
 
 /** 图片卡片比例：用原图宽高，极端长图/长横幅夹在 2:3 ~ 1.9:1，避免卡片过长 */
-function coverRatio(post) {
+function coverRatio(post: Pick<CommunityPostSummary, 'coverWidth' | 'coverHeight'>) {
   if (!post.coverWidth || !post.coverHeight) return 0.8;
   return Math.min(1.9, Math.max(0.66, post.coverWidth / post.coverHeight));
 }
 
 /** 根据容器宽度算瀑布流列数：手机 2 列，桌面最多 4 列 */
-function useColumnCount(gridRef) {
+function useColumnCount(gridRef: RefObject<HTMLDivElement | null>) {
   const [count, setCount] = useState(() => (
     typeof window !== 'undefined' && window.innerWidth <= 640 ? 2 : 4
   ));
@@ -77,14 +136,14 @@ function useColumnCount(gridRef) {
 }
 
 export default function CommunityPage() {
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: CommunityUser | null };
 
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState('');
-  const cursorRef = useRef(null);
+  const cursorRef = useRef<number | null>(null);
 
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -95,10 +154,10 @@ export default function CommunityPage() {
   const [category, setCategory] = useState('CHAT');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [editorState, setEditorState] = useState({ textLength: 0, imageCount: 0 });
+  const [editorState, setEditorState] = useState<EditorState>({ textLength: 0, imageCount: 0 });
 
-  const editorRef = useRef(null);
-  const gridRef = useRef(null);
+  const editorRef = useRef<ComponentRef<typeof RichTextEditor> | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
   const columnCount = useColumnCount(gridRef);
 
   /**
@@ -106,7 +165,10 @@ export default function CommunityPage() {
    * 这样既保持新帖靠前，又不会像 CSS columns 那样把新帖全堆在左列。
    */
   const columns = useMemo(() => {
-    const cols = Array.from({ length: columnCount }, () => ({ items: [], score: 0 }));
+    const cols: CommunityColumn[] = Array.from(
+      { length: columnCount },
+      () => ({ items: [], score: 0 }),
+    );
     for (const post of posts) {
       const target = cols.reduce((a, b) => (a.score <= b.score ? a : b));
       target.items.push(post);
@@ -121,7 +183,7 @@ export default function CommunityPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const load = useCallback(async ({ reset = true } = {}) => {
+  const load = useCallback(async ({ reset = true }: { reset?: boolean } = {}) => {
     if (reset) {
       cursorRef.current = null;
       setLoading(true);
@@ -191,7 +253,7 @@ export default function CommunityPage() {
   };
 
   /** 乐观更新：先改 UI，失败再回滚。列表项没有正文，只能合并计数 */
-  const toggleLike = async (post) => {
+  const toggleLike = async (post: CommunityPostSummary) => {
     setPosts((prev) => prev.map((p) => (p.id === post.id
       ? { ...p, liked: !p.liked, likeCount: p.likeCount + (p.liked ? -1 : 1) }
       : p)));
@@ -209,7 +271,7 @@ export default function CommunityPage() {
     }
   };
 
-  const removePost = async (post) => {
+  const removePost = async (post: CommunityPostSummary) => {
     if (!window.confirm('删除后无法恢复，确定删除这条分享吗？')) return;
     try {
       await community.remove(post.id);

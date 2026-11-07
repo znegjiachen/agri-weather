@@ -1,4 +1,5 @@
 import { getDayName } from '../utils/weatherCodes';
+import type { DailyWeather } from '../types/weather';
 
 const W = 560;
 const PAD_L = 36;
@@ -7,8 +8,17 @@ const TOP = 28;
 const BOTTOM = 186;
 const RAIN_BASE = 210;
 
+interface TrendPoint {
+  x: number;
+  y: number;
+}
+
+interface ForecastTrendProps {
+  daily?: DailyWeather | null;
+}
+
 /** 用 Catmull-Rom 转三次贝塞尔，折线看起来更柔和 */
-function smoothPath(points) {
+function smoothPath(points: TrendPoint[]): string {
   if (points.length < 2) return '';
   let d = `M${points[0].x},${points[0].y}`;
   for (let i = 0; i < points.length - 1; i += 1) {
@@ -28,12 +38,12 @@ function smoothPath(points) {
 /**
  * 未来 7 天最高/最低气温 + 降水。纯 SVG，不引入图表库。
  */
-export default function ForecastTrend({ daily }) {
+export default function ForecastTrend({ daily }: ForecastTrendProps) {
   const days = (daily?.time || []).slice(0, 7).map((date, i) => ({
     date,
-    high: Number(daily.temperature_2m_max?.[i] ?? 0),
-    low: Number(daily.temperature_2m_min?.[i] ?? 0),
-    rain: Number(daily.precipitation_sum?.[i] ?? 0),
+    high: Number(daily!.temperature_2m_max?.[i] ?? 0),
+    low: Number(daily!.temperature_2m_min?.[i] ?? 0),
+    rain: Number(daily!.precipitation_sum?.[i] ?? 0),
   }));
 
   if (days.length < 2) {
@@ -47,8 +57,8 @@ export default function ForecastTrend({ daily }) {
   const span = Math.max(1, max - min);
   const step = (W - PAD_L - PAD_R) / (days.length - 1);
 
-  const x = (i) => PAD_L + i * step;
-  const y = (v) => BOTTOM - ((v - min) / span) * (BOTTOM - TOP);
+  const x = (i: number) => PAD_L + i * step;
+  const y = (v: number) => BOTTOM - ((v - min) / span) * (BOTTOM - TOP);
 
   const highPoints = days.map((d, i) => ({ x: x(i), y: y(d.high) }));
   const lowPoints = days.map((d, i) => ({ x: x(i), y: y(d.low) }));

@@ -1,6 +1,31 @@
 import { useEffect, useRef } from 'react';
 
-const PARTICLE_CONFIGS = {
+type ParticleKind = 'sun' | 'fog' | 'rain' | 'snow' | 'star';
+
+type ParticleConfig =
+  | { type: 'none' }
+  | {
+      type: ParticleKind;
+      count: number;
+      color: string;
+      speed: number;
+      size: number;
+    };
+
+interface Particle {
+  x: number;
+  y: number;
+  r: number;
+  speed: number;
+  opacity: number;
+  wind: number;
+}
+
+interface WeatherParticlesProps {
+  weatherCode: string;
+}
+
+const PARTICLE_CONFIGS: Record<string, ParticleConfig> = {
   sunny: { type: 'sun', count: 30, color: '255, 220, 100', speed: 0.3, size: 2 },
   cloudy: { type: 'fog', count: 20, color: '255, 255, 255', speed: 0.15, size: 40 },
   rainy: { type: 'rain', count: 60, color: '180, 210, 255', speed: 8, size: 1 },
@@ -10,20 +35,28 @@ const PARTICLE_CONFIGS = {
   default: { type: 'none' },
 };
 
-export default function WeatherParticles({ weatherCode }) {
-  const canvasRef = useRef(null);
-  const animRef = useRef(null);
+export default function WeatherParticles({ weatherCode }: WeatherParticlesProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const canvasMaybe = canvasRef.current;
+    if (!canvasMaybe) return;
+    const canvas: HTMLCanvasElement = canvasMaybe;
 
-    const ctx = canvas.getContext('2d');
+    const ctxMaybe = canvas.getContext('2d');
+    if (!ctxMaybe) return;
+    const ctx: CanvasRenderingContext2D = ctxMaybe;
+
     const config = PARTICLE_CONFIGS[weatherCode] || PARTICLE_CONFIGS.default;
     if (config.type === 'none') return;
+    // 提前解构，供内部函数闭包使用（函数声明内不会保留联合类型收窄）
+    const particleType: ParticleKind = config.type;
+    const { color, size, speed } = config;
 
-    let particles = [];
-    let w, h;
+    let particles: Particle[] = [];
+    let w = 0;
+    let h = 0;
 
     function resize() {
       w = canvas.width = window.innerWidth;
@@ -33,12 +66,12 @@ export default function WeatherParticles({ weatherCode }) {
     resize();
     window.addEventListener('resize', resize);
 
-    function createParticle() {
+    function createParticle(): Particle {
       return {
         x: Math.random() * w,
         y: Math.random() * h,
-        r: config.size * (0.5 + Math.random()),
-        speed: config.speed * (0.5 + Math.random()),
+        r: size * (0.5 + Math.random()),
+        speed: speed * (0.5 + Math.random()),
         opacity: 0.3 + Math.random() * 0.5,
         wind: (Math.random() - 0.5) * 0.6,
       };
@@ -46,8 +79,8 @@ export default function WeatherParticles({ weatherCode }) {
 
     particles = Array.from({ length: config.count }, createParticle);
 
-    function drawRain(p) {
-      ctx.strokeStyle = `rgba(${config.color}, ${p.opacity})`;
+    function drawRain(p: Particle) {
+      ctx.strokeStyle = `rgba(${color}, ${p.opacity})`;
       ctx.lineWidth = p.r * 0.6;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
@@ -55,40 +88,40 @@ export default function WeatherParticles({ weatherCode }) {
       ctx.stroke();
     }
 
-    function drawSnow(p) {
-      ctx.fillStyle = `rgba(${config.color}, ${p.opacity})`;
+    function drawSnow(p: Particle) {
+      ctx.fillStyle = `rgba(${color}, ${p.opacity})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = `rgba(${config.color}, ${p.opacity * 0.5})`;
+      ctx.fillStyle = `rgba(${color}, ${p.opacity * 0.5})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * 1.8, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function drawSunRay(p) {
-      ctx.fillStyle = `rgba(${config.color}, ${p.opacity * 0.15})`;
+    function drawSunRay(p: Particle) {
+      ctx.fillStyle = `rgba(${color}, ${p.opacity * 0.15})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function drawFog(p) {
-      ctx.fillStyle = `rgba(${config.color}, ${p.opacity * 0.08})`;
+    function drawFog(p: Particle) {
+      ctx.fillStyle = `rgba(${color}, ${p.opacity * 0.08})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function drawStar(p) {
+    function drawStar(p: Particle) {
       const flicker = 0.5 + Math.sin(Date.now() * 0.003 + p.x) * 0.5;
-      ctx.fillStyle = `rgba(${config.color}, ${p.opacity * flicker})`;
+      ctx.fillStyle = `rgba(${color}, ${p.opacity * flicker})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    const drawMap = {
+    const drawMap: Record<ParticleKind, (p: Particle) => void> = {
       rain: drawRain,
       snow: drawSnow,
       sun: drawSunRay,
@@ -96,25 +129,25 @@ export default function WeatherParticles({ weatherCode }) {
       star: drawStar,
     };
 
-    const drawFn = drawMap[config.type];
+    const drawFn = drawMap[particleType];
 
     function animate() {
       ctx.clearRect(0, 0, w, h);
 
       particles.forEach((p) => {
-        if (config.type === 'rain') {
+        if (particleType === 'rain') {
           p.y += p.speed;
           p.x += p.wind;
           if (p.y > h + 20) { p.y = -20; p.x = Math.random() * w; }
-        } else if (config.type === 'snow') {
+        } else if (particleType === 'snow') {
           p.y += p.speed * 0.6;
           p.x += Math.sin(p.y * 0.02) * 0.5 + p.wind * 0.3;
           if (p.y > h + 10) { p.y = -10; p.x = Math.random() * w; }
-        } else if (config.type === 'sun' || config.type === 'star') {
+        } else if (particleType === 'sun' || particleType === 'star') {
           p.y += p.speed * 0.2;
           p.x += p.wind * 0.2;
           if (p.y > h + 10 || p.y < -10) { p.y = Math.random() * h; p.x = Math.random() * w; }
-        } else if (config.type === 'fog') {
+        } else if (particleType === 'fog') {
           p.x += p.wind * 0.3;
           if (p.x > w + 60) { p.x = -60; p.y = Math.random() * h; }
           if (p.x < -60) { p.x = w + 60; }
@@ -129,7 +162,7 @@ export default function WeatherParticles({ weatherCode }) {
     animate();
 
     return () => {
-      cancelAnimationFrame(animRef.current);
+      if (animRef.current != null) cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
   }, [weatherCode]);

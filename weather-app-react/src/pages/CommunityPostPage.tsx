@@ -6,15 +6,49 @@ import { useAuth } from '../context/AuthContext';
 import PostContent from '../components/PostContent';
 import { errorMessage } from '../utils/errorMessage';
 
-const CATEGORY_LABEL = { CHAT: '闲聊', TECH: '农技', ALERT: '预警' };
+/** 帖子详情视图（与后端 PostView 对齐） */
+interface PostView {
+  id: number;
+  title?: string;
+  content?: string;
+  contentFormat?: string;
+  category: string;
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
+  author?: string;
+  authorId?: number;
+  createdAt?: string;
+}
+
+/** 评论项（与后端 CommentView 对齐） */
+interface PostComment {
+  id: number;
+  content?: string;
+  author?: string;
+  authorId?: number;
+  createdAt?: string;
+}
+
+/** 当前登录用户（AuthContext 为 JS，这里补最小字段约束） */
+interface PostAuthor {
+  userId?: number;
+  username?: string;
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  CHAT: '闲聊',
+  TECH: '农技',
+  ALERT: '预警',
+};
 
 export default function CommunityPostPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuth() as { user: PostAuthor | null };
 
-  const [post, setPost] = useState(null);
-  const [comments, setComments] = useState([]);
+  const [post, setPost] = useState<PostView | null>(null);
+  const [comments, setComments] = useState<PostComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [input, setInput] = useState('');
@@ -46,7 +80,7 @@ export default function CommunityPostPage() {
 
   useEffect(() => {
     if (!preview) return undefined;
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setPreview('');
     };
     window.addEventListener('keydown', onKey);

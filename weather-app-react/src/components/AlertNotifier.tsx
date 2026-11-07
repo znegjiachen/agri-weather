@@ -5,25 +5,40 @@ import { useAuth } from '../context/AuthContext';
 const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const LAST_NOTIFIED_PREFIX = 'agri:last-notified-alert:';
 
+interface AuthUser {
+  userId?: number | string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+}
+
+interface AlertItem {
+  id: number;
+  farmlandName?: string | null;
+  alertContent?: string;
+  isRead?: boolean;
+}
+
 /**
  * 应用打开期间轮询未处理预警：出现比上次更新的预警且浏览器通知已授权时弹出系统通知。
  *
  * 真正关掉浏览器后的后台推送需要 Web Push + VAPID，这里只覆盖「页面还开着」的场景。
  */
 export default function AlertNotifier() {
-  const { user } = useAuth();
+  const { user } = useAuth() as AuthContextValue;
   const storageKey = `${LAST_NOTIFIED_PREFIX}${user?.userId ?? 'anon'}`;
   const lastAlertIdRef = useRef(Number(localStorage.getItem(storageKey)) || 0);
   const initializedRef = useRef(Number(localStorage.getItem(storageKey)) > 0);
 
   useEffect(() => {
     let alive = true;
-    const saveLastId = (id) => {
+    const saveLastId = (id: number) => {
       lastAlertIdRef.current = id;
       localStorage.setItem(storageKey, String(id));
     };
 
-    const notify = (fresh) => {
+    const notify = (fresh: AlertItem[]) => {
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
       const top = fresh[0];
       try {
@@ -38,7 +53,7 @@ export default function AlertNotifier() {
 
     const poll = async () => {
       try {
-        const data = await alerts.list({ status: 'active', limit: 20 });
+        const data: AlertItem[] = await alerts.list({ status: 'active', limit: 20 });
         if (!alive) return;
         const unread = (Array.isArray(data) ? data : []).filter((item) => !item.isRead);
         const maxId = unread.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);

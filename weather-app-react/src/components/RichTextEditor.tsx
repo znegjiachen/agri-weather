@@ -39,13 +39,14 @@ interface RichTextEditorProps {
   onError?: (message: string) => void;
 }
 
+// ref 由各页面按需声明（如 CommunityPage 的 EditorHandle），这里保持宽松类型
 const RichTextEditor = forwardRef<any, RichTextEditorProps>(function RichTextEditor(
   { placeholder = '说点什么…', onChange, onUploadingChange, onError },
   ref,
 ) {
-  const hostRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const quillRef = useRef(null);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const quillRef = useRef<Quill | null>(null);
   const uploadingRef = useRef(0);
   const tokenSeq = useRef(0);
   const [textLength, setTextLength] = useState(0);
@@ -68,13 +69,13 @@ const RichTextEditor = forwardRef<any, RichTextEditorProps>(function RichTextEdi
     onChangeRef.current?.({ html: quill.root.innerHTML, textLength: text.length, imageCount });
   }, []);
 
-  const setUploading = useCallback((delta) => {
+  const setUploading = useCallback((delta: number) => {
     uploadingRef.current = Math.max(0, uploadingRef.current + delta);
     setUploadingCount(uploadingRef.current);
     onUploadingRef.current?.(uploadingRef.current > 0);
   }, []);
 
-  const replaceToken = useCallback((token, url) => {
+  const replaceToken = useCallback((token: string, url: string | null) => {
     const quill = quillRef.current;
     if (!quill) return;
     const index = quill.getText().indexOf(token);
@@ -86,7 +87,7 @@ const RichTextEditor = forwardRef<any, RichTextEditorProps>(function RichTextEdi
     }
   }, []);
 
-  const uploadOne = useCallback(async (file) => {
+  const uploadOne = useCallback(async (file: File) => {
     const quill = quillRef.current;
     if (!quill) return;
 

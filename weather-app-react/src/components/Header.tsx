@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
+
+interface HeaderProps {
+  onSearch: (city: string) => void;
+  onLocate: () => void;
+  history: string[];
+  onHistorySelect: (city: string) => void;
+  locateMessage?: string;
+}
 
 export default function Header({
   onSearch, onLocate, history, onHistorySelect, locateMessage,
-}) {
+}: HeaderProps) {
   const [inputValue, setInputValue] = useState('');
 
   const handleSearch = () => {
@@ -10,14 +18,14 @@ export default function Header({
     if (city) onSearch(city);
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const city = inputValue.trim();
       if (city) onSearch(city);
     }
   };
 
-  const handleHistoryClick = (city) => {
+  const handleHistoryClick = (city: string) => {
     setInputValue(city);
     onHistorySelect(city);
   };

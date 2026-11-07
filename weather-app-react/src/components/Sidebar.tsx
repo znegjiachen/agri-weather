@@ -4,8 +4,17 @@ import { alerts as alertsApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { PRIMARY_NAV, SUB_NAV, isNavActive } from '../nav';
 
+interface AuthUser {
+  username?: string;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+  logout: () => void;
+}
+
 export default function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as AuthContextValue;
   const { pathname } = useLocation();
   const [unread, setUnread] = useState(0);
 

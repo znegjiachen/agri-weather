@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { agent as agentApi, farmlands as farmlandApi, crops } from '../api';
 import FarmlandMap from '../components/FarmlandMap';
 import { polygonAreaMu, polygonCenter, roundCoord } from '../utils/geo';
+import type { LatLng } from '../utils/geo';
+import type { Farmland } from '../types/farmland';
+import type { CurrentWeather } from '../types/weather';
 import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
@@ -13,6 +17,37 @@ interface RegionOption {
   adcode: number;
   center: [number, number];
   level: string;
+}
+
+/** 作物下拉项 */
+interface CropOption {
+  id: number;
+  cropName: string;
+}
+
+/** 种植计划解析出的任务 */
+interface PlanTask {
+  id?: number;
+  title?: string;
+  taskType?: string;
+  plannedDate?: string | null;
+}
+
+/** FarmlandMap 通过 forwardRef 暴露的命令式方法 */
+interface FarmlandMapHandle {
+  locate: () => void;
+  flyTo: (lat: number, lng: number, zoom?: number) => void;
+  fitAll: () => void;
+}
+
+/** FarmlandMap 选中回调传入的地块字段（地图组件内部使用的子集） */
+interface MapFarmland {
+  id: number | string;
+  fieldName?: string;
+  lat?: number | null;
+  lng?: number | null;
+  boundary?: string | null;
+  areaMu?: number | null;
 }
 
 const REGION_ROOT_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
@@ -38,7 +73,7 @@ async function fetchRegionOptions(url: string): Promise<RegionOption[]> {
     .filter(Boolean) as RegionOption[];
 }
 
-const WEATHER_ICONS = {
+const WEATHER_ICONS: Record<number, string> = {
   0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️',
   51: '🌦️', 53: '🌦️', 55: '🌧️', 61: '🌧️', 63: '🌧️', 65: '🌧️',
   71: '🌨️', 73: '🌨️', 75: '❄️', 80: '🌦️', 81: '🌧️', 82: '🌧️',
@@ -47,11 +82,11 @@ const WEATHER_ICONS = {
 
 export default function MapPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [list, setList] = useState([]);
-  const [cropList, setCropList] = useState([]);
-  const [cropMap, setCropMap] = useState({});
-  const [selected, setSelected] = useState(null);
-  const [weather, setWeather] = useState(null);
+  const [list, setList] = useState<Farmland[]>([]);
+  const [cropList, setCropList] = useState<CropOption[]>([]);
+  const [cropMap, setCropMap] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Farmland | null>(null);
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -59,7 +94,7 @@ export default function MapPage() {
   const [satellite, setSatellite] = useState(true);
   // 从「添加地块」跳转过来时直接进入圈地模式
   const [drawing, setDrawing] = useState(() => searchParams.get('draw') === '1');
-  const [draft, setDraft] = useState([]);
+  const [draft, setDraft] = useState<LatLng[]>([]);
   const [finishOpen, setFinishOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCropId, setNewCropId] = useState('');
@@ -68,11 +103,11 @@ export default function MapPage() {
   const [newIrrigationType, setNewIrrigationType] = useState('');
   const [soilTouched, setSoilTouched] = useState(false);
   const [irrigationTouched, setIrrigationTouched] = useState(false);
-  const [planFile, setPlanFile] = useState(null);
+  const [planFile, setPlanFile] = useState<File | null>(null);
   const [planNotice, setPlanNotice] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const mapRef = useRef(null);
+  const mapRef = useRef<FarmlandMapHandle | null>(null);
   const draftArea = useMemo(() => polygonAreaMu(draft), [draft]);
 
   // 圈地参数只用一次，清掉以免刷新或返回时重复进入
@@ -101,7 +136,7 @@ export default function MapPage() {
       .finally(() => setLoading(false));
 
     crops.list()
-      .then((cs) => {
+      .then((cs: CropOption[]) => {
         setCropList(cs);
         setCropMap(Object.fromEntries(cs.map((c) => [c.id, c.cropName])));
       })
@@ -179,23 +214,26 @@ export default function MapPage() {
     flyToRegion(district, 13);
   };
 
-  const handleSelect = useCallback((farmland) => {
-    setSelected(farmland);
+  const handleSelect = useCallback((farmland: MapFarmland) => {
+    // 地图组件只透传它用到的字段，选中态按完整 Farmland 处理
+    const field = farmland as Farmland;
+    setSelected(field);
     setWeather(null);
     setWeatherLoading(true);
 
     // 走缓存接口：预热后约 6ms
-    farmlandApi.weather(farmland.id)
+    farmlandApi.weather(field.id)
       .then((d) => setWeather(d.current || null))
       .catch(() => setWeather(null))
       .finally(() => setWeatherLoading(false));
   }, []);
 
-  const addPoint = useCallback((point) => {
+  const addPoint = useCallback((point: LatLng) => {
     setDraft((prev) => [...prev, point]);
   }, []);
 
-  const cropNameOf = (id) => cropList.find((c) => String(c.id) === String(id))?.cropName;
+  const cropNameOf = (id: number | string) =>
+    cropList.find((c) => String(c.id) === String(id))?.cropName;
 
   const startDrawing = () => {
     setDrawing(true);
@@ -238,7 +276,7 @@ export default function MapPage() {
     setError('');
   };
 
-  const handlePlanFile = (event) => {
+  const handlePlanFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -287,7 +325,7 @@ export default function MapPage() {
       if (planFile) {
         try {
           const document = await agentApi.document(planFile);
-          const preview = await farmlandApi.tasks.extract(created.id, document.id);
+          const preview = (await farmlandApi.tasks.extract(created.id, document.id)) as PlanTask[];
           const sourceName = document.filename || planFile.name;
           // 没手填播种日期时，用方案里的播种任务日期自动补齐
           if (!created.plantDate && Array.isArray(preview)) {
@@ -592,7 +630,7 @@ export default function MapPage() {
                 <div>
                   <h3>{selected.fieldName}</h3>
                   <p className="map-card-sub">
-                    {cropMap[selected.cropId] || '未设置作物'}
+                    {cropMap[String(selected.cropId)] || '未设置作物'}
                     {selected.areaMu ? ` · ${selected.areaMu} 亩` : ''}
                     {selected.soilType ? ` · ${selected.soilType}` : ''}
                   </p>
