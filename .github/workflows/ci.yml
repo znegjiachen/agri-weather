@@ -23,14 +23,12 @@ jobs:
         run: ./mvnw -q test
 
   fresh-db:
-    name: Fresh MySQL (${{ matrix.mode }})
+    name: Fresh MySQL schema + Flyway
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # schema-seed：按部署文档用 schema.sql + seed-current.sql 初始化，再以 V10 为基线启动
-        # flyway-only：空库从 V1 跑到 V10，验证迁移链本身
-        mode: [schema-seed, flyway-only]
+    # 正式初始化路径：schema.sql + seed-current.sql，然后以 application.yml 的
+    # baseline-version=10 启动，由 Hibernate ddl-auto=validate 校验实体与表结构一致。
+    # 注意：V1__baseline.sql 是历史迁移，早期版本含重复外键名和 CHAR 列；
+    # 已发布迁移不回头改校验和，全新库统一走 schema.sql。
     services:
       mysql:
         image: mysql:8.0
@@ -69,18 +67,11 @@ jobs:
         run: command -v mysql >/dev/null || (sudo apt-get update && sudo apt-get install -y mysql-client)
 
       - name: Initialize with schema.sql + seed-current.sql
-        if: matrix.mode == 'schema-seed'
         run: |
           mysql -h127.0.0.1 -uroot -proot < sql/schema.sql
           mysql -h127.0.0.1 -uroot -proot agri_weather < sql/seed-current.sql
           mysql -h127.0.0.1 -uroot -proot agri_weather -e \
             "SELECT COUNT(*) AS crops FROM crop_info; SELECT COUNT(*) AS pests FROM pest_knowledge;"
-
-      - name: Create empty database for Flyway chain
-        if: matrix.mode == 'flyway-only'
-        run: |
-          mysql -h127.0.0.1 -uroot -proot -e \
-            "DROP DATABASE IF EXISTS agri_weather; CREATE DATABASE agri_weather CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
       - name: Start backend, run Flyway and Hibernate validate
         run: |
