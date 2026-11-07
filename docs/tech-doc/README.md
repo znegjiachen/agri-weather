@@ -4,7 +4,7 @@
 
 ## 产物
 
-- `../../问田-智慧农业天气系统-技术文档.pdf`：交付版 PDF，A4，23 页
+- `../../问田-智慧农业天气系统-技术文档-2026-11-07.pdf`：交付版 PDF，A4，23 页
 
 ## 重新生成
 
@@ -20,4 +20,4 @@ python build_doc.py         # 生成根目录 PDF
 
 - 正文与图表均为项目实测/仓库文档口径，AI 评测样本较小，文中已标注局限。
 - 图表使用 Microsoft YaHei，PDF 已嵌入字体子集。
-- 页数如后续调整内容，请用 `python -c "import pymupdf; print(pymupdf.open('../../问田-智慧农业天气系统-技术文档.pdf').page_count)"` 校验不超过 30 页。
+- 页数如后续调整内容，请用 `python -c "import pymupdf; print(pymupdf.open('../../问田-智慧农业天气系统-技术文档-2026-11-07.pdf').page_count)"` 校验不超过 30 页。
