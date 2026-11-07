@@ -60,6 +60,8 @@ public class SearchCropTool implements Tool {
         m.put("frostSensitive", c.getFrostSensitive());
         m.put("heatSensitive", c.getHeatSensitive());
         m.put("waterlogSensitive", c.getWaterlogSensitive());
+        m.put("dataSource", c.getDataSource());
+        m.put("confidence", c.getConfidence());
         return m;
     }
 }

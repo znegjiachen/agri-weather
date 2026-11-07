@@ -43,7 +43,10 @@ CREATE TABLE IF NOT EXISTS crop_info (
     sowing_temp_max DOUBLE,
     frost_sensitive BOOLEAN DEFAULT FALSE,
     heat_sensitive BOOLEAN DEFAULT FALSE,
-    waterlog_sensitive BOOLEAN DEFAULT FALSE
+    waterlog_sensitive BOOLEAN DEFAULT FALSE,
+    data_source VARCHAR(200) DEFAULT 'QX/T 734—2024（播种温度参考）+ FAO EcoCrop + 公开农技资料'
+        COMMENT '数据来源与依据',
+    confidence VARCHAR(10) DEFAULT 'MEDIUM' COMMENT '置信度：HIGH/MEDIUM/LOW'
 ) ENGINE=InnoDB;
 
 -- =============================================

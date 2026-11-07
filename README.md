@@ -111,7 +111,7 @@ cd weather-app-react && npm install && npm run build && cd ..
 docker-compose up -d
 ```
 
-访问 http://localhost 即可。MySQL 容器首次启动会自动执行 `sql/schema.sql` 和 `sql/seed-current.sql` 建表并补齐播种/作物数据，后端以 Flyway V9 为基线继续后续迁移。
+访问 http://localhost 即可。MySQL 容器首次启动会自动执行 `sql/schema.sql` 和 `sql/seed-current.sql` 建表并补齐播种/作物数据，后端以 Flyway V10 为基线继续后续迁移。
 
 ```bash
 docker-compose logs -f    # 查看日志
@@ -123,12 +123,12 @@ docker-compose down       # 停止
 **前置**：JDK 17+、Node.js 18+、MySQL 8
 
 ```bash
-# 1. 初始化全新数据库：先建表，再补齐 V6-V9 的播种/作物数据
+# 1. 初始化全新数据库：先建表，再补齐 V6-V10 的播种、作物与数据来源信息
 mysql -u root -p < agri-weather-server/sql/schema.sql
 mysql -u root -p agri_weather < agri-weather-server/sql/seed-current.sql
 
 # 老库升级：先备份，再启动后端；Flyway 会校验已有历史并补齐后续迁移。
-# 以 schema.sql 初始化的库已到 V9，application.yml 的 Flyway 基线也是 V9。
+# 以 schema.sql 初始化的库已到 V10，application.yml 的 Flyway 基线也是 V10。
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -207,6 +207,7 @@ cd weather-app-react && npm install && npm run dev
 - **接口限流与额度**：登录/注册、智能体对话、上传接口按用户或 IP 每分钟限流；每用户每日对话额度默认 80 次，Redis 不可用时自动放行
 - **用户反馈**：回答下方 👍/👎 写入 `agent_feedback`，可按消息去重更新
 - **安全兜底**：`AgriSafetyGuard` 检测高毒/禁用农药、绝对化承诺，并自动隐去手机号/身份证号
+- **数据依据**：作物、病虫害、天气与预警的来源、标准号和置信度见 [docs/data-sources.md](docs/data-sources.md)；作物接口与 `search_crop` 工具返回 `dataSource` / `confidence`
 - **RAG 质量评测**：`POST /api/agents/{id}/knowledge/eval`，用问题 + 期望关键词统计检索命中率；样例见 [docs/ai-eval-set.json](docs/ai-eval-set.json)，实测报告见 [docs/ai-eval-report.md](docs/ai-eval-report.md)（10 条水稻问题、8 份资料，hit@5 10/10）
 - **Agent 模拟评测**：5 题试点报告见 [docs/agent-eval-report.md](docs/agent-eval-report.md)；45 题扩展集、工具选择准确率、P95 耗时和 5 分制盲评流程见 [docs/agent-eval-protocol.md](docs/agent-eval-protocol.md)，执行脚本 `node scripts/run-agent-eval.mjs --dry-run`
 - **模型对比**：同模型无工具、Qwen 裸答与问田 Agent 的对照实验，见 [docs/agent-comparison.md](docs/agent-comparison.md)

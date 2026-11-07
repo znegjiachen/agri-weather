@@ -28,7 +28,7 @@ services:
     volumes:
       # 数据持久化（容器删除后数据不丢）
       - mysql_data:/var/lib/mysql
-      # 首次初始化：完整表结构 + V6-V9 汇总的播种/作物数据
+      # 首次初始化：完整表结构 + V6-V10 汇总的播种、作物与数据来源信息
       - ./agri-weather-server/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./agri-weather-server/sql/seed-current.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     ports:
@@ -74,7 +74,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # 初始化脚本已把库建到 V9，Flyway 以此为基线，后续 V10+ 继续迁移
+      # 初始化脚本已把库建到 V10，Flyway 以此为基线，后续 V11+ 继续迁移
       SPRING_FLYWAY_BASELINE_VERSION: 9
     depends_on:
       mysql:
@@ -107,7 +107,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # 初始化脚本已把库建到 V9，Flyway 以此为基线，后续 V10+ 继续迁移
+      # 初始化脚本已把库建到 V10，Flyway 以此为基线，后续 V11+ 继续迁移
       SPRING_FLYWAY_BASELINE_VERSION: 9
     depends_on:
       mysql:

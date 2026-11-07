@@ -69,4 +69,12 @@ public class CropInfo {
 
     @Builder.Default
     private Boolean waterlogSensitive = false;
+
+    /** 数据来源与依据，如「QX/T 734—2024 + FAO EcoCrop + 公开农技资料」 */
+    @Column(name = "data_source", length = 200)
+    private String dataSource;
+
+    /** 置信度：HIGH / MEDIUM / LOW，口径见 docs/data-sources.md */
+    @Column(length = 10)
+    private String confidence;
 }
