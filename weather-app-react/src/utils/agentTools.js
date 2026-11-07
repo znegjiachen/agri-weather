@@ -7,4 +7,6 @@ export const TOOL_LABELS = {
   get_operation_advice: { icon: '📅', label: '农事决策引擎', desc: '调用平台内置规则，给出未来 7 天适宜/不宜的农事作业。' },
   check_alerts: { icon: '⚠️', label: '检查灾害预警', desc: '检查冻害、热害、涝害、大风等风险并生成预警。' },
   search_crop: { icon: '📚', label: '检索作物知识库', desc: '在 64 种作物的内置知识中检索品种、生育期和适宜条件。' },
+  search_pest: { icon: '🐛', label: '检索病虫害库', desc: '查询病虫害的气象诱因、高危阶段、防治方法和推荐药剂。' },
+  get_tasks: { icon: '✅', label: '查询计划任务', desc: '查询地块今日待办、逾期任务和未来任务，判断当前该做什么。' },
 };

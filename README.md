@@ -48,7 +48,7 @@
 
 **对话内看文档**：📄 按钮可上传 PDF / Word / TXT / Markdown（≤5MB，最多同时引用 3 份）。上传时复用知识库解析器切块并建立向量索引，提问时按问题检索相关片段注入，不再截断整篇正文；文档保留 7 天后自动清理，不进入知识库。附件会持续作为后续提问的参考资料，刷新后可从历史消息重新引用，点 × 可解除。
 
-可用工具（7 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop`
+可用工具（9 个）：`list_farmlands` · `get_farmland_detail` · `get_weather` · `get_crop_stage` · `get_operation_advice` · `check_alerts` · `search_crop` · `search_pest` · `get_tasks`
 
 ### 一块地一个助农手
 
@@ -56,7 +56,7 @@
 
 - **人设独立**：名称、欢迎语、专属人设可编辑；作物或面积变化时会同步默认人设，用户改过的人设不会被覆盖。
 - **知识库独立**：支持粘贴文本或上传 TXT / Markdown / PDF / Word（UTF-8/GB18030，≤5MB），中文关键词 + 向量混合检索，最多注入 4 段资料；回答下方会标注「参考知识」。
-- **工具可调配**：每个助农手可启用/停用 7 个农事工具；关闭后模型看不到该工具。
+- **工具可调配**：每个助农手可启用/停用 9 个农事工具；关闭后模型看不到该工具。
 - **历史持久化**：对话记录存后端，刷新页面或换设备后仍可恢复；每个智能体独立会话。
 - **季节与农事记录**：地块可新增多个种植季（作物、播种/预计收获/实际收获、状态、备注），换茬不覆盖历史；施肥、打药、灌溉等农事操作单独记录。
 - **方案任务闭环**：上传种植方案 → AI 抽取农事任务 → 用户确认 → 到期 Web Push 提醒 → 完成/跳过 → 自动生成农事记录，并统计完成率、按时率、逾期和延误天数。
@@ -156,7 +156,7 @@ cd weather-app-react && npm install && npm run dev
 │   ├── src/main/java/com/agriweather/
 │   │   ├── agent/                    # 智能体框架（工具调用循环，零领域知识、可复用）
 │   │   ├── ai/                       # 应用层：DeepSeek 适配、Spring 装配、提示词
-│   │   │   └── tool/                 # 7 个农事工具实现 + 地块归属校验
+│   │   │   └── tool/                 # 9 个农事工具实现 + 地块归属校验
 │   │   ├── config/                   # 安全配置、JWT 过滤器
 │   │   ├── controller/               # REST 接口
 │   │   ├── dto/  entity/  repository/  service/

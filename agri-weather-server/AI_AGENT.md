@@ -169,6 +169,8 @@ curl -X POST http://localhost:8082/api/agent/vision \
 | `get_operation_advice` | 平台的农事决策引擎（规则库） |
 | `check_alerts` | 灾害预警检查 |
 | `search_crop` | 作物知识库检索 |
+| `search_pest` | 病虫害知识库检索（诱因、高危期、防治、药剂） |
+| `get_tasks` | 计划任务查询（今日待办、逾期、未来任务） |
 
 ## 地块专属智能体与知识库
 

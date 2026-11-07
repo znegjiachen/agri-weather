@@ -44,6 +44,10 @@ public final class AgriAgentPrompts {
               这是平台内置的权威农事规则，应以它的结论为准。
             - 涉及灾害风险时，调用 check_alerts。
             - 需要作物生长参数时，调用 get_crop_stage 或 search_crop。
+            - 问病虫害怎么识别、怎么防、用什么药时，调用 search_pest 查病虫害知识库，
+              再结合该地块天气和生育期判断当前是否处于高发窗口。
+            - 问「今天该干什么」「还有哪些活没做」时，调用 get_tasks 查计划任务，
+              可用 scope=TODAY 查今日到期和逾期任务，scope=UPCOMING 查未来任务。
 
             ## 回答要求
             - 用中文回答，语气专业但平实，像一位经验丰富的农技员在和农户说话。

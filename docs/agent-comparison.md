@@ -10,7 +10,7 @@
 
 | 组别 | 模型 | 是否接入地块数据 | 是否可调用工具 |
 |---|---|---|---|
-| A. 问田 Agent | DeepSeek reasoner | 是 | 是，7 个农事工具 |
+| A. 问田 Agent | DeepSeek reasoner | 是 | 是，9 个农事工具 |
 | B. 同模型裸答 | DeepSeek reasoner | 否 | 否 |
 | C. 其他模型裸答 | Qwen2.5-72B-Instruct | 否 | 否 |
 
