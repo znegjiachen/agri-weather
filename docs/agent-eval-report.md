@@ -32,6 +32,26 @@
 
 **结果：5/5 场景均正确调用了相关工具，没有出现编造天气或跨地块数据。**
 
+> 5 题只能说明链路跑通，不能说明统计效果。仓库已补充 45 题扩展评测集与自动指标脚本，见下一节。
+
+## 扩展评测（v2，45 题）
+
+为回答“工具选择是否稳定、回答质量是否可接受、耗时是否可接受”，新增：
+
+- [`docs/agent-eval-set-v2.json`](agent-eval-set-v2.json)：45 个农户口语问题，覆盖地块、天气、生育期、农事决策、灾害预警、作物知识、病虫害、计划任务和安全边界 9 类；
+- [`scripts/run-agent-eval.mjs`](../scripts/run-agent-eval.mjs)：逐题调用 `/api/agent/chat`，输出工具轨迹、工具选择准确率、平均/中位/P95 耗时和超时题数；
+- [`scripts/build-blind-review.mjs`](../scripts/build-blind-review.mjs)：把 Agent 组与基线组回答随机打乱，生成不含组别的 5 分制盲评表与独立揭盲文件；
+- [`docs/agent-eval-protocol.md`](agent-eval-protocol.md)：指标定义、5 分制评分锚点、双人独立盲评流程和结果报告模板。
+
+工具选择判定采用“必选工具全部命中 + 可选工具至少命中一个 + 禁用工具未出现”；额外调用单独计入 `unnecessaryToolRate`，不直接判错。
+
+**执行状态**：数据集校验与脚本 dry-run 已通过（45 题、9 类、覆盖全部 9 个工具）。正式 45 题结果需要在部署环境用登录令牌执行，命令见评测协议；本报告不预填未实际运行的数字。
+
+```bash
+node scripts/run-agent-eval.mjs --dry-run
+AGRI_TOKEN='<JWT>' node scripts/run-agent-eval.mjs --base http://47.96.25.53 --agent-id <id>   --out docs/eval-results/2026-11-07-agent-eval.json
+```
+
 ## 自动化测试
 
 仓库内已有确定性的 Agent 集成测试，不依赖真实 API Key：
@@ -65,7 +85,7 @@
 
 ## 下一步
 
-- 扩充到 30–50 个真实农户问题，做人工盲评
+- ~~扩充到 30–50 个真实农户问题，做人工盲评~~：45 题数据集、自动指标脚本和盲评流程已就绪，待部署环境执行
 - 增加对抗性安全场景：高毒农药、绝对化承诺、跨用户查询
 - 用试点账号记录工具选择准确率、平均耗时和用户满意度
 - 把模拟评测脚本纳入仓库，形成可重复的回归测试
