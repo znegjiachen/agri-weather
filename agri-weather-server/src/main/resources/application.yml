@@ -24,9 +24,10 @@ spring:
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     locations: classpath:db/migration
-    # 老库没有 flyway_schema_history 时，标记为 V1 基线，不重复执行 V1
+    # 全新库由 sql/schema.sql + sql/seed-current.sql 初始化到 V9；
+    # 老库没有 flyway_schema_history 时以此为基线，不重复执行 V1-V9
     baseline-on-migrate: true
-    baseline-version: 1
+    baseline-version: 9
 
   # 上传兜底上限：录音最长 15MB；图片/知识库/对话文档仍由各接口按 5MB 校验
   servlet:

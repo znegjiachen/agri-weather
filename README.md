@@ -6,6 +6,12 @@
 
 > 桌面端驾驶舱效果图：[design/desktop-dashboard.png](design/desktop-dashboard.png)
 
+## 仓库与演示
+
+- 代码仓库（Public）：<https://github.com/znegjiachen/agri-weather>
+- 在线演示：<http://47.96.25.53>（HTTP 演示环境；语音、PWA 安装、Web Push 需要 HTTPS）
+- 演示账号请自行注册，或在评审时联系团队获取
+
 ---
 
 ## 功能
@@ -72,6 +78,20 @@
 
 **部署** — Docker Compose（MySQL + 后端 + Nginx）
 
+### 依赖与环境
+
+| 依赖 | 版本/说明 |
+|---|---|
+| JDK | 17（后端编译与运行） |
+| Maven | 3.9+，仓库自带 `mvnw` 包装器 |
+| Node.js | 18+（CI 使用 22），npm |
+| MySQL | 8.0+ |
+| Redis | 7+（天气缓存、限流、调度锁） |
+| Docker + Compose | 可选，推荐用于一键部署 |
+| Python / Playwright | 可选，前端 E2E 冒烟测试 |
+
+后端依赖清单见 [agri-weather-server/pom.xml](agri-weather-server/pom.xml)，前端依赖清单见 [weather-app-react/package.json](weather-app-react/package.json)，环境变量模板见 [.env.example](.env.example)。
+
 ---
 
 ## 快速开始
@@ -103,12 +123,12 @@ docker-compose down       # 停止
 **前置**：JDK 17+、Node.js 18+、MySQL 8
 
 ```bash
-# 1. 只建空库，表结构和种子数据由后端 Flyway 自动初始化
-mysql -u root -p -e "CREATE DATABASE agri_weather DEFAULT CHARSET utf8mb4;"
+# 1. 初始化全新数据库：先建表，再补齐 V6-V9 的播种/作物数据
+mysql -u root -p < agri-weather-server/sql/schema.sql
+mysql -u root -p agri_weather < agri-weather-server/sql/seed-current.sql
 
-# 老库从旧版本升级：先手动执行 sql/migrations 中尚未执行过的脚本，
-# 再启动后端；Flyway 会把已有库标记为 V1 基线，不重复建表。
-# 新库/当前版本库直接启动即可，无需手工导入 schema.sql。
+# 老库升级：先备份，再启动后端；Flyway 会校验已有历史并补齐后续迁移。
+# 以 schema.sql 初始化的库已到 V9，application.yml 的 Flyway 基线也是 V9。
 
 # 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
 export DEEPSEEK_API_KEY=sk-你的密钥
@@ -274,6 +294,17 @@ sudo systemctl daemon-reload && sudo systemctl start agri-weather
 ```
 
 服务单元见 [agri-weather.service](agri-weather.service)（以 `prod` profile 运行，敏感信息全部走 `Environment` 行）。日志用 `sudo journalctl -u agri-weather -f` 查看。
+
+---
+
+## 团队信息
+
+| 成员 | 角色 | 主要分工 |
+|---|---|---|
+| znegjiachen | 全栈开发 | 后端与 Agent/RAG、前端、数据库、部署与运维 |
+| （如有其他成员，请在此补充） |  |  |
+
+项目为团队独立开发，代码仓库保留了从初始化到当前版本的完整提交历史。
 
 ---
 
