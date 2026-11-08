@@ -4,7 +4,7 @@
 
 ## 产物
 
-- `../../问田-智慧农业天气系统-技术文档-2026-11-08.pdf`：交付版 PDF，A4，27 页
+- `../问田-智慧农业天气系统-技术文档.pdf`：交付版 PDF，A4，27 页
 
 ## 重新生成
 
@@ -22,6 +22,6 @@ python build_doc.py         # 生成根目录 PDF
 - 正文与图表均为项目实测/仓库文档口径，AI 评测样本较小，文中已标注局限。
 - 图表使用 Microsoft YaHei，PDF 已嵌入字体子集。
 - 功能截图位于 `assets/screens/`，由 Playwright 对本地运行的页面实拍；Agent 对话截图使用真实 DeepSeek 调用，展示思考与 3 个工具调用轨迹。
-- 页数如后续调整内容，请用 `python -c "import pymupdf; print(pymupdf.open('../../问田-智慧农业天气系统-技术文档-2026-11-08.pdf').page_count)"` 校验不超过 30 页。
+- 页数如后续调整内容，请用 `python -c "import pymupdf; print(pymupdf.open('../问田-智慧农业天气系统-技术文档.pdf').page_count)"` 校验不超过 30 页。
 
 - 封面照片来自 Unsplash（免费许可），由 make_cover.py 合成为绿色渐变底图。

@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
-OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档-2026-11-08.pdf")
+OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "docs", "问田-智慧农业天气系统-技术文档.pdf")
 SHOT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "design", "desktop-dashboard.png")
 COVER_IMG = os.path.join(ASSETS, "cover-composed.jpg")
 
@@ -385,6 +385,7 @@ toc.levelStyles = [
 toc.dotsMinLevel = 0
 story += [toc, Spacer(1, 10)]
 story.append(P("说明：本目录页码为 PDF 物理页码，封面为第 1 页。", "Small"))
+story += CALLOUT("全文逻辑主线", "第 1 章问题与目标 → 第 2 章需求收敛 → 第 3 章架构与边界 → 第 4 章 AI 接入 → 第 5 章功能落地 → 第 6 章验证与部署 → 第 7 章创新与展望。每一章都为下一章提供输入，而不是彼此并列的功能清单。")
 story.append(PageBreak())
 
 # =====================================================================
@@ -472,7 +473,7 @@ story += T([
     ["FR-06", "AI 助农手", "多轮对话、工具调用、地块范围、轨迹可视化、流式输出", "高"],
     ["FR-07", "知识库与 RAG", "文档上传、切块、检索、引用；每智能体独立", "中高"],
     ["FR-08", "多模态与语音", "最多 3 张照片识别；语音转写或浏览器回退", "中"],
-    ["FR-09", "方案任务闭环", "抽取、确认、提醒、完成/跳过、记录与统计", "中"],
+    ["FR-09", "方案任务闭环（5.7）", "抽取、确认、提醒、完成/跳过、记录与统计", "中"],
     ["FR-10", "社区与 MCP", "富文本净化、图片托管；标准 MCP 工具与审计", "中"],
 ], [1.5 * cm, 3.0 * cm, FRAME_W - 5.5 * cm, 1.2 * cm], "功能需求清单")
 
@@ -500,7 +501,15 @@ story += T([
 ], [4.0 * cm, 5.0 * cm, FRAME_W - 9.0 * cm], "关键约束与设计取舍")
 
 story.append(H2("2.6  需求实现映射"))
-story.append(P("上述需求在代码中均有明确落点：地块与种植季对应 FarmlandController / FarmlandRecordController；天气与预警对应 WeatherClient、FarmlandWeatherService、AlertService；作物与播种对应 CropService；AI 能力对应 agent 包（循环与工具协议）与 ai 包（DeepSeek 适配、工具实现、安全兜底）；方案任务对应 FarmlandTaskController、PlanTaskExtractionService、FarmTaskReminderScheduler；社区对应 CommunityService 与图片处理链路。第 5 章按用户可见功能逐项说明。"))
+story.append(P("为避免“需求、架构、实现、验证”四张皮，表 8 把核心需求直接映射到架构落点、实现章节与验证方式；后续章节按这条链路展开。"))
+story += T([
+    ["需求域", "架构 / 代码落点", "实现章节", "验证方式"],
+    ["账号、地块与权限", "SecurityConfig、FarmlandController、FarmlandAccessGuard", "5.1", "越权集成测试、CI"],
+    ["天气与预警", "WeatherClient、FarmlandWeatherService、AlertService", "5.2 / 5.4", "缓存状态、预警去重、Web Push 测试"],
+    ["作物与任务", "CropService、PlanTaskExtractionService、FarmTaskReminderScheduler", "5.3 / 5.7", "生育期与任务统计、E2E"],
+    ["AI 顾问与知识库", "AgentHarness、DeepSeekClient、KnowledgeRetrievalService", "4.3 / 5.5", "Agent 5 场景、RAG hit@5"],
+    ["社区与开放能力", "CommunityService、mcp-server", "5.8 / 5.10", "HTML 净化、写操作审计"],
+], [3.2 * cm, 6.2 * cm, 2.4 * cm, FRAME_W - 11.8 * cm], "需求—实现—验证映射")
 
 story.append(H2("2.7  迭代批次与交付边界"))
 story.append(P("项目按“先跑通、再增强、后闭环、最后工程化”的批次推进，每个批次都保留可演示、可回退的完整链路，避免一次性堆叠功能导致无法验收。"))
@@ -518,7 +527,7 @@ story.append(CondPageBreak(7 * cm))
 story += H1("3  系统架构设计")
 
 story.append(H2("3.1  总体架构"))
-story.append(P("系统采用分层架构：接入层负责静态资源、反向代理与 SSE 透传；前端层是 React 单页应用与 PWA；应用服务层承载认证、地块、天气、作物、预警、任务、社区等业务；智能体层独立封装工具调用循环、RAG、多模态与安全兜底；数据层由 MySQL、Redis 与 Flyway 组成；外部服务通过配置接入，可替换、可降级。"))
+story.append(P("系统采用分层架构（图 2）：接入层负责静态资源、反向代理与 SSE 透传；前端层是 React 单页应用与 PWA；应用服务层承载认证、地块、天气、作物、预警、任务、社区等业务；智能体层独立封装工具调用循环、RAG、多模态与安全兜底；数据层由 MySQL、Redis 与 Flyway 组成；外部服务通过配置接入，可替换、可降级。"))
 story += FIG(os.path.join(ASSETS, "fig1-architecture.png"), 16.2 * cm,
              "问田系统总体架构：业务能力与智能体能力分层，外部依赖可替换")
 story.append(P("分层的直接收益是“换模型不改业务、换天气源不改前端”。DeepSeek 通过 OpenAI 兼容协议接入，基座模型可用 base-url 与 model 切换；天气源抽象为 WeatherClient，主源失败自动切备源；Embedding 未配置时回退本地向量，ASR 未配置时回退浏览器识别。任何单一外部服务都不是系统的单点。"))
@@ -626,7 +635,7 @@ story.append(P("项目没有引入 LangChain / LlamaIndex 等编排框架，而�
 
 story.append(H2("4.3  集成方式"))
 story.append(H3("4.3.1  工具调用循环"))
-story.append(P("AgentHarness 是整个 AI 能力的核心。它不感知“地块”“打药”等业务概念，只负责：把 system prompt、历史消息与用户问题组装成消息列表；把 ToolRegistry 提供的工具描述交给模型；解析模型返回的 tool_calls；执行工具并把结果作为 tool 消息回喂；直到模型不再调用工具或达到轮数上限。"))
+story.append(P("AgentHarness 是整个 AI 能力的核心（图 3）。它不感知“地块”“打药”等业务概念，只负责：把 system prompt、历史消息与用户问题组装成消息列表；把 ToolRegistry 提供的工具描述交给模型；解析模型返回的 tool_calls；执行工具并把结果作为 tool 消息回喂；直到模型不再调用工具或达到轮数上限。"))
 story += FIG(os.path.join(ASSETS, "fig2-agent-loop.png"), 16.2 * cm,
              "智能体工具调用循环：模型决策、工具执行、结果回喂与收敛保护")
 story.append(P("循环之外还有一层保护：如果 6 轮后模型仍在调用工具，系统会追加一条“基于已有信息直接回答、不要再调用工具”的指令，并在响应中标记 truncated。这样即使模型陷入反复查询，也能给用户一个可读的结果，而不是超时或空响应。"))
@@ -645,7 +654,7 @@ story += T([
     ["get_tasks", "今日待办、逾期、未来任务", "farm_plan_task；按范围查询"],
 ], [3.5 * cm, 6.6 * cm, FRAME_W - 10.1 * cm], "9 个农事工具")
 story.append(H3("4.3.3  RAG 知识库"))
-story.append(P("知识库以“每个智能体独立”为边界：上传的文档只保留提取后的纯文本，按目标 480 字、上限 600 字、重叠 60 字切块；段落优先、句末优先，避免把一句话拦腰截断。检索时中文取 bigram、英文取整词，过滤“怎么、什么、可以”等停用 bigram，计算 TF-IDF 与标题加权，再与向量余弦相似度融合。"))
+story.append(P("知识库以“每个智能体独立”为边界：上传的文档只保留提取后的纯文本，按目标 480 字、上限 600 字、重叠 60 字切块；段落优先、句末优先，避免把一句话拦腰截断。检索时中文取 bigram、英文取整词，过滤“怎么、什么、可以”等停用 bigram，计算 TF-IDF 与标题加权，再与向量余弦相似度融合（图 4）。"))
 story += FIG(os.path.join(ASSETS, "fig3-rag.png"), 16.2 * cm,
              "知识库入库与检索链路：词法、向量与上下文边界")
 story.append(Paragraph("score = Σ (1 + ln tf)·idf(t) + 1.8·Σ idf(t∈标题) + 4.0·cos(q,c) + 精确子串加分", S["Formula"]))
@@ -723,7 +732,7 @@ story += H1("5  核心功能实现")
 story.append(P("本章按用户可见功能说明实现路径，重点写“数据从哪里来、边界在哪里、异常怎么处理”，不逐行罗列代码。"))
 
 story.append(H2("5.1  地块管理与地图圈地"))
-story.append(P("地块是系统的最小业务单元，包含名称、经纬度、面积、土壤、灌溉方式、作物与播期。前端使用 Leaflet 加载卫星底图，用户依次点击边界点围成多边形，系统自动计算亩数并保存边界数组；也可使用浏览器定位。地块创建后自动生成专属助农手，作物或面积变化时只刷新未自定义的人设，用户改过的人设不会被覆盖。删除地块时，应用层按顺序清理预警、农事记录、任务、种植季与智能体数据，避免外键约束导致 500。"))
+story.append(P("地块是系统的最小业务单元（图 5、图 6），包含名称、经纬度、面积、土壤、灌溉方式、作物与播期。前端使用 Leaflet 加载卫星底图，用户依次点击边界点围成多边形，系统自动计算亩数并保存边界数组；也可使用浏览器定位。地块创建后自动生成专属助农手，作物或面积变化时只刷新未自定义的人设，用户改过的人设不会被覆盖。删除地块时，应用层按顺序清理预警、农事记录、任务、种植季与智能体数据，避免外键约束导致 500。"))
 story += FIG(os.path.join(ASSETS, "screens", "map.jpg"), 15.6 * cm,
              "地块地图：卫星底图圈选、边界保存与亩数计算")
 story += FIG(os.path.join(ASSETS, "screens", "farmlands.jpg"), 15.6 * cm,
@@ -731,15 +740,15 @@ story += FIG(os.path.join(ASSETS, "screens", "farmlands.jpg"), 15.6 * cm,
 story.append(H2("5.2  天气服务与展示"))
 story.append(P("天气接口按经纬度返回实时、逐小时与 7 日数据，前端提供趋势图、单位切换与天气详情；响应头携带缓存状态（HIT / MISS / STALE / BYPASS），便于排查。移动端采用独立布局，弱网下由 Workbox 对 GET 接口做 NetworkFirst 缓存（3 秒超时），并对 Open-Meteo 资源做 StaleWhileRevalidate。PWA 采用 prompt 更新而不是自动刷新，避免打断正在进行的对话或发帖。"))
 story.append(H2("5.3  作物与播种适配"))
-story.append(P("作物库覆盖 64 种常见作物，记录适宜播种温度、生长周期、各阶段天数、适宜温湿度、降水与光照需求，以及霜冻、高温、涝害敏感标记。播种适配不是简单查表：系统把计划播期前后的温度与作物适宜区间比较，结合 FAO EcoCrop 的四断点响应思路给出匹配度，并在返回体中写明方法与数据说明。作物接口与 search_crop 工具都会返回 data_source 与 confidence，避免把团队整理数据说成国家标准。"))
+story.append(P("作物库覆盖 64 种常见作物（图 7），记录适宜播种温度、生长周期、各阶段天数、适宜温湿度、降水与光照需求，以及霜冻、高温、涝害敏感标记。播种适配不是简单查表：系统把计划播期前后的温度与作物适宜区间比较，结合 FAO EcoCrop 的四断点响应思路给出匹配度，并在返回体中写明方法与数据说明。作物接口与 search_crop 工具都会返回 data_source 与 confidence，避免把团队整理数据说成国家标准。"))
 story += FIG(os.path.join(ASSETS, "screens", "crops.jpg"), 15.6 * cm,
              "播种适配：64 种作物选择、地块实时气象与播期条件检测")
 story.append(H2("5.4  预警中心"))
-story.append(P("预警中心按地块展示未读与历史预警，支持单条已读与全部已读；移动端首页有入口与未读角标。后台巡检与手动检查共用同一套规则：冻害看未来 24 小时最低温与作物敏感标记，热害看最高温，涝害看累计降水，大风看最大风速，阶段异常看当前生育期的适宜温湿度。预警分级为平台自定义，不等同于气象部门官方预警信号，接口与文案都明确这一点。"))
+story.append(P("预警中心按地块展示未读与历史预警（图 8），支持单条已读与全部已读；移动端首页有入口与未读角标。后台巡检与手动检查共用同一套规则：冻害看未来 24 小时最低温与作物敏感标记，热害看最高温，涝害看累计降水，大风看最大风速，阶段异常看当前生育期的适宜温湿度。预警分级为平台自定义，不等同于气象部门官方预警信号，接口与文案都明确这一点。"))
 story += FIG(os.path.join(ASSETS, "screens", "alerts.jpg"), 15.6 * cm,
              "预警中心：多类风险分级、处理状态与已读操作")
 story.append(H2("5.5  助农手与智能体控制台"))
-story.append(P("每块地一个助农手，是这个项目最具差异化的产品设计。控制台支持修改名称、头像、欢迎语与人设，恢复默认人设，查看内置作物档案；知识库支持粘贴文本或上传 TXT / Markdown / PDF / Word，中文关键词 + 向量混合检索，最多注入 4 段资料；9 个工具可逐项启用/停用，关闭后模型看不到该工具；对话历史存后端，刷新或换设备仍可恢复；回答下方可点赞/点踩，顶部展示成功率、平均延迟、工具调用、知识命中与安全提示次数。"))
+story.append(P("每块地一个助农手，是这个项目最具差异化的产品设计（图 9、图 10）。控制台支持修改名称、头像、欢迎语与人设，恢复默认人设，查看内置作物档案；知识库支持粘贴文本或上传 TXT / Markdown / PDF / Word，中文关键词 + 向量混合检索，最多注入 4 段资料；9 个工具可逐项启用/停用，关闭后模型看不到该工具；对话历史存后端，刷新或换设备仍可恢复；回答下方可点赞/点踩，顶部展示成功率、平均延迟、工具调用、知识命中与安全提示次数。"))
 story += FIG(os.path.join(ASSETS, "screens", "agent-studio.jpg"), 15.6 * cm,
              "智能体控制台：一块地一个助农手，人设、知识库、工具与运行指标独立配置")
 story += FIG(os.path.join(ASSETS, "screens", "agent-chat.jpg"), 15.6 * cm,
@@ -755,6 +764,18 @@ story.append(H2("5.9  前端工程与 PWA"))
 story.append(P("前端采用 React 19 + Vite 8，页面层已迁移 TypeScript，CI 对所有 TS/TSX 开启 strict；路由级 lazy 拆包，首屏只保留首页；桌面驾驶舱与移动端使用两套布局，公共组件复用。PWA 使用 Workbox：社区图片 CacheFirst、GET 接口 NetworkFirst、Open-Meteo StaleWhileRevalidate；缓存键额外拼入 Authorization 的 SHA-256 指纹，防止同一浏览器换账号后读到上一位用户的私有数据。"))
 story.append(H2("5.10  MCP 开放能力"))
 story.append(P("mcp-server 把地块、天气、农事建议、作物检索封装为标准 MCP 工具，并提供创建农事记录、种植季、提醒 3 个写工具。写操作必须显式传 confirm：第一次只返回参数预览，第二次才真正写库；每次预览、成功、失败都追加 JSONL 审计日志。MCP 服务与后端共用同一套 JWT 权限，只代理当前用户有权访问的地块，不绕过任何鉴权。"))
+
+story.append(H2("5.11  一条端到端业务链路"))
+story.append(P("把前面的模块串起来看，一次完整的农事决策从“建地块”开始，到“复盘统计”结束。表 18 用一条链路说明用户动作、系统响应与涉及模块，避免把功能写成孤立清单。"))
+story += T([
+    ["阶段", "用户动作", "系统响应", "涉及模块"],
+    ["建档", "添加地块、圈边界、选作物与播期", "计算亩数、保存边界、自动生成专属助农手", "地块/地图、Agent"],
+    ["监测", "打开驾驶舱或预警中心", "缓存天气、巡检预警、更新未读角标", "天气、预警、Push"],
+    ["咨询", "问“明天能打药吗”", "调用天气/规则/生育期工具，输出建议与轨迹", "Agent、工具、规则引擎"],
+    ["决策", "采纳建议并创建任务", "任务入库、到期提醒、状态跟踪", "计划任务、调度"],
+    ["执行", "完成或跳过任务", "自动生成农事记录、统计完成率/按时率", "任务、农事记录"],
+    ["复盘", "查看统计、进入下一季", "保留季节历史，数据回流到下一轮决策", "种植季、统计"],
+], [1.4 * cm, 4.6 * cm, 6.3 * cm, FRAME_W - 12.3 * cm], "端到端业务链路")
 
 # =====================================================================
 # 6 测试与部署
@@ -796,7 +817,7 @@ story.append(P("AI 评测不放进 CI 的必过门禁，因为它依赖真实模
 story.append(H2("6.6  部署方案"))
 story += FIG(os.path.join(ASSETS, "fig4-deploy.png"), 16.2 * cm,
              "部署拓扑：Nginx、两个无状态后端、MySQL、Redis 与外部服务")
-story.append(P("默认使用 Docker Compose 编排 5 个服务：MySQL 8、Redis 7、两个 Spring Boot 后端、Nginx。MySQL 首次启动执行 schema.sql 与 seed-current.sql；后端通过环境变量读数据库、JWT、CORS、DeepSeek、Embedding、ASR、VAPID 等配置；Nginx 托管前端静态文件、反代 /api，并对 /api/agent/ 关闭缓冲、放宽读超时。两个后端无状态，由 Nginx least_conn 轮询，健康检查失败自动摘除。"))
+story.append(P("默认使用 Docker Compose 编排 5 个服务（图 11）：MySQL 8、Redis 7、两个 Spring Boot 后端、Nginx。MySQL 首次启动执行 schema.sql 与 seed-current.sql；后端通过环境变量读数据库、JWT、CORS、DeepSeek、Embedding、ASR、VAPID 等配置；Nginx 托管前端静态文件、反代 /api，并对 /api/agent/ 关闭缓冲、放宽读超时。两个后端无状态，由 Nginx least_conn 轮询，健康检查失败自动摘除。"))
 story.append(B("<b>非 Docker：</b>deploy.sh 提供 setup / deploy 两步；systemd 以 prod profile 运行，敏感信息全部写 Environment 行；Nginx 同域托管前端与反代，避免跨域配置。"))
 story.append(B("<b>HTTPS：</b>语音识别、PWA 安装、Web Push 均要求安全上下文；HTTP 演示环境会明确降级为浏览器能力或站内通知，不会静默失败。"))
 story.append(B("<b>迁移：</b>Flyway 启动自动执行；已发布脚本不改校验和，结构变更追加新版本；老库首次接入时以基线版本标记，不重复建表。"))
@@ -824,24 +845,24 @@ story.append(P("更重要的是，项目没有把“接入大模型”当作终�
 story.append(H2("7.2  技术创新点"))
 story += T([
     ["编号", "创新点", "具体做法", "价值"],
-    ["T1", "领域无关的轻量 Agent 框架", "AgentHarness + Tool SPI + ToolRegistry + Observer；框架不含农业词汇，纯 Java 可测", "业务与编排解耦；新增工具零改框架；测试不依赖真实模型"],
-    ["T2", "规则计算 + 模型调度的混合决策", "农学阈值由 OperationAdvisor / AlertService 计算，模型只选工具、解释与表达", "避免模型编造“风速 3m/s 可以打药”；结论可复现、可审计"],
-    ["T3", "地块与智能体双重权限边界", "工具层同时校验 userId 与 agent.farmlandId，list_farmlands 也只返回负责地块", "即使提示词被绕过，也无法跨用户/跨地块取数"],
-    ["T4", "面向小知识库的中文混合检索", "bigram + 停用词 + IDF + 标题加权 + 可选向量 + 长度归一 + 同文档限流", "无需向量数据库即可工作；无外部服务时自动降级"],
-    ["T5", "可靠性与成本工程", "6 轮强制收敛、工具错误 JSON 回喂、SSE 取消、历史裁剪、结果摘要、缓存/锁/限流/额度", "长链路不中断、成本可控、弱网可用"],
-    ["T6", "全链路可解释与可回归", "工具轨迹、思考摘要、运行指标、RAG/Agent 评测集、对照实验、CI 全新库校验", "从“演示成功”走向“可重复验证”"],
+    ["T1", "领域无关的轻量 Agent 框架（4.3.1）", "AgentHarness + Tool SPI + ToolRegistry + Observer；框架不含农业词汇，纯 Java 可测", "业务与编排解耦；新增工具零改框架；测试不依赖真实模型"],
+    ["T2", "规则计算 + 模型调度的混合决策（4.1 / 4.3.2）", "农学阈值由 OperationAdvisor / AlertService 计算，模型只选工具、解释与表达", "避免模型编造“风速 3m/s 可以打药”；结论可复现、可审计"],
+    ["T3", "地块与智能体双重权限边界（3.5.3 / 4.3.2）", "工具层同时校验 userId 与 agent.farmlandId，list_farmlands 也只返回负责地块", "即使提示词被绕过，也无法跨用户/跨地块取数"],
+    ["T4", "面向小知识库的中文混合检索（4.3.3）", "bigram + 停用词 + IDF + 标题加权 + 可选向量 + 长度归一 + 同文档限流", "无需向量数据库即可工作；无外部服务时自动降级"],
+    ["T5", "可靠性与成本工程（4.4）", "6 轮强制收敛、工具错误 JSON 回喂、SSE 取消、历史裁剪、结果摘要、缓存/锁/限流/额度", "长链路不中断、成本可控、弱网可用"],
+    ["T6", "全链路可解释与可回归（4.5 / 6.4）", "工具轨迹、思考摘要、运行指标、RAG/Agent 评测集、对照实验、CI 全新库校验", "从“演示成功”走向“可重复验证”"],
 ], [1.0 * cm, 4.2 * cm, 7.3 * cm, FRAME_W - 12.5 * cm], "技术创新点")
 
 story.append(CondPageBreak(9 * cm))
 story.append(H2("7.3  应用创新点"))
 story += T([
     ["编号", "创新点", "具体做法", "价值"],
-    ["A1", "一块地一个助农手", "每块地自动生成智能体，人设、知识库、工具、会话、权限独立", "建议带地块上下文；多地块用户不串数据"],
-    ["A2", "可执行的农事问答", "把“明天能打药吗”拆成地块、天气、生育期、规则四步，返回具体日期与理由", "从“知道天气”变成“知道该做什么”"],
-    ["A3", "播种适配与数据可信", "64 种作物 + 实时气象 + 播期匹配；接口返回来源与置信度", "避免把团队整理数据冒充国标；支持追责与复核"],
-    ["A4", "预警到行动的最小闭环", "后台巡检 + 站内未读 + Web Push + 已读；预警分级与官方信号明确区分", "提醒能到达、能处理、能追踪"],
+    ["A1", "一块地一个助农手（5.5）", "每块地自动生成智能体，人设、知识库、工具、会话、权限独立", "建议带地块上下文；多地块用户不串数据"],
+    ["A2", "可执行的农事问答（4.3.1 / 5.5）", "把“明天能打药吗”拆成地块、天气、生育期、规则四步，返回具体日期与理由", "从“知道天气”变成“知道该做什么”"],
+    ["A3", "播种适配与数据可信（5.3）", "64 种作物 + 实时气象 + 播期匹配；接口返回来源与置信度", "避免把团队整理数据冒充国标；支持追责与复核"],
+    ["A4", "预警到行动的最小闭环（3.5.2 / 5.4）", "后台巡检 + 站内未读 + Web Push + 已读；预警分级与官方信号明确区分", "提醒能到达、能处理、能追踪"],
     ["A5", "方案任务闭环", "方案抽取 → 人工确认 → 到期提醒 → 完成/跳过 → 农事记录 → 完成率统计", "AI 输出落到农事动作，而不是停在聊天框"],
-    ["A6", "田间可用的多入口", "PWA、语音、拍照识病、文档问答、MCP 开放工具、社区", "覆盖打字不便、网络不稳、需要外部集成的真实场景"],
+    ["A6", "田间可用的多入口（5.9 / 5.10）", "PWA、语音、拍照识病、文档问答、MCP 开放工具、社区", "覆盖打字不便、网络不稳、需要外部集成的真实场景"],
 ], [1.0 * cm, 4.2 * cm, 7.3 * cm, FRAME_W - 12.5 * cm], "应用创新点")
 
 story.append(H2("7.4  不足"))
