@@ -137,13 +137,6 @@ def draw_cover(c, doc):
                  "项目概述 · 需求分析 · 系统架构 · AI 方案 · 核心实现 · 测试部署 · 总结展望")
     c.setFillAlpha(1)
 
-    c.setFont("MSYH", 8.0)
-    c.drawRightString(PAGE_W - 2.2 * cm, PAGE_H - 11.25 * cm, "Technical Documentation   V1.0")
-    c.setFillAlpha(0.65)
-    c.setFont("MSYH", 6.4)
-    c.drawRightString(PAGE_W - 2.2 * cm, PAGE_H - 11.75 * cm, "封面图：Unsplash（免费许可）")
-    c.setFillAlpha(1)
-
     # 封面信息
     c.setFillColor(DARK)
     c.setFont("MSYHB", 10.5)
