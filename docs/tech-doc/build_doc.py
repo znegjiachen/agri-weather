@@ -10,6 +10,7 @@ from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, HRFlowable,
                                 Image, KeepTogether, LongTable, NextPageTemplate, PageBreak,
                                 PageTemplate, Paragraph, Spacer, Table, TableStyle)
@@ -17,8 +18,9 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
-OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档-2026-11-07.pdf")
+OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "docs", "问田-智慧农业天气系统-技术文档-2026-11-07.pdf")
 SHOT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "design", "desktop-dashboard.png")
+COVER_IMG = os.path.join(ASSETS, "cover-composed.jpg")
 
 # ---------------- 字体 ----------------
 pdfmetrics.registerFont(TTFont("MSYH", "C:/Windows/Fonts/msyh.ttc", subfontIndex=0))
@@ -66,6 +68,8 @@ S["TableText"] = ParagraphStyle("TableText", fontName="MSYH", fontSize=7.9, lead
                                 textColor=DARK, wordWrap="CJK")
 S["TableHead"] = ParagraphStyle("TableHead", parent=S["TableText"], fontName="MSYHB",
                                 textColor=colors.white)
+S["TableLabel"] = ParagraphStyle("TableLabel", parent=S["TableText"], fontName="MSYHB",
+                                 textColor=DARK)
 S["Small"] = ParagraphStyle("Small", fontName="MSYH", fontSize=8.1, leading=12,
                             textColor=GRAY, wordWrap="CJK")
 S["Callout"] = ParagraphStyle("Callout", fontName="MSYH", fontSize=8.6, leading=13,
@@ -92,43 +96,58 @@ class Doc(BaseDocTemplate):
 
 
 # ---------------- 画封面 ----------------
+def _draw_cover_photo(c, path, x, y, w, h):
+    """按 cover 方式裁切图片，填满指定区域。"""
+    img = ImageReader(path)
+    iw, ih = img.getSize()
+    scale = max(w / iw, h / ih)
+    dw, dh = iw * scale, ih * scale
+    dx, dy = x + (w - dw) / 2, y + (h - dh) / 2
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(x, y, w, h)
+    c.clipPath(clip, stroke=0, fill=0)
+    c.drawImage(img, dx, dy, dw, dh, mask="auto")
+    c.restoreState()
+
+
 def draw_cover(c, doc):
     c.saveState()
-    # 顶部绿色色块
-    h = 10.6 * cm
-    c.setFillColor(GREEN)
-    c.rect(0, PAGE_H - h, PAGE_W, h, fill=1, stroke=0)
+    h = 12.2 * cm
+    top = PAGE_H - h
+
+    # 预先合成的封面底图：真实田野照片 + 左侧绿色渐变 + 底部压暗
+    _draw_cover_photo(c, COVER_IMG, 0, top, PAGE_W, h)
+
     c.setFillColor(AMBER)
-    c.rect(0, PAGE_H - h - 0.14 * cm, PAGE_W, 0.14 * cm, fill=1, stroke=0)
+    c.rect(0, top - 0.14 * cm, PAGE_W, 0.14 * cm, fill=1, stroke=0)
 
-    # 装饰圆与网格
-    c.setFillAlpha(0.06)
-    c.setFillColor(colors.white)
-    c.circle(PAGE_W - 2.6 * cm, PAGE_H - 2.4 * cm, 3.5 * cm, fill=1, stroke=0)
-    c.circle(PAGE_W - 1.0 * cm, PAGE_H - 7.4 * cm, 2.2 * cm, fill=1, stroke=0)
-    c.setFillAlpha(1)
-
+    # 封面标题
     c.setFillColor(colors.white)
     c.setFont("MSYH", 8.2)
     c.drawString(2.2 * cm, PAGE_H - 2.3 * cm, "SMART AGRICULTURE  ·  FIELD WEATHER  ·  AI ADVISOR")
 
     c.setFont("MSYHB", 37)
-    c.drawString(2.2 * cm, PAGE_H - 5.3 * cm, "问田")
+    c.drawString(2.2 * cm, PAGE_H - 5.2 * cm, "问田")
     c.setFont("MSYH", 17)
-    c.drawString(2.2 * cm, PAGE_H - 6.7 * cm, "智慧农业天气系统技术文档")
+    c.drawString(2.2 * cm, PAGE_H - 6.6 * cm, "智慧农业天气系统技术文档")
     c.setFont("MSYH", 9.2)
-    c.setFillAlpha(0.9)
-    c.drawString(2.2 * cm, PAGE_H - 8.2 * cm,
+    c.setFillAlpha(0.92)
+    c.drawString(2.2 * cm, PAGE_H - 8.1 * cm,
                  "项目概述 · 需求分析 · 系统架构 · AI 方案 · 核心实现 · 测试部署 · 总结展望")
     c.setFillAlpha(1)
 
-    c.setFont("MSYH", 8.2)
-    c.drawRightString(PAGE_W - 2.2 * cm, PAGE_H - h + 0.75 * cm, "Technical Documentation   V1.0")
+    c.setFont("MSYH", 8.0)
+    c.drawRightString(PAGE_W - 2.2 * cm, PAGE_H - 11.25 * cm, "Technical Documentation   V1.0")
+    c.setFillAlpha(0.65)
+    c.setFont("MSYH", 6.4)
+    c.drawRightString(PAGE_W - 2.2 * cm, PAGE_H - 11.75 * cm, "封面图：Unsplash（免费许可）")
+    c.setFillAlpha(1)
 
     # 封面信息
     c.setFillColor(DARK)
     c.setFont("MSYHB", 10.5)
-    c.drawString(2.2 * cm, PAGE_H - 13.0 * cm, "把实时天气、作物生长模型、灾害预警和 AI 农事顾问，放进同一个工作台。")
+    c.drawString(2.2 * cm, PAGE_H - 13.7 * cm, "把实时天气、作物生长模型、灾害预警和 AI 农事顾问，放进同一个工作台。")
 
     c.setFont("MSYH", 8.6)
     c.setFillColor(GRAY)
@@ -139,7 +158,7 @@ def draw_cover(c, doc):
         ("项目仓库", "github.com/znegjiachen/agri-weather"),
         ("演示环境", "http://47.96.25.53"),
     ]
-    y = PAGE_H - 15.0 * cm
+    y = PAGE_H - 15.4 * cm
     for k, v in meta:
         c.setFillColor(GRAY)
         c.drawString(2.2 * cm, y, k)
@@ -148,7 +167,7 @@ def draw_cover(c, doc):
         y -= 0.62 * cm
 
     # 关键数字卡片
-    card_y = PAGE_H - 21.4 * cm
+    card_y = PAGE_H - 20.9 * cm
     cards = [("64", "种常见作物档案"), ("9", "个可调用农事工具"), ("23", "张业务数据表")]
     x = 2.2 * cm
     for num, label in cards:
@@ -318,7 +337,7 @@ info = [
     ["代码规模", "后端 195 个 Java 文件、约 1.36 万行；前端 55 个 TS/TSX 文件、约 1.19 万行；REST 端点 88 个；数据表 23 张"],
     ["文档状态", "V1.0 交付版，与 2026-11-07 主线代码一致"],
 ]
-t = Table([[cell(a, True), cell(b)] for a, b in info], colWidths=[3.3 * cm, FRAME_W - 3.3 * cm])
+t = Table([[Paragraph(a, S["TableLabel"]), cell(b)] for a, b in info], colWidths=[3.3 * cm, FRAME_W - 3.3 * cm])
 t.setStyle(TableStyle([
     ("GRID", (0, 0), (-1, -1), 0.35, RULE),
     ("BACKGROUND", (0, 0), (0, -1), LGRAY),
@@ -348,7 +367,7 @@ structure = [
     ["第 6 章", "测试与部署：测试体系、CI、Docker / systemd、运维"],
     ["第 7 章", "总结与展望：成果、技术创新点、应用创新点、不足与路线"],
 ]
-t = Table([[cell(a, True), cell(b)] for a, b in structure], colWidths=[2.6 * cm, FRAME_W - 2.6 * cm])
+t = Table([[Paragraph(a, S["TableLabel"]), cell(b)] for a, b in structure], colWidths=[2.6 * cm, FRAME_W - 2.6 * cm])
 t.setStyle(TableStyle([
     ("LINEBELOW", (0, 0), (-1, -1), 0.3, RULE),
     ("VALIGN", (0, 0), (-1, -1), "TOP"),
