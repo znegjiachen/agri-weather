@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
-OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档.pdf")
+OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档-2026-11-08.pdf")
 SHOT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "design", "desktop-dashboard.png")
 COVER_IMG = os.path.join(ASSETS, "cover-composed.jpg")
 
@@ -742,6 +742,8 @@ story.append(H2("5.5  助农手与智能体控制台"))
 story.append(P("每块地一个助农手，是这个项目最具差异化的产品设计。控制台支持修改名称、头像、欢迎语与人设，恢复默认人设，查看内置作物档案；知识库支持粘贴文本或上传 TXT / Markdown / PDF / Word，中文关键词 + 向量混合检索，最多注入 4 段资料；9 个工具可逐项启用/停用，关闭后模型看不到该工具；对话历史存后端，刷新或换设备仍可恢复；回答下方可点赞/点踩，顶部展示成功率、平均延迟、工具调用、知识命中与安全提示次数。"))
 story += FIG(os.path.join(ASSETS, "screens", "agent-studio.jpg"), 15.6 * cm,
              "智能体控制台：一块地一个助农手，人设、知识库、工具与运行指标独立配置")
+story += FIG(os.path.join(ASSETS, "screens", "agent-chat.jpg"), 15.6 * cm,
+             "助农手对话：用户问题、两轮思考、3 个工具调用与最终回答在同一屏内可追溯")
 story.append(P("权限边界在工具层而不是提示词层：AgriContext 携带 userId、agentId、farmlandId，所有地块工具先校验归属，再校验是否属于当前智能体负责的地块。这样即使模型被诱导，也无法读取其他用户或其他地块的数据。"))
 story.append(H2("5.6  多模态识图与语音"))
 story.append(P("前端最多上传 3 张 JPG/PNG，自动压缩到 1600px 后提交；后端校验数量与单张大小，调用视觉模型输出结构化 JSON。识别结果以卡片展示植物、学名、生育期、健康状态、问题列表、置信度与照护建议，再作为上下文交给文本智能体。解析器容忍模型偶尔输出 markdown 代码块，解析失败时退化为纯文本结论，避免整轮对话失败。语音按钮支持录音转文字，配置 ASR 后走服务端，未配置时回退浏览器识别。"))
