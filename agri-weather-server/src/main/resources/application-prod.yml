@@ -20,7 +20,8 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/agri_weather?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8}
     username: ${DB_USER:root}
-    password: ${DB_PASSWORD:root}
+    # 生产环境不提供默认密码，缺失时启动失败
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -43,7 +44,8 @@ spring:
 # JWT
 app:
   jwt:
-    secret: ${JWT_SECRET:change-me-to-a-random-string-at-least-256-bits}
+    # 生产环境不提供默认密钥，缺失时启动失败
+    secret: ${JWT_SECRET}
     expiration-ms: 86400000       # 24小时
 
 # 访问日志

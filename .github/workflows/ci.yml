@@ -19,6 +19,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      - name: Generate CI JWT secret
+        run: echo "JWT_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
       - name: Run tests
         run: ./mvnw -q test
 
@@ -62,6 +64,9 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+
+      - name: Generate CI JWT secret
+        run: echo "JWT_SECRET=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
 
       - name: Install MySQL client if missing
         run: command -v mysql >/dev/null || (sudo apt-get update && sudo apt-get install -y mysql-client)

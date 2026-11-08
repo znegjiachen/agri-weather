@@ -102,7 +102,7 @@
 # 1. 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入数据库密码和 JWT 密钥
-#   JWT 密钥生成：openssl rand -hex 32
+#   JWT 密钥生成：openssl rand -base64 32
 
 # 2. 构建前端静态文件
 cd weather-app-react && npm install && npm run build && cd ..
@@ -130,8 +130,11 @@ mysql -u root -p agri_weather < agri-weather-server/sql/seed-current.sql
 # 老库升级：先备份，再启动后端；Flyway 会校验已有历史并补齐后续迁移。
 # 以 schema.sql 初始化的库已到 V10，application.yml 的 Flyway 基线也是 V10。
 
-# 2. 设置 DeepSeek 密钥（Windows 用 setx，改完需重开终端）
-export DEEPSEEK_API_KEY=sk-你的密钥
+# 2. 设置数据库密码、JWT 密钥与 DeepSeek 密钥
+#    JWT_SECRET 必填，缺失时后端启动会直接报错；推荐 openssl rand -base64 32
+export DB_PASSWORD=你的数据库密码
+export JWT_SECRET=$(openssl rand -base64 32)
+export DEEPSEEK_API_KEY=你的DeepSeek密钥
 
 # 3. 启动后端（默认 8082 端口）
 cd agri-weather-server && ./mvnw spring-boot:run

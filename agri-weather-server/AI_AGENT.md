@@ -28,12 +28,12 @@
 
 Windows：
 ```cmd
-setx DEEPSEEK_API_KEY sk-你的密钥
+setx DEEPSEEK_API_KEY 你的密钥
 ```
 
 Linux / macOS：
 ```bash
-export DEEPSEEK_API_KEY=sk-你的密钥
+export DEEPSEEK_API_KEY=你的密钥
 ```
 
 设完**重开终端**才生效。
