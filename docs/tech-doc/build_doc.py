@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
-OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档.pdf")
+OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "docs", "问田-智慧农业天气系统-技术文档.pdf")
 SHOT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "design", "desktop-dashboard.png")
 COVER_IMG = os.path.join(ASSETS, "cover-composed.jpg")
 
@@ -173,6 +173,39 @@ def draw_cover(c, doc):
         c.setFont("MSYH", 7.8)
         c.drawString(x + 0.42 * cm, card_y + 0.55 * cm, label)
         x += 5.05 * cm
+
+    # 内容导览：填满封面下半部，避免大面积留白
+    c.setStrokeColor(RULE)
+    c.setLineWidth(0.5)
+    c.line(2.2 * cm, PAGE_H - 22.0 * cm, PAGE_W - 2.2 * cm, PAGE_H - 22.0 * cm)
+
+    c.setFillColor(GREEN)
+    c.setFont("MSYHB", 7.8)
+    c.drawString(2.2 * cm, PAGE_H - 22.75 * cm, "内容导览")
+
+    guide = [
+        ("01", "需求与架构", "问题、需求、分层与选型"),
+        ("02", "AI 方案", "模型、工具、RAG 与评测"),
+        ("03", "功能落地", "地块、天气、预警、助农手"),
+        ("04", "验证交付", "测试、CI、部署与运维"),
+    ]
+    gx = 2.2 * cm
+    for num, title, desc in guide:
+        c.setFillColor(AMBER)
+        c.setFont("MSYHB", 7.0)
+        c.drawString(gx, PAGE_H - 23.55 * cm, num)
+        c.setFillColor(DARK)
+        c.setFont("MSYHB", 8.0)
+        c.drawString(gx + 0.72 * cm, PAGE_H - 23.55 * cm, title)
+        c.setFillColor(GRAY)
+        c.setFont("MSYH", 6.7)
+        c.drawString(gx, PAGE_H - 24.25 * cm, desc)
+        gx += 4.15 * cm
+
+    c.setFillColor(GRAY)
+    c.setFont("MSYH", 6.8)
+    c.drawString(2.2 * cm, PAGE_H - 25.75 * cm,
+                 "Spring Boot 3.5  ·  React 19  ·  MySQL 8  ·  Redis 7  ·  DeepSeek  ·  Open-Meteo")
 
     c.setStrokeColor(RULE)
     c.setLineWidth(0.8)
