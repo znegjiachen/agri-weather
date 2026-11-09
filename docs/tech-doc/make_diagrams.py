@@ -257,39 +257,54 @@ def fig_rag():
 
 # ---------------------------------------------------------------- 图4 部署拓扑
 def fig_deploy():
-    fig, ax = canvas(7.2, 4.8)
-    ax.text(2, 96.0, "部署拓扑与流量路径", fontsize=12.6, color=INK, fontproperties=FPB)
-    ax.text(2, 92.2, "Docker Compose 默认 5 个服务；后端无状态，Redis 承担共享缓存与锁",
-            fontsize=7.4, color=GRAY, fontproperties=FP)
+    fig, ax = canvas(7.2, 5.3)
+    ax.text(2, 96.5, "部署拓扑与流量路径", fontsize=12.6, color=INK, fontproperties=FPB)
+    ax.text(2, 92.8, "Docker Compose 默认 5 个服务；后端无状态，Redis 承担共享缓存与锁",
+            fontsize=7.2, color=GRAY, fontproperties=FP)
 
-    box(ax, 3, 65, 18, 17, "农户 / 浏览器", ["桌面驾驶舱", "移动端 PWA", "Web Push"], fc="white", ec=GREEN2, fs=8.7, lfs=7.5)
-    box(ax, 26, 65, 23, 17, "Nginx :80 / :443", ["静态资源 + SPA", "/api 反代", "agent 关闭缓冲"], fc=LGREEN, ec=GREEN, fs=8.7, lfs=7.5)
-    box(ax, 57, 73.5, 19, 8.5, "backend-1 :8082", ["Spring Boot · JWT / SSE"], fc=LBLUE, ec=BLUE, fs=8.3, lfs=7.3)
-    box(ax, 57, 61.5, 19, 8.5, "backend-2 :8082", ["同镜像 · least_conn"], fc=LBLUE, ec=BLUE, fs=8.3, lfs=7.3)
-    box(ax, 83, 61.5, 14, 20.5, "数据层", ["MySQL 8", "Redis 7", "持久卷"], fc=LGRAY, ec=GRAY, fs=8.7, lfs=7.5)
+    # 客户端 → 接入 → 应用 → 数据
+    box(ax, 3, 68, 18, 16, "农户 / 浏览器",
+        ["桌面驾驶舱", "移动端 PWA", "Web Push 订阅"], fc="white", ec=GREEN2, fs=8.4, lfs=7.0)
+    box(ax, 26, 68, 23, 16, "Nginx :80 / :443",
+        ["静态资源 + SPA 回退", "/api 反向代理", "agent 关闭缓冲"], fc=LGREEN, ec=GREEN, fs=8.4, lfs=7.0)
+    box(ax, 56, 76, 20, 8.5, "backend-1 :8082", ["Spring Boot · JWT / SSE"], fc=LBLUE, ec=BLUE, fs=7.9, lfs=6.7)
+    box(ax, 56, 64.5, 20, 8.5, "backend-2 :8082", ["同镜像 · least_conn"], fc=LBLUE, ec=BLUE, fs=7.9, lfs=6.7)
+    box(ax, 82, 64.5, 15, 20, "数据层",
+        ["MySQL 8", "Redis 7", "持久卷"], fc=LGRAY, ec=GRAY, fs=8.4, lfs=7.0)
 
-    arrow(ax, 21.3, 73.5, 25.7, 73.5)
-    arrow(ax, 49.3, 76.5, 56.7, 77.5)
-    arrow(ax, 49.3, 69.0, 56.7, 65.5)
-    arrow(ax, 76.3, 77.7, 82.6, 77.7)
-    arrow(ax, 76.3, 65.7, 82.6, 65.7)
+    arrow(ax, 21.3, 76.0, 25.7, 76.0)
+    arrow(ax, 49.2, 80.5, 55.7, 80.0)
+    arrow(ax, 49.2, 71.0, 55.7, 69.0)
+    arrow(ax, 76.2, 80.2, 81.7, 78.0)
+    arrow(ax, 76.2, 69.0, 81.7, 69.8)
 
-    box(ax, 57, 36, 40, 14, "外部服务", ["Open-Meteo · 和风（备源）", "DeepSeek Chat / Vision", "Embedding / ASR（可选）"], fc=LAMBER, ec=AMBER, fs=8.7, lfs=7.5)
-    arrow(ax, 70, 61.0, 70, 50.5, color=AMBER, style="<|-|>", label="HTTPS", lpos=0.5, loff=(3.8, 0), lfs=6.4)
+    # 外部服务：两个后端共用同一条出口，避免箭头穿过下方实例
+    box(ax, 56, 36, 41, 14, "外部服务",
+        ["两实例共用：Open-Meteo / 和风", "DeepSeek Chat / Vision", "Embedding / ASR（可选）"],
+        fc=LAMBER, ec=AMBER, fs=8.4, lfs=7.0)
+    arrow(ax, 70, 64.2, 70, 50.5, color=AMBER, style="<|-|>",
+          label="HTTPS", lpos=0.5, loff=(4.0, 0), lfs=6.4)
 
-    box(ax, 26, 36, 23, 14, "推送通道", ["VAPID / Web Push", "失效订阅清理", "不阻塞入库"], fc="white", ec=GREEN2, fs=8.7, lfs=7.5)
-    arrow(ax, 56.7, 62.5, 49.3, 49.0, color=GREEN2, style="-|>", label="推送", lpos=0.55, loff=(2.0, 0), lfs=6.4)
+    # Web Push：从后端绕到浏览器，走下方，避免穿过 Nginx
+    ax.plot([57, 57, 12, 12], [64.3, 58.5, 58.5, 67.8],
+            color=GREEN2, linewidth=1.0, linestyle=(0, (3, 2)), zorder=4)
+    arrow(ax, 12, 62.0, 12, 67.7, color=GREEN2, lw=1.0, style="-|>")
+    ax.text(34.5, 59.2, "Web Push / VAPID（HTTPS）", ha="center", va="center",
+            fontsize=6.4, color=GRAY, fontproperties=FP,
+            bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.95), zorder=6)
 
-    box(ax, 3, 36, 18, 14, "单机部署", ["systemd 后端", "Nginx 前端", "环境变量密钥"], fc=LGRAY, ec=BORDER, fs=8.7, lfs=7.5)
+    # 单机替代方案：不并入主流程，单独说明
+    ax.text(3, 32.0, "单机替代：systemd 后端 + Nginx 前端\n密钥通过 Environment 注入（非 Docker）",
+            fontsize=6.6, color=GRAY, fontproperties=FP, va="top")
 
-    box(ax, 3, 11, 94, 17, "运维与可观测", [
+    box(ax, 3, 10, 94, 16, "运维与可观测", [
         "/actuator/health · restart=always · upstream 故障转移（max_fails）",
-        "Flyway 迁移 + Hibernate validate；CI 全新 MySQL 校验初始化链路",
+        "Flyway 迁移 + Hibernate validate；CI 用全新 MySQL 校验初始化链路",
         "/api/agent/metrics：请求、成功率、延迟、工具、知识命中、反馈",
-    ], fc=LGRAY, ec=BORDER, fs=8.7, lfs=7.5)
+    ], fc=LGRAY, ec=BORDER, fs=8.0, lfs=6.8)
 
-    ax.text(3, 5.2, "HTTPS 是语音识别、PWA 安装、Web Push 的前置条件；HTTP 演示环境会降级并明确提示。",
-            fontsize=6.9, color=GRAY, fontproperties=FP)
+    ax.text(3, 4.8, "HTTPS 是语音识别、PWA 安装、Web Push 的前置条件；HTTP 演示环境会降级并明确提示。",
+            fontsize=6.6, color=GRAY, fontproperties=FP)
 
     fig.savefig(os.path.join(ASSETS, "fig4-deploy.png"), dpi=300,
                 facecolor="white", bbox_inches="tight", pad_inches=0.05)

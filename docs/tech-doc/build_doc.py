@@ -18,7 +18,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(BASE, "assets")
-OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "问田-智慧农业天气系统-技术文档.pdf")
+OUT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "docs", "问田-智慧农业天气系统-技术文档.pdf")
 SHOT = os.path.join(os.path.dirname(os.path.dirname(BASE)), "design", "desktop-dashboard.png")
 COVER_IMG = os.path.join(ASSETS, "cover-composed.jpg")
 
