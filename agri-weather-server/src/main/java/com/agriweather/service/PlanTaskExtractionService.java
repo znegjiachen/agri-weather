@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,7 +89,7 @@ public class PlanTaskExtractionService {
             String type = string(item.get("taskType"));
             task.setTaskType(type != null && TASK_TYPES.contains(type) ? type : "OTHER");
             String date = string(item.get("plannedDate"));
-            task.setPlannedDate(validDate(date) ? date : null);
+            task.setPlannedDate(normalizeDate(date, baseDate));
             task.setSourceQuote(truncate(string(item.get("sourceQuote")), 500));
             task.setNotes(truncate(string(item.get("notes")), 500));
             tasks.add(task);
@@ -115,14 +117,52 @@ public class PlanTaskExtractionService {
         }
     }
 
-    private boolean validDate(String value) {
-        if (value == null || value.isBlank()) return false;
+    /**
+     * 模型偶尔会返回 2026/11/9、2026年11月9日、3月15日 或「播后 7 天」。
+     * 这里统一换成 YYYY-MM-DD，解析不了才置空，避免任务保存时整批 400。
+     */
+    private String normalizeDate(String value, LocalDate baseDate) {
+        if (value == null || value.isBlank()) return null;
+        String text = value.trim().replace('／', '/');
         try {
-            LocalDate.parse(value.trim());
-            return true;
-        } catch (DateTimeParseException e) {
-            return false;
+            return LocalDate.parse(text).toString();
+        } catch (DateTimeParseException ignored) {
+            // 继续尝试常见格式
         }
+
+        Matcher full = Pattern.compile("(\\d{4})[./年-](\\d{1,2})[./月-](\\d{1,2})日?")
+                .matcher(text);
+        if (full.find()) {
+            try {
+                return LocalDate.of(Integer.parseInt(full.group(1)),
+                        Integer.parseInt(full.group(2)), Integer.parseInt(full.group(3))).toString();
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        Matcher monthDay = Pattern.compile("(\\d{1,2})月(\\d{1,2})日").matcher(text);
+        if (monthDay.find()) {
+            LocalDate base = baseDate != null ? baseDate : LocalDate.now();
+            try {
+                LocalDate date = LocalDate.of(base.getYear(),
+                        Integer.parseInt(monthDay.group(1)), Integer.parseInt(monthDay.group(2)));
+                if (date.isBefore(base.minusDays(60))) date = date.plusYears(1);
+                return date.toString();
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        Matcher after = Pattern.compile("(?:播后|出苗后|移栽后|返青后|追肥后)\\s*(\\d+)\\s*天").matcher(text);
+        if (after.find() && baseDate != null) {
+            return baseDate.plusDays(Long.parseLong(after.group(1))).toString();
+        }
+        Matcher before = Pattern.compile("(?:播前|移栽前)\\s*(\\d+)\\s*天").matcher(text);
+        if (before.find() && baseDate != null) {
+            return baseDate.minusDays(Long.parseLong(before.group(1))).toString();
+        }
+        return null;
     }
 
     private String string(Object value) {

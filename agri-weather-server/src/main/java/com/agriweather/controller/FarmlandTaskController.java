@@ -25,10 +25,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * 方案任务：抽取 → 确认 → 执行 → 偏差统计。
@@ -89,12 +91,19 @@ public class FarmlandTaskController {
                     .findFirst()
                     .orElse(null);
         }
+        // 同一块地重复上传同一份方案时，按「标题 + 计划日期」跳过已有任务，避免刷出重复待办
+        Set<String> existing = new HashSet<>();
+        for (FarmPlanTask old : taskRepository.findByFarmlandIdOrderByPlannedDateAscIdAsc(farmlandId)) {
+            existing.add(old.getTitle() + "|" + old.getPlannedDate());
+        }
         List<FarmPlanTask> saved = new ArrayList<>();
         for (PlanTaskItem item : body.getTasks()) {
             FarmPlanTask task = new FarmPlanTask();
             task.setFarmlandId(farmlandId);
             task.setSeasonId(seasonId);
             applyItem(task, item);
+            String key = task.getTitle() + "|" + task.getPlannedDate();
+            if (!existing.add(key)) continue;
             task.setSourceName(truncate(body.getSourceName(), 255));
             saved.add(taskRepository.save(task));
         }
