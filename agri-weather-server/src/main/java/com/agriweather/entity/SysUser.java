@@ -31,6 +31,10 @@ public class SysUser {
     @Column(length = 100)
     private String region;
 
+    /** 头像：本站社区图片 URL 或 emoji；null 时前端用默认头像 */
+    @Column(length = 255)
+    private String avatar;
+
     /** 退出全部设备时递增，旧 access token 立即失效 */
     @Column(name = "token_version", nullable = false)
     @Builder.Default

@@ -4,6 +4,7 @@ import { community } from '../api';
 import { formatCommunityTime } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
 import PostContent from '../components/PostContent';
+import CommunityAvatar from '../components/CommunityAvatar';
 import { errorMessage } from '../utils/errorMessage';
 
 /** 帖子详情视图（与后端 PostView 对齐） */
@@ -17,6 +18,7 @@ interface PostView {
   commentCount: number;
   liked: boolean;
   author?: string;
+  authorAvatar?: string | null;
   authorId?: number;
   createdAt?: string;
 }
@@ -26,6 +28,7 @@ interface PostComment {
   id: number;
   content?: string;
   author?: string;
+  authorAvatar?: string | null;
   authorId?: number;
   createdAt?: string;
 }
@@ -144,7 +147,7 @@ export default function CommunityPostPage() {
       <article className="glass community-post">
         <div className="community-post-head">
           <div className="community-author">
-            <span className="community-avatar">👨‍🌾</span>
+            <CommunityAvatar src={post.authorAvatar} />
             <div>
               <div className="community-author-name">{post.author}</div>
               <div className="community-time">{formatCommunityTime(post.createdAt)}</div>
@@ -181,7 +184,7 @@ export default function CommunityPostPage() {
         {comments.map((c) => (
           <div key={c.id} className="glass community-comment">
             <div className="community-comment-head">
-              <span className="community-avatar small">👨‍🌾</span>
+              <CommunityAvatar src={c.authorAvatar} small />
               <span className="community-author-name">{c.author}</span>
               <span className="community-time">{formatCommunityTime(c.createdAt)}</span>
             </div>

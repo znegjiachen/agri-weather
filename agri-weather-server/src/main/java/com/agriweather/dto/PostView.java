@@ -12,6 +12,7 @@ public record PostView(
         int commentCount,
         boolean liked,
         String author,
+        String authorAvatar,
         Long authorId,
         String createdAt
 ) {

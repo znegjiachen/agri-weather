@@ -6,6 +6,7 @@ import { PRIMARY_NAV, SUB_NAV, isNavActive } from '../nav';
 
 interface AuthUser {
   username?: string;
+  avatar?: string;
 }
 
 interface AuthContextValue {
@@ -69,7 +70,11 @@ export default function Sidebar() {
 
       <div className="nav-footer">
         <div className="nav-user">
-          <span className="nav-avatar">{(user?.username || '农').slice(0, 1)}</span>
+          <span className="nav-avatar">
+            {user?.avatar
+              ? <img src={user.avatar} alt="头像" />
+              : (user?.username || '农').slice(0, 1)}
+          </span>
           <span className="nav-user-name">{user?.username}</span>
         </div>
         <button className="btn-logout" onClick={logout}>退出登录</button>

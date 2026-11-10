@@ -66,13 +66,15 @@ public class CommunityService {
         authorIds.add(post.getUserId());
         comments.forEach(c -> authorIds.add(c.getUserId()));
         Map<Long, String> names = loadNames(authorIds);
+        Map<Long, String> avatars = loadAvatars(authorIds);
 
-        PostView pv = toView(post, userId, names);
+        PostView pv = toView(post, userId, names, avatars);
         List<CommentView> cvs = comments.stream()
                 .map(c -> new CommentView(
                         c.getId(),
                         c.getContent(),
                         names.getOrDefault(c.getUserId(), "农友"),
+                        avatars.getOrDefault(c.getUserId(), ""),
                         c.getUserId(),
                         c.getCreatedAt() == null ? "" : c.getCreatedAt().format(FMT)))
                 .toList();
@@ -125,7 +127,7 @@ public class CommunityService {
             imageService.attachToPost(saved.getId(), userId, imageIds);
         }
 
-        return toView(saved, Set.of(), loadNames(Set.of(userId)));
+        return toView(saved, Set.of(), loadNames(Set.of(userId)), loadAvatars(Set.of(userId)));
     }
 
     @Transactional
@@ -150,8 +152,10 @@ public class CommunityService {
 
         postRepo.incCommentCount(postId);
 
-        String author = userRepo.findById(userId).map(SysUser::getUsername).orElse("农友");
-        return new CommentView(saved.getId(), saved.getContent(), author, userId,
+        SysUser authorUser = userRepo.findById(userId).orElse(null);
+        String author = authorUser == null ? "农友" : authorUser.getUsername();
+        String avatar = authorUser == null || authorUser.getAvatar() == null ? "" : authorUser.getAvatar();
+        return new CommentView(saved.getId(), saved.getContent(), author, avatar, userId,
                 saved.getCreatedAt() == null ? "" : saved.getCreatedAt().format(FMT));
     }
 
@@ -179,7 +183,8 @@ public class CommunityService {
         // 点赞态直接取本次操作的期望值 —— 在同一事务里再查一次可能读到未刷新的旧状态。
         CommunityPost fresh = requirePost(postId);
         Map<Long, String> names = loadNames(Set.of(fresh.getUserId()));
-        return toView(fresh, like ? Set.of(postId) : Set.of(), names);
+        Map<Long, String> avatars = loadAvatars(Set.of(fresh.getUserId()));
+        return toView(fresh, like ? Set.of(postId) : Set.of(), names, avatars);
     }
 
     // ---------------- 内部 ----------------
@@ -187,8 +192,9 @@ public class CommunityService {
     private List<PostSummary> toSummaries(List<CommunityPost> posts, Long userId) {
         if (posts.isEmpty()) return List.of();
 
-        Map<Long, String> names = loadNames(
-                posts.stream().map(CommunityPost::getUserId).collect(Collectors.toSet()));
+        Set<Long> authorIds = posts.stream().map(CommunityPost::getUserId).collect(Collectors.toSet());
+        Map<Long, String> names = loadNames(authorIds);
+        Map<Long, String> avatars = loadAvatars(authorIds);
 
         Set<Long> likedIds = Set.of();
         if (userId != null) {
@@ -201,7 +207,7 @@ public class CommunityService {
 
         final Set<Long> liked = likedIds;
         return posts.stream()
-                .map(p -> toSummary(p, liked, names, covers))
+                .map(p -> toSummary(p, liked, names, avatars, covers))
                 .toList();
     }
 
@@ -221,6 +227,7 @@ public class CommunityService {
     }
 
     private PostSummary toSummary(CommunityPost p, Set<Long> likedIds, Map<Long, String> names,
+                                  Map<Long, String> avatars,
                                   Map<String, CommunityImageRepository.ImageMeta> covers) {
         String format = storedFormat(p.getContentFormat());
         String coverImage = null;
@@ -250,16 +257,19 @@ public class CommunityService {
                 nz(p.getCommentCount()),
                 likedIds.contains(p.getId()),
                 names.getOrDefault(p.getUserId(), "农友"),
+                avatars.getOrDefault(p.getUserId(), ""),
                 p.getUserId(),
                 p.getCreatedAt() == null ? "" : p.getCreatedAt().format(FMT));
     }
 
-    private PostView toView(CommunityPost p, Long userId, Map<Long, String> names) {
+    private PostView toView(CommunityPost p, Long userId,
+                            Map<Long, String> names, Map<Long, String> avatars) {
         boolean liked = userId != null && likeRepo.existsByPostIdAndUserId(p.getId(), userId);
-        return toView(p, liked ? Set.of(p.getId()) : Set.of(), names);
+        return toView(p, liked ? Set.of(p.getId()) : Set.of(), names, avatars);
     }
 
-    private PostView toView(CommunityPost p, Set<Long> likedIds, Map<Long, String> names) {
+    private PostView toView(CommunityPost p, Set<Long> likedIds,
+                            Map<Long, String> names, Map<Long, String> avatars) {
         return new PostView(
                 p.getId(),
                 p.getTitle(),
@@ -270,6 +280,7 @@ public class CommunityService {
                 nz(p.getCommentCount()),
                 likedIds.contains(p.getId()),
                 names.getOrDefault(p.getUserId(), "农友"),
+                avatars.getOrDefault(p.getUserId(), ""),
                 p.getUserId(),
                 p.getCreatedAt() == null ? "" : p.getCreatedAt().format(FMT));
     }
@@ -278,6 +289,13 @@ public class CommunityService {
         if (userIds.isEmpty()) return Map.of();
         return userRepo.findAllById(userIds).stream()
                 .collect(Collectors.toMap(SysUser::getId, SysUser::getUsername));
+    }
+
+    private Map<Long, String> loadAvatars(Set<Long> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        return userRepo.findAllById(userIds).stream()
+                .filter(u -> u.getAvatar() != null && !u.getAvatar().isBlank())
+                .collect(Collectors.toMap(SysUser::getId, SysUser::getAvatar));
     }
 
     private CommunityPost requirePost(Long id) {

@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { auth } from '../api';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { auth, community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { getPushStatus, enablePush, disablePush } from '../utils/push';
 import { errorMessage } from '../utils/errorMessage';
@@ -8,6 +8,7 @@ interface AuthUser {
   username?: string;
   phone?: string;
   region?: string;
+  avatar?: string;
 }
 
 /** AuthContext 是 JS 模块，这里声明个人中心实际使用的上下文形状 */
@@ -62,6 +63,8 @@ export default function ProfilePage() {
     phone: user?.phone || '',
     region: user?.region || '',
   });
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [profileState, setProfileState] = useState<FormState>({ saving: false, message: '', error: '' });
 
   const [password, setPassword] = useState<PasswordForm>({ oldPassword: '', newPassword: '', confirm: '' });
@@ -70,6 +73,31 @@ export default function ProfilePage() {
   const showNotice = (text: string) => {
     setPageNotice(text);
     window.setTimeout(() => setPageNotice(''), 2500);
+  };
+
+  const handleAvatarFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!/^image\/(jpeg|png)$/i.test(file.type)) {
+      showNotice('头像仅支持 JPG / PNG');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showNotice('头像不能超过 5MB');
+      return;
+    }
+    setAvatarSaving(true);
+    try {
+      const image = await community.uploadImage(file);
+      const data = await auth.updateProfile({ avatar: image.url });
+      updateUser({ avatar: data.avatar || image.url });
+      showNotice('头像已更新');
+    } catch (e) {
+      showNotice(errorMessage(e, '头像上传失败'));
+    } finally {
+      setAvatarSaving(false);
+    }
   };
 
   const openSheet = (name: 'profile' | 'password') => {
@@ -218,7 +246,24 @@ export default function ProfilePage() {
 
       <section className="profile-hero glass">
         <div className="profile-hero-main">
-          <div className="profile-avatar">👨‍🌾</div>
+          <button
+            type="button"
+            className="profile-avatar"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarSaving}
+            title="更换头像"
+            aria-label="更换头像"
+          >
+            {user?.avatar ? <img src={user.avatar} alt="头像" /> : '👨‍🌾'}
+            <span className="profile-avatar-edit" aria-hidden>📷</span>
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            hidden
+            onChange={handleAvatarFile}
+          />
           <div className="profile-hero-text">
             <h3 className="profile-name">{user?.username}</h3>
           </div>

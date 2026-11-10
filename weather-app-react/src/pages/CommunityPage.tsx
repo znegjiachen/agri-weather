@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { community } from '../api';
 import { useAuth } from '../context/AuthContext';
 import RichTextEditor from '../components/RichTextEditor';
+import CommunityAvatar from '../components/CommunityAvatar';
 import { formatCommunityTime } from '../utils/date';
 import { errorMessage } from '../utils/errorMessage';
 
@@ -28,6 +29,7 @@ interface CommunityPostSummary {
   commentCount: number;
   liked: boolean;
   author?: string;
+  authorAvatar?: string | null;
   authorId?: number;
   createdAt?: string;
 }
@@ -43,6 +45,7 @@ interface CommunityPostView {
   commentCount: number;
   liked: boolean;
   author?: string;
+  authorAvatar?: string | null;
   authorId?: number;
   createdAt?: string;
 }
@@ -101,6 +104,7 @@ function toSummary(post: CommunityPostView): CommunityPostSummary {
     commentCount: post.commentCount,
     liked: post.liked,
     author: post.author,
+    authorAvatar: post.authorAvatar,
     authorId: post.authorId,
     createdAt: post.createdAt,
   };
@@ -429,7 +433,7 @@ export default function CommunityPage() {
 
                 <div className="community-note-foot">
                   <div className="community-note-who">
-                    <span className="community-avatar small">👨‍🌾</span>
+                    <CommunityAvatar src={p.authorAvatar} small />
                     <span className="community-note-who-text">
                       <span className="community-note-author-name">{p.author}</span>
                       <span className="community-note-time">{formatCommunityTime(p.createdAt)}</span>

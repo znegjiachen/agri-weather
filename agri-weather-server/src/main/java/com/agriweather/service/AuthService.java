@@ -126,8 +126,10 @@ public class AuthService {
     @Transactional
     public Map<String, Object> updateProfile(Long userId, ProfileUpdateRequest request) {
         SysUser user = requireUser(userId);
-        user.setPhone(trimToNull(request.getPhone()));
-        user.setRegion(trimToNull(request.getRegion()));
+        // 允许只改头像：未提交的字段保持原值，提交空串才清空
+        if (request.getPhone() != null) user.setPhone(trimToNull(request.getPhone()));
+        if (request.getRegion() != null) user.setRegion(trimToNull(request.getRegion()));
+        if (request.getAvatar() != null) user.setAvatar(trimToNull(request.getAvatar()));
         userRepository.save(user);
         return toProfile(user);
     }
@@ -151,7 +153,7 @@ public class AuthService {
                 user.getUsername(), user.getId(), user.getRole(), version);
         String refreshToken = createRefreshToken(user.getId());
         return new AuthResponse(accessToken, user.getUsername(), user.getRole(), user.getId(),
-                user.getPhone(), user.getRegion(), refreshToken);
+                user.getPhone(), user.getRegion(), user.getAvatar(), refreshToken);
     }
 
     private String createRefreshToken(Long userId) {
@@ -190,6 +192,7 @@ public class AuthService {
         result.put("userId", user.getId());
         result.put("phone", user.getPhone());
         result.put("region", user.getRegion());
+        result.put("avatar", user.getAvatar());
         return result;
     }
 

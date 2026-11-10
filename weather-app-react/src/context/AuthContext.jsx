@@ -32,6 +32,7 @@ export function AuthProvider({ children }) {
       userId: data.userId,
       phone: data.phone || '',
       region: data.region || '',
+      avatar: data.avatar || '',
     }, data.token, data.refreshToken);
     return data;
   }, [saveUser]);
@@ -44,6 +45,7 @@ export function AuthProvider({ children }) {
       userId: data.userId,
       phone: data.phone || '',
       region: data.region || '',
+      avatar: data.avatar || '',
     }, data.token, data.refreshToken);
     return data;
   }, [saveUser]);
@@ -95,6 +97,7 @@ export function AuthProvider({ children }) {
           userId: data.userId,
           phone: data.phone || '',
           region: data.region || '',
+          avatar: data.avatar || '',
         });
       })
       .catch(() => {});
@@ -120,6 +123,7 @@ export function AuthProvider({ children }) {
         userId: data.userId,
         phone: data.phone || '',
         region: data.region || '',
+        avatar: data.avatar || '',
       });
       setAuthNotice('');
     };

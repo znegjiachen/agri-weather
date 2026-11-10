@@ -12,5 +12,6 @@ public class AuthResponse {
     private Long userId;
     private String phone;
     private String region;
+    private String avatar;
     private String refreshToken;
 }

@@ -9359,3 +9359,51 @@ body:has(.alerts-page) .subpage-bar { display: none; }
   .studio-kb-actions { flex-direction: column; }
   .studio-dropzone { min-height: 76px; }
 }
+/* 个人中心头像：可点击上传，图片填满圆形 */
+.profile-avatar {
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  color: inherit;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(31, 41, 80, 0.72);
+  color: #fff;
+  font-size: 11px;
+  border: 2px solid #fff;
+}
+
+.profile-avatar:disabled { cursor: wait; opacity: 0.7; }
+
+/* 社区头像图片 */
+.community-avatar {
+  overflow: hidden;
+  object-fit: cover;
+  flex: none;
+}
+
+/* 左侧栏头像图片 */
+.nav-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
