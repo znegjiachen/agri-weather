@@ -111,10 +111,10 @@ export default function CropPage() {
   const [keyword, setKeyword] = useState('');
   const [stages, setStages] = useState<GrowthStage[]>([]);
   const [match, setMatch] = useState<WeatherMatchResult | null>(null);
-  const [temp, setTemp] = useState(25);
-  const [humidity, setHumidity] = useState(65);
-  const [rainfall, setRainfall] = useState(10);
-  const [light, setLight] = useState(8);
+  const [temp, setTemp] = useState<number | null>(null);
+  const [humidity, setHumidity] = useState<number | null>(null);
+  const [rainfall, setRainfall] = useState<number | null>(null);
+  const [light, setLight] = useState<number | null>(null);
 
   const [provinces, setProvinces] = useState<RegionOption[]>([]);
   const [cities, setCities] = useState<RegionOption[]>([]);
@@ -127,6 +127,7 @@ export default function CropPage() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
   const regionSeq = useRef(0);
+  const weatherSeq = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -138,8 +139,12 @@ export default function CropPage() {
   const matchRequestRef = useRef(0);
   const selectedRef = useRef<CropInfoItem | null>(null);
 
-  const runMatch = async (crop: CropInfoItem, values: Array<number | string>) => {
+  const runMatch = async (crop: CropInfoItem, values: Array<number | string | null>) => {
     if (!crop) return;
+    if (values.some((value) => value == null || value === '' || !Number.isFinite(Number(value)))) {
+      setMatchError('请先选择省份、城市和区县，自动填入气象值');
+      return;
+    }
     const nums = values.map(Number);
     if (nums.some((value) => !Number.isFinite(value))) {
       setMatchError('请填写有效的温度、湿度、降水和光照');
@@ -230,13 +235,35 @@ export default function CropPage() {
     if (info.rainfall != null) setRainfall(info.rainfall);
     if (info.light != null) setLight(info.light);
     setWeatherInfo(info);
-    if (selectedRef.current) {
-      runMatch(selectedRef.current, [
-        info.temp ?? temp,
-        info.humidity ?? humidity,
-        info.rainfall ?? rainfall,
-        info.light ?? light,
-      ]);
+    const values = [info.temp, info.humidity, info.rainfall, info.light];
+    if (selectedRef.current && values.every((value) => value != null)) {
+      runMatch(selectedRef.current, values);
+    }
+  };
+
+  const clearWeatherInputs = () => {
+    setTemp(null);
+    setHumidity(null);
+    setRainfall(null);
+    setLight(null);
+  };
+
+  const fetchRegionWeather = async (region: RegionOption) => {
+    const seq = ++weatherSeq.current;
+    setWeatherLoading(true);
+    setWeatherInfo(null);
+    setMatch(null);
+    setRegionError('');
+    try {
+      const data = await weather.forecast(region.center[1], region.center[0]);
+      if (seq !== weatherSeq.current) return;
+      applyForecast(data);
+    } catch (err) {
+      if (seq === weatherSeq.current) {
+        setRegionError(errorMessage(err, '该区域气象获取失败，可手动填写'));
+      }
+    } finally {
+      if (seq === weatherSeq.current) setWeatherLoading(false);
     }
   };
 
@@ -249,6 +276,9 @@ export default function CropPage() {
     setWeatherInfo(null);
     setMatch(null);
     setRegionError('');
+    weatherSeq.current += 1;
+    setWeatherLoading(false);
+    clearWeatherInputs();
     if (!value) return;
 
     const seq = ++regionSeq.current;
@@ -276,6 +306,7 @@ export default function CropPage() {
     setWeatherInfo(null);
     setMatch(null);
     setRegionError('');
+    clearWeatherInputs();
     if (!value) return;
 
     const seq = ++regionSeq.current;
@@ -284,6 +315,8 @@ export default function CropPage() {
       const options = await fetchRegionOptions(regionUrl(Number(value)));
       if (seq !== regionSeq.current) return;
       setDistricts(options);
+      const city = cities.find((item) => String(item.adcode) === value);
+      if (city) await fetchRegionWeather(city);
     } catch {
       if (seq === regionSeq.current) setRegionError('该城市区县数据加载失败');
     } finally {
@@ -296,23 +329,12 @@ export default function CropPage() {
     setRegionError('');
     setWeatherInfo(null);
     setMatch(null);
+    clearWeatherInputs();
     if (!value) return;
 
     const district = districts.find((item) => String(item.adcode) === value);
     if (!district) return;
-    const seq = ++regionSeq.current;
-    setWeatherLoading(true);
-    try {
-      const data = await weather.forecast(district.center[1], district.center[0]);
-      if (seq !== regionSeq.current) return;
-      applyForecast(data);
-    } catch (err) {
-      if (seq === regionSeq.current) {
-        setRegionError(errorMessage(err, '该区县气象获取失败，可手动填写'));
-      }
-    } finally {
-      if (seq === regionSeq.current) setWeatherLoading(false);
-    }
+    await fetchRegionWeather(district);
   };
 
   const retryLoad = () => {
@@ -547,12 +569,15 @@ export default function CropPage() {
           </div>
           <div className="match-form">
             <div className="match-grid">
-              <label>5日均温 (°C)<input type="number" value={temp} onChange={(e) => setTemp(+e.target.value)} /></label>
-              <label>湿度 (%)<input type="number" value={humidity} onChange={(e) => setHumidity(+e.target.value)} /></label>
-              <label>当日降水 (mm)<input type="number" value={rainfall} onChange={(e) => setRainfall(+e.target.value)} /></label>
-              <label>日照时长 (h)<input type="number" value={light} onChange={(e) => setLight(+e.target.value)} /></label>
+              <label>5日均温 (°C)<input type="number" value={temp ?? ''} placeholder="选择区县后自动填充" onChange={(e) => setTemp(e.target.value === '' ? null : +e.target.value)} /></label>
+              <label>湿度 (%)<input type="number" value={humidity ?? ''} placeholder="选择区县后自动填充" onChange={(e) => setHumidity(e.target.value === '' ? null : +e.target.value)} /></label>
+              <label>当日降水 (mm)<input type="number" value={rainfall ?? ''} placeholder="选择区县后自动填充" onChange={(e) => setRainfall(e.target.value === '' ? null : +e.target.value)} /></label>
+              <label>日照时长 (h)<input type="number" value={light ?? ''} placeholder="选择区县后自动填充" onChange={(e) => setLight(e.target.value === '' ? null : +e.target.value)} /></label>
             </div>
-            <button onClick={checkMatch} disabled={!selected || matchLoading}>
+            <button
+              onClick={checkMatch}
+              disabled={!selected || matchLoading || temp == null || humidity == null || rainfall == null || light == null}
+            >
               {matchLoading ? '检测中…' : '重新检测'}
             </button>
           </div>
