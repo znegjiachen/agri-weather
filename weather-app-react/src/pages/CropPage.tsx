@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { crops, farmlands as farmlandApi } from '../api';
-import { getFieldContext } from '../utils/fieldContext';
+import { crops, weather } from '../api';
 import { errorMessage } from '../utils/errorMessage';
+import { REGION_ROOT_URL, regionUrl, fetchRegionOptions } from '../utils/regions';
+import type { RegionOption } from '../utils/regions';
 
 /** 作物档案（与后端 CropInfo 对齐） */
 interface CropInfoItem {
@@ -21,12 +22,6 @@ interface CropInfoItem {
   frostSensitive?: boolean;
   heatSensitive?: boolean;
   waterlogSensitive?: boolean;
-}
-
-/** 地块列表项（与后端地块接口对齐） */
-interface FieldItem {
-  id: number;
-  fieldName?: string;
 }
 
 /** 地块当前气象回填值 */
@@ -121,10 +116,17 @@ export default function CropPage() {
   const [rainfall, setRainfall] = useState(10);
   const [light, setLight] = useState(8);
 
-  const [fieldList, setFieldList] = useState<FieldItem[]>([]);
-  const [fieldId, setFieldId] = useState('');
+  const [provinces, setProvinces] = useState<RegionOption[]>([]);
+  const [cities, setCities] = useState<RegionOption[]>([]);
+  const [districts, setDistricts] = useState<RegionOption[]>([]);
+  const [provinceCode, setProvinceCode] = useState('');
+  const [cityCode, setCityCode] = useState('');
+  const [districtCode, setDistrictCode] = useState('');
+  const [regionLoading, setRegionLoading] = useState(false);
+  const [regionError, setRegionError] = useState('');
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherInfo, setWeatherInfo] = useState<WeatherInfo | null>(null);
+  const regionSeq = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -192,73 +194,126 @@ export default function CropPage() {
     return () => { alive = false; };
   }, [reloadKey]);
 
-  // 以首页当前选中的地块为默认数据源，没有上下文时取第一块地
+  // 省份列表：播种适配按行政区划取气象，不再依赖某一块地
   useEffect(() => {
     let alive = true;
-    farmlandApi.list()
-      .then((data) => {
-        if (!alive) return;
-        const list: FieldItem[] = Array.isArray(data) ? data : [];
-        setFieldList(list);
-        if (list.length === 0) return;
-        const context = getFieldContext();
-        const preferred = list.find((field) => String(field.id) === String(context?.id)) || list[0];
-        setFieldId(String(preferred.id));
-        setWeatherLoading(true);
-      })
-      .catch(() => {});
+    fetchRegionOptions(REGION_ROOT_URL)
+      .then((options) => { if (alive) setProvinces(options); })
+      .catch(() => { if (alive) setRegionError('行政区划数据加载失败，可手动填写气象值'); });
     return () => { alive = false; };
-  }, [reloadKey]);
+  }, []);
 
-  // 地块切换后，用该地块当前气象填充检测表单默认值
-  useEffect(() => {
-    if (!fieldId) return undefined;
-    let alive = true;
-    farmlandApi.weather(fieldId)
-      .then((data) => {
-        if (!alive) return;
-        const current = data?.current || {};
-        const daily = data?.daily || {};
-        const rain = Number(daily.precipitation_sum?.[0]);
-        // QX/T 734 用「稳定通过」界限温度：这里用未来 5 天日均温均值近似
-        const means: number[] = [];
-        const days = Math.min(5, daily.time?.length || 0);
-        for (let i = 0; i < days; i += 1) {
-          const hi = Number(daily.temperature_2m_max?.[i]);
-          const lo = Number(daily.temperature_2m_min?.[i]);
-          if (Number.isFinite(hi) && Number.isFinite(lo)) means.push((hi + lo) / 2);
-        }
-        const fiveDayMean = means.length >= 3
-          ? round1(means.reduce((sum, value) => sum + value, 0) / means.length)
-          : (current.temperature_2m != null ? round1(current.temperature_2m) : null);
-        const info: WeatherInfo = {
-          temp: fiveDayMean,
-          humidity: current.relative_humidity_2m != null
-            ? Math.round(Number(current.relative_humidity_2m)) : null,
-          rainfall: Number.isFinite(rain) ? round1(rain) : 0,
-          light: daylightHours(daily.sunrise?.[0], daily.sunset?.[0]),
-        };
-        if (info.temp != null) setTemp(info.temp);
-        if (info.humidity != null) setHumidity(info.humidity);
-        if (info.rainfall != null) setRainfall(info.rainfall);
-        if (info.light != null) setLight(info.light);
-        setWeatherInfo(info);
-        // 已选作物时，换地块/天气加载完成后自动复检一次
-        if (selectedRef.current) {
-          runMatch(selectedRef.current, [
-            info.temp ?? temp,
-            info.humidity ?? humidity,
-            info.rainfall ?? rainfall,
-            info.light ?? light,
-          ]);
-        }
-      })
-      .catch(() => { if (alive) setWeatherInfo(null); })
-      .finally(() => { if (alive) setWeatherLoading(false); });
-    return () => { alive = false; };
-    // 只在切换地块时重新取数；天气回填后的复检由 selectedRef 控制
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldId]);
+  /** 把区域天气回填到检测表单；已选作物时自动复检 */
+  const applyForecast = (data: any) => {
+    const current = data?.current || {};
+    const daily = data?.daily || {};
+    const rain = Number(daily.precipitation_sum?.[0]);
+    const means: number[] = [];
+    const days = Math.min(5, daily.time?.length || 0);
+    for (let i = 0; i < days; i += 1) {
+      const hi = Number(daily.temperature_2m_max?.[i]);
+      const lo = Number(daily.temperature_2m_min?.[i]);
+      if (Number.isFinite(hi) && Number.isFinite(lo)) means.push((hi + lo) / 2);
+    }
+    const fiveDayMean = means.length >= 3
+      ? round1(means.reduce((sum, value) => sum + value, 0) / means.length)
+      : (current.temperature_2m != null ? round1(current.temperature_2m) : null);
+    const info: WeatherInfo = {
+      temp: fiveDayMean,
+      humidity: current.relative_humidity_2m != null
+        ? Math.round(Number(current.relative_humidity_2m)) : null,
+      rainfall: Number.isFinite(rain) ? round1(rain) : 0,
+      light: daylightHours(daily.sunrise?.[0], daily.sunset?.[0]),
+    };
+    if (info.temp != null) setTemp(info.temp);
+    if (info.humidity != null) setHumidity(info.humidity);
+    if (info.rainfall != null) setRainfall(info.rainfall);
+    if (info.light != null) setLight(info.light);
+    setWeatherInfo(info);
+    if (selectedRef.current) {
+      runMatch(selectedRef.current, [
+        info.temp ?? temp,
+        info.humidity ?? humidity,
+        info.rainfall ?? rainfall,
+        info.light ?? light,
+      ]);
+    }
+  };
+
+  const handleProvinceChange = async (value: string) => {
+    setProvinceCode(value);
+    setCityCode('');
+    setDistrictCode('');
+    setCities([]);
+    setDistricts([]);
+    setWeatherInfo(null);
+    setMatch(null);
+    setRegionError('');
+    if (!value) return;
+
+    const seq = ++regionSeq.current;
+    setRegionLoading(true);
+    try {
+      const options = await fetchRegionOptions(regionUrl(Number(value)));
+      if (seq !== regionSeq.current) return;
+      if (options.some((item) => item.level === 'city')) {
+        setCities(options);
+      } else {
+        // 直辖市：省下一级直接是区县
+        setDistricts(options);
+      }
+    } catch {
+      if (seq === regionSeq.current) setRegionError('该省份下级区划加载失败');
+    } finally {
+      if (seq === regionSeq.current) setRegionLoading(false);
+    }
+  };
+
+  const handleCityChange = async (value: string) => {
+    setCityCode(value);
+    setDistrictCode('');
+    setDistricts([]);
+    setWeatherInfo(null);
+    setMatch(null);
+    setRegionError('');
+    if (!value) return;
+
+    const seq = ++regionSeq.current;
+    setRegionLoading(true);
+    try {
+      const options = await fetchRegionOptions(regionUrl(Number(value)));
+      if (seq !== regionSeq.current) return;
+      setDistricts(options);
+    } catch {
+      if (seq === regionSeq.current) setRegionError('该城市区县数据加载失败');
+    } finally {
+      if (seq === regionSeq.current) setRegionLoading(false);
+    }
+  };
+
+  const handleDistrictChange = async (value: string) => {
+    setDistrictCode(value);
+    setRegionError('');
+    setWeatherInfo(null);
+    setMatch(null);
+    if (!value) return;
+
+    const district = districts.find((item) => String(item.adcode) === value);
+    if (!district) return;
+    const seq = ++regionSeq.current;
+    setWeatherLoading(true);
+    try {
+      const data = await weather.forecast(district.center[1], district.center[0]);
+      if (seq !== regionSeq.current) return;
+      applyForecast(data);
+    } catch (err) {
+      if (seq === regionSeq.current) {
+        setRegionError(errorMessage(err, '该区县气象获取失败，可手动填写'));
+      }
+    } finally {
+      if (seq === regionSeq.current) setWeatherLoading(false);
+    }
+  };
 
   const retryLoad = () => {
     setLoading(true);
@@ -273,8 +328,8 @@ export default function CropPage() {
     selectedRef.current = crop;
     setStages([]);
     setStageError('');
-    // 选中即用当前地块气象自动检测，省掉一次点击
-    runMatch(crop, [temp, humidity, rainfall, light]);
+    // 有区域气象时选中即自动检测；没有区域时等用户选完区县再自动跑
+    if (weatherInfo) runMatch(crop, [temp, humidity, rainfall, light]);
     try {
       const data = await crops.stages(crop.id);
       if (requestRef.current === requestId) {
@@ -352,41 +407,61 @@ export default function CropPage() {
   return (
     <div className="crop-page">
       <h2 className="page-title">🌱 播种适配</h2>
-      <p className="page-subtitle">按地块气象与作物播种界限温度，选择适合现在播种的作物</p>
+      <p className="page-subtitle">按所选区域的气象与作物播种界限温度，选择适合现在播种的作物</p>
 
-      {fieldList.length > 0 && (
-        <div className="glass crop-weather-bar">
-          <div className="crop-weather-source">
-            <span>📡 数据来源地块</span>
-            <select
-              value={fieldId}
-              onChange={(e) => {
-                setFieldId(e.target.value);
-                setWeatherLoading(true);
-              }}
-              aria-label="选择用于气象适配的地块"
-            >
-              {fieldList.map((field) => (
-                <option key={field.id} value={field.id}>{field.fieldName}</option>
-              ))}
-            </select>
-          </div>
-
-          {weatherLoading ? (
-            <span className="crop-weather-hint">正在读取地块气象…</span>
-          ) : weatherInfo ? (
-            <div className="crop-weather-chips">
-              <span>🌡 5日均温 {weatherInfo.temp ?? '--'}°C</span>
-              <span>💧 {weatherInfo.humidity ?? '--'}%</span>
-              <span>🌧 {weatherInfo.rainfall ?? '--'} mm</span>
-              <span>☀️ {weatherInfo.light ?? '--'} h</span>
-              <em>已作为默认值填入，可手动修改</em>
-            </div>
-          ) : (
-            <span className="crop-weather-hint">该地块暂未取到气象数据，可手动填写</span>
-          )}
+      <div className="glass crop-weather-bar">
+        <div className="crop-weather-source">
+          <span>📍 数据来源区域</span>
+          <select
+            value={provinceCode}
+            onChange={(e) => handleProvinceChange(e.target.value)}
+            aria-label="选择省份"
+          >
+            <option value="">省份</option>
+            {provinces.map((item) => (
+              <option key={item.adcode} value={item.adcode}>{item.name}</option>
+            ))}
+          </select>
+          <select
+            value={cityCode}
+            onChange={(e) => handleCityChange(e.target.value)}
+            disabled={cities.length === 0}
+            aria-label="选择城市"
+          >
+            <option value="">城市</option>
+            {cities.map((item) => (
+              <option key={item.adcode} value={item.adcode}>{item.name}</option>
+            ))}
+          </select>
+          <select
+            value={districtCode}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            disabled={districts.length === 0}
+            aria-label="选择区县"
+          >
+            <option value="">区 / 县</option>
+            {districts.map((item) => (
+              <option key={item.adcode} value={item.adcode}>{item.name}</option>
+            ))}
+          </select>
+          {regionLoading && <span className="crop-weather-hint">加载中…</span>}
         </div>
-      )}
+
+        {weatherLoading ? (
+          <span className="crop-weather-hint">正在按所选区域读取气象…</span>
+        ) : weatherInfo ? (
+          <div className="crop-weather-chips">
+            <span>🌡 5日均温 {weatherInfo.temp ?? '--'}°C</span>
+            <span>💧 {weatherInfo.humidity ?? '--'}%</span>
+            <span>🌧 {weatherInfo.rainfall ?? '--'} mm</span>
+            <span>☀️ {weatherInfo.light ?? '--'} h</span>
+            <em>已作为默认值填入，可手动修改</em>
+          </div>
+        ) : (
+          <span className="crop-weather-hint">请选择到区县，系统按该区域取气温、湿度、降水和日照</span>
+        )}
+        {regionError && <span className="crop-weather-hint">{regionError}</span>}
+      </div>
 
       <div className="grid-2col">
         <div className="glass section-card crop-picker">
@@ -468,7 +543,7 @@ export default function CropPage() {
         <div className="glass section-card match-card">
           <div className="match-card-head">
             <h3>播种条件检测</h3>
-            <span>{selected ? '已按地块气象自动检测，可调整后复检' : '先选择一种作物'}</span>
+            <span>{selected ? (weatherInfo ? '已按所选区域气象自动检测，可调整后复检' : '请先选择省份、城市和区县') : '先选择区域和作物'}</span>
           </div>
           <div className="match-form">
             <div className="match-grid">

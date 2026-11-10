@@ -11,13 +11,8 @@ import {
   SOIL_TYPES, IRRIGATION_TYPES, suggestSoil, suggestIrrigation,
 } from '../utils/farmlandDefaults';
 import { errorMessage } from '../utils/errorMessage';
-
-interface RegionOption {
-  name: string;
-  adcode: number;
-  center: [number, number];
-  level: string;
-}
+import { REGION_ROOT_URL, regionUrl, fetchRegionOptions } from '../utils/regions';
+import type { RegionOption } from '../utils/regions';
 
 /** 作物下拉项 */
 interface CropOption {
@@ -48,29 +43,6 @@ interface MapFarmland {
   lng?: number | null;
   boundary?: string | null;
   areaMu?: number | null;
-}
-
-const REGION_ROOT_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
-const regionUrl = (adcode: number) =>
-  `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
-
-async function fetchRegionOptions(url: string): Promise<RegionOption[]> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('行政区划数据加载失败');
-  const data = await response.json();
-  return (data.features || [])
-    .map((feature: any) => {
-      const props = feature.properties || {};
-      const center = props.center;
-      if (!Array.isArray(center) || center.length < 2) return null;
-      return {
-        name: props.name,
-        adcode: Number(props.adcode),
-        center: [Number(center[0]), Number(center[1])] as [number, number],
-        level: props.level || '',
-      };
-    })
-    .filter(Boolean) as RegionOption[];
 }
 
 const WEATHER_ICONS: Record<number, string> = {
