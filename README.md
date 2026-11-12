@@ -143,7 +143,7 @@ cd agri-weather-server && ./mvnw spring-boot:run
 cd weather-app-react && npm install && npm run dev
 ```
 
-未设置 `CORS_ORIGINS` 时后端默认放行 `http://localhost:*` 的任意端口，本地开发无需额外配置跨域。
+未设置 `CORS_ORIGINS` 时后端默认放行 `http://localhost:*` 和 `http://127.0.0.1:*` 的任意端口，本地开发无需额外配置跨域。
 
 前端检查：`npm run typecheck`（TypeScript）、`npm run lint`（ESLint）、`npm run e2e`（Playwright 冒烟测试，使用本机 Chrome，自动启动 Vite）。
 

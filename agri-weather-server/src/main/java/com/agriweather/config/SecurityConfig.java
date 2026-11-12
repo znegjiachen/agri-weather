@@ -40,7 +40,9 @@ public class SecurityConfig {
         if (corsOrigins != null && !corsOrigins.isBlank()) {
             allowedOrigins = List.of(corsOrigins.split(","));
         } else {
-            allowedOrigins = List.of("http://localhost:*");
+            // 本地开发常用 localhost 和 127.0.0.1 两种写法，浏览器会把 Origin 原样带上；
+            // 只放行 localhost 时，用 127.0.0.1 打开前端会收到 403 Invalid CORS request。
+            allowedOrigins = List.of("http://localhost:*", "http://127.0.0.1:*");
         }
 
         CorsConfiguration config = new CorsConfiguration();
