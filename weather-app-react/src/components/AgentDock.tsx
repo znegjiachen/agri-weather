@@ -774,6 +774,25 @@ export default function AgentDock({ defaultCollapsed = false }: { defaultCollaps
 
       {error && <div className="agent-dock-error">{error}</div>}
 
+      {voice.devices.length > 1 && (
+        <label className="voice-device">
+          <span>🎙 麦克风</span>
+          <select
+            value={voice.deviceId}
+            onChange={(e) => voice.setDeviceId(e.target.value)}
+            disabled={voice.recording || voice.processing}
+            aria-label="选择麦克风"
+          >
+            <option value="default">系统默认</option>
+            {voice.devices.map((device, index) => (
+              <option key={device.deviceId || index} value={device.deviceId}>
+                {device.label || `麦克风 ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {docAttachments.length > 0 && (
         <div className="agent-dock-doc-list">
           {docAttachments.map((doc) => (

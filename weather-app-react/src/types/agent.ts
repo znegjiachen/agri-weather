@@ -119,6 +119,10 @@ export interface VoiceInput {
   mode?: string | null;
   /** 录音时的实时音量（0–1），用于音量条和静音判断 */
   level: number;
+  /** 可用输入设备；标签需要授权后才有 */
+  devices: MediaDeviceInfo[];
+  deviceId: string;
+  setDeviceId: (id: string) => void;
   supported: boolean;
 }
 

@@ -9456,3 +9456,23 @@ body:has(.alerts-page) .subpage-bar { display: none; }
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
 }
+
+/* 麦克风选择：多设备时才出现，默认跟随系统 */
+.voice-device {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--text-2, #5b5875);
+}
+
+.voice-device select {
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(103, 126, 234, 0.28);
+  background: rgba(255, 255, 255, 0.7);
+  color: inherit;
+  font-size: 12px;
+}

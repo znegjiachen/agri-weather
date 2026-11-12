@@ -28,8 +28,13 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   const [processing, setProcessing] = useState(false);
   const [mode, setMode] = useState(null);
   const [level, setLevel] = useState(0);
+  const [devices, setDevices] = useState([]);
+  const [deviceId, setDeviceIdState] = useState(() => {
+    try { return localStorage.getItem('agri.micDeviceId') || 'default'; } catch { return 'default'; }
+  });
 
   const mediaRef = useRef(null);
+  const micLabelRef = useRef('');
   const recognitionRef = useRef(null);
   const browserTextRef = useRef('');
   const callbacksRef = useRef({ onText, onError });
@@ -51,6 +56,21 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   }, [onText, onError]);
 
   // 录音期间用 AnalyserNode 测音量：既做实时反馈，也用来识别「麦克风其实没收到声音」
+  const refreshDevices = useCallback(async () => {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      // 未授权时 label 为空，无法区分设备；授权后再次枚举才会有可读名称
+      setDevices(list.filter((item) => item.kind === 'audioinput' && item.label));
+    } catch {
+      // 没有权限时标签为空，等首次录音授权后再刷新
+    }
+  }, []);
+
+  const setDeviceId = useCallback((id) => {
+    setDeviceIdState(id);
+    try { localStorage.setItem('agri.micDeviceId', id); } catch { /* ignore */ }
+  }, []);
+
   const stopMeter = useCallback(() => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
@@ -131,7 +151,23 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
 
   const startBackend = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioConstraints = deviceId && deviceId !== 'default'
+        ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true }
+        : { echoCancellation: true, noiseSuppression: true };
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      } catch (err) {
+        // 保存的设备已被拔掉：回退到系统默认，避免一直录不到
+        if (deviceId && deviceId !== 'default' && err?.name === 'OverconstrainedError') {
+          setDeviceId('default');
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } else {
+          throw err;
+        }
+      }
+      micLabelRef.current = stream.getAudioTracks()[0]?.label || '系统默认设备';
+      refreshDevices();
       const recorder = new MediaRecorder(stream);
       const chunks = [];
 
@@ -152,8 +188,8 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         const peak = levelPeakRef.current;
         if (meterAvailableRef.current && peak < SILENCE_RMS) {
           callbacksRef.current.onError?.(
-            `麦克风没有采集到声音（音量峰值 ${peak.toFixed(4)}）。`
-            + '请检查系统输入设备是否选对、是否静音，或换一个麦克风后重试。',
+            `麦克风「${micLabelRef.current}」没有采集到声音（音量峰值 ${peak.toFixed(4)}）。`
+            + '请切换到正在使用的麦克风，或检查 Windows 输入设备是否静音。',
           );
           return;
         }
@@ -258,6 +294,9 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
     toggle,
     mode,
     level,
+    devices,
+    deviceId,
+    setDeviceId,
     supported: !!browserRecognition || (!!asrConfigured && recorderSupported),
   };
 }
