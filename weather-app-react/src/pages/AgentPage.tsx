@@ -882,6 +882,18 @@ export default function AgentPage() {
             {analyzing ? '识别中' : loading ? '…' : '发送'}
           </button>
         </div>
+        {voice.recording && (
+          <div className="voice-meter" role="status" aria-live="polite">
+            <span className="voice-meter-dot" />
+            <span>正在录音</span>
+            <span className="voice-meter-track">
+              <span
+                className="voice-meter-fill"
+                style={{ width: `${Math.max(4, Math.round(voice.level * 100))}%` }}
+              />
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

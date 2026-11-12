@@ -6,6 +6,9 @@ function getSpeechRecognition() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+// 音量峰值低于该值视为没采到人声；正常说话 RMS 一般在 0.01 以上
+const SILENCE_RMS = 0.003;
+
 const BROWSER_ASR_ERRORS = {
   'not-allowed': '麦克风权限被拒绝，请在浏览器地址栏允许访问麦克风',
   'service-not-allowed': '浏览器语音服务被禁用，请改用文字输入',
@@ -24,12 +27,17 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [mode, setMode] = useState(null);
+  const [level, setLevel] = useState(0);
 
   const mediaRef = useRef(null);
   const recognitionRef = useRef(null);
   const browserTextRef = useRef('');
   const callbacksRef = useRef({ onText, onError });
   const startedAtRef = useRef(0);
+  const levelPeakRef = useRef(0);
+  const meterAvailableRef = useRef(false);
+  const audioCtxRef = useRef(null);
+  const rafRef = useRef(0);
   // 离开页面时丢弃正在录的音，避免卸载后还在上传
   const cancelledRef = useRef(false);
   const browserRecognition = getSpeechRecognition();
@@ -41,6 +49,56 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   useEffect(() => {
     callbacksRef.current = { onText, onError };
   }, [onText, onError]);
+
+  // 录音期间用 AnalyserNode 测音量：既做实时反馈，也用来识别「麦克风其实没收到声音」
+  const stopMeter = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    if (ctx) {
+      try { ctx.close(); } catch { /* ignore */ }
+    }
+    setLevel(0);
+  }, []);
+
+  const startMeter = useCallback((stream) => {
+    levelPeakRef.current = 0;
+    meterAvailableRef.current = false;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    try {
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const buffer = new Float32Array(analyser.fftSize);
+      let lastPaint = 0;
+      audioCtxRef.current = ctx;
+      meterAvailableRef.current = true;
+
+      const tick = () => {
+        analyser.getFloatTimeDomainData(buffer);
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i += 1) sum += buffer[i] * buffer[i];
+        const rms = Math.sqrt(sum / buffer.length);
+        if (rms > levelPeakRef.current) levelPeakRef.current = rms;
+        const now = performance.now();
+        if (now - lastPaint > 100) {
+          lastPaint = now;
+          setLevel(Math.min(1, rms * 6));
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      // 拿不到 AudioContext 时不做静音判断，交给后端 ASR
+      meterAvailableRef.current = false;
+    }
+  }, []);
 
   const stop = useCallback(() => {
     const media = mediaRef.current;
@@ -66,9 +124,10 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         } catch { /* ignore */ }
         media.stream?.getTracks().forEach((track) => track.stop());
       }
+      stopMeter();
       try { recognitionRef.current?.abort?.(); } catch { /* ignore */ }
     };
-  }, []);
+  }, [stopMeter]);
 
   const startBackend = async () => {
     try {
@@ -82,11 +141,20 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         mediaRef.current = null;
+        stopMeter();
         if (cancelledRef.current) return;
         setRecording(false);
         const durationMs = Date.now() - startedAtRef.current;
         if (durationMs < 800) {
           callbacksRef.current.onError?.('录音时间太短，请说完再点结束');
+          return;
+        }
+        const peak = levelPeakRef.current;
+        if (meterAvailableRef.current && peak < SILENCE_RMS) {
+          callbacksRef.current.onError?.(
+            `麦克风没有采集到声音（音量峰值 ${peak.toFixed(4)}）。`
+            + '请检查系统输入设备是否选对、是否静音，或换一个麦克风后重试。',
+          );
           return;
         }
         if (chunks.length === 0) {
@@ -111,6 +179,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
       // 每 250ms 落一块，短录音也能拿到数据；避免快速停止时 chunks 为空
       recorder.start(250);
       startedAtRef.current = Date.now();
+      startMeter(stream);
       mediaRef.current = { stream, recorder };
       setMode('backend');
       setRecording(true);
@@ -188,6 +257,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
     processing,
     toggle,
     mode,
+    level,
     supported: !!browserRecognition || (!!asrConfigured && recorderSupported),
   };
 }

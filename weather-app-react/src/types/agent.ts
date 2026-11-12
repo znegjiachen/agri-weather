@@ -117,6 +117,8 @@ export interface VoiceInput {
   processing: boolean;
   toggle: () => void;
   mode?: string | null;
+  /** 录音时的实时音量（0–1），用于音量条和静音判断 */
+  level: number;
   supported: boolean;
 }
 

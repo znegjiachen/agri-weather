@@ -9407,3 +9407,52 @@ body:has(.alerts-page) .subpage-bar { display: none; }
   border-radius: 50%;
   display: block;
 }
+
+/* 语音录音音量条：录音时悬浮在输入区上方，实时显示麦克风电平 */
+.voice-meter {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(38, 32, 72, 0.82);
+  color: #fff;
+  font-size: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(38, 32, 72, 0.25);
+  pointer-events: none;
+}
+
+.voice-meter-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff5d5d;
+  animation: voicePulse 1s infinite;
+}
+
+.voice-meter-track {
+  width: 96px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.voice-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #7ee787, #ffd166, #ff7b72);
+  transition: width 0.1s linear;
+}
+
+@keyframes voicePulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

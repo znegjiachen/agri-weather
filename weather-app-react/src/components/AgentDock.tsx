@@ -901,6 +901,18 @@ export default function AgentDock({ defaultCollapsed = false }: { defaultCollaps
             </button>
           </div>
         </div>
+        {voice.recording && (
+          <div className="voice-meter" role="status" aria-live="polite">
+            <span className="voice-meter-dot" />
+            <span>正在录音</span>
+            <span className="voice-meter-track">
+              <span
+                className="voice-meter-fill"
+                style={{ width: `${Math.max(4, Math.round(voice.level * 100))}%` }}
+              />
+            </span>
+          </div>
+        )}
         <p className="agent-dock-disclaimer">内容由 AI 生成，仅供参考</p>
       </footer>
     </aside>
