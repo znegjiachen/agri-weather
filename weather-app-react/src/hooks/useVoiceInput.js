@@ -150,6 +150,8 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   }, [stopMeter]);
 
   const startBackend = async () => {
+    // 开始新一次录音时先清掉上一次的报错，避免成功后旧提示还挂着
+    callbacksRef.current.onError?.('');
     try {
       const audioConstraints = deviceId && deviceId !== 'default'
         ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true }
@@ -203,8 +205,12 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
           const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
           const data = await agentApi.transcribe(blob);
           const text = (data?.text || '').trim();
-          if (text) callbacksRef.current.onText?.(text);
-          else callbacksRef.current.onError?.('没有识别到语音内容，请再说一次');
+          if (text) {
+            callbacksRef.current.onError?.('');
+            callbacksRef.current.onText?.(text);
+          } else {
+            callbacksRef.current.onError?.('没有识别到语音内容，请再说一次');
+          }
         } catch (e) {
           callbacksRef.current.onError?.(e.message || '语音识别失败');
         } finally {
@@ -226,6 +232,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
 
   const startBrowser = () => {
     if (!browserRecognition) return;
+    callbacksRef.current.onError?.('');
     try {
       const recognition = new browserRecognition();
       recognition.lang = 'zh-CN';
@@ -259,7 +266,10 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         const text = browserTextRef.current.trim();
         browserTextRef.current = '';
         setRecording(false);
-        if (text) callbacksRef.current.onText?.(text);
+        if (text) {
+          callbacksRef.current.onError?.('');
+          callbacksRef.current.onText?.(text);
+        }
       };
       recognitionRef.current = recognition;
       setMode('browser');
