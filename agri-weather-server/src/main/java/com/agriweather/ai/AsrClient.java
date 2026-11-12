@@ -79,7 +79,10 @@ public class AsrClient {
             JsonNode root = mapper.readTree(response.body());
             String text = root.path("text").asText("").trim();
             if (text.isEmpty()) {
-                throw new AsrException("语音识别没有返回文字");
+                // 200 但空文本，多数是录到了静音或录音过短；留下音频信息便于排查
+                log.warn("ASR 返回空文本：bytes={}, filename={}, contentType={}, response={}",
+                        audio.length, filename, contentType, truncate(response.body(), 500));
+                throw new AsrException("没有识别到语音内容，请确认麦克风未被静音，靠近麦克风再说一次");
             }
             return text;
         } catch (AsrException e) {

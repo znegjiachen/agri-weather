@@ -29,6 +29,7 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
   const recognitionRef = useRef(null);
   const browserTextRef = useRef('');
   const callbacksRef = useRef({ onText, onError });
+  const startedAtRef = useRef(0);
   // 离开页面时丢弃正在录的音，避免卸载后还在上传
   const cancelledRef = useRef(false);
   const browserRecognition = getSpeechRecognition();
@@ -83,7 +84,15 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         mediaRef.current = null;
         if (cancelledRef.current) return;
         setRecording(false);
-        if (chunks.length === 0) return;
+        const durationMs = Date.now() - startedAtRef.current;
+        if (durationMs < 800) {
+          callbacksRef.current.onError?.('录音时间太短，请说完再点结束');
+          return;
+        }
+        if (chunks.length === 0) {
+          callbacksRef.current.onError?.('没有录到声音，请检查麦克风是否被静音');
+          return;
+        }
 
         setProcessing(true);
         try {
@@ -99,7 +108,9 @@ export function useVoiceInput({ asrConfigured, onText, onError }) {
         }
       };
 
-      recorder.start();
+      // 每 250ms 落一块，短录音也能拿到数据；避免快速停止时 chunks 为空
+      recorder.start(250);
+      startedAtRef.current = Date.now();
       mediaRef.current = { stream, recorder };
       setMode('backend');
       setRecording(true);
