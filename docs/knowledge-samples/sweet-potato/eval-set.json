@@ -1,0 +1,13 @@
+{
+  "note": "检索评测用，不用于上传；把 sweet-potato 目录下的 6 份资料上传到同一智能体后，调用 POST /api/agents/{id}/knowledge/eval",
+  "cases": [
+    { "question": "红薯黑斑病怎么防治？", "expectedKeywords": ["黑斑病", "种薯", "高剪苗"] },
+    { "question": "红薯什么时候收获？", "expectedKeywords": ["收获", "15℃", "霜"] },
+    { "question": "红薯膨大期怎么施肥？", "expectedKeywords": ["膨大", "裂缝肥", "硫酸钾"] },
+    { "question": "红薯栽插密度多少合适？", "expectedKeywords": ["密度", "3000", "株"] },
+    { "question": "烟薯25适合做什么？", "expectedKeywords": ["烟薯", "鲜食", "烘烤"] },
+    { "question": "红薯窖藏温度多少？", "expectedKeywords": ["窖藏", "12", "温度"] },
+    { "question": "红薯茎线虫病怎么识别？", "expectedKeywords": ["茎线虫", "糠心", "龟裂"] },
+    { "question": "红薯有哪些生长阶段？", "expectedKeywords": ["缓苗", "结薯", "膨大"] }
+  ]
+}
