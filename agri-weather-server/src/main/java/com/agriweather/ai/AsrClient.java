@@ -71,7 +71,30 @@ public class AsrClient {
                 .build();
 
         try {
-            HttpResponse<String> response = client().send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = null;
+            IOException lastError = null;
+            // 网络偶发 connection reset：短重试一次，避免用户白说一遍
+            for (int attempt = 0; attempt < 2; attempt += 1) {
+                try {
+                    response = client().send(request, HttpResponse.BodyHandlers.ofString());
+                    lastError = null;
+                    break;
+                } catch (IOException e) {
+                    lastError = e;
+                    log.warn("ASR 请求失败（第 {} 次）：{}", attempt + 1, e.toString());
+                    if (attempt == 0) {
+                        try {
+                            Thread.sleep(300);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+            }
+            if (response == null) {
+                throw new AsrException("语音识别网络连接失败，请重试", lastError);
+            }
             if (response.statusCode() != 200) {
                 throw new AsrException("语音识别服务返回 HTTP " + response.statusCode()
                         + "：" + truncate(response.body(), 300));
@@ -103,7 +126,10 @@ public class AsrClient {
         if (current == null) {
             synchronized (this) {
                 if (http == null) {
+                    // 默认优先 HTTP/2，但该网络对 api.siliconflow.cn 的 HTTP/2 连接会偶发 reset；
+                    // 强制 HTTP/1.1 后与 curl 行为一致，稳定得多。
                     http = HttpClient.newBuilder()
+                            .version(HttpClient.Version.HTTP_1_1)
                             .connectTimeout(Duration.ofSeconds(10))
                             .build();
                 }
